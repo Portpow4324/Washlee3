@@ -90,17 +90,25 @@ export async function POST(request: NextRequest) {
       console.log('[ORDERS-API] ✓ Order created successfully:', orderId)
       
       return NextResponse.json({
-      success: true,
-      orderId,
-      message: 'Order created successfully'
-    }, { status: 201 })
+        success: true,
+        orderId,
+        message: 'Order created successfully'
+      }, { status: 201 })
+    } catch (dbError: any) {
+      const errorMsg = dbError.message || 'Unknown error'
+      console.error('[ORDERS-API] Database Error:', errorMsg, dbError)
 
+      return NextResponse.json(
+        { error: `Failed to create order: ${errorMsg}` },
+        { status: 500 }
+      )
+    }
   } catch (error: any) {
     const errorMsg = error.message || 'Unknown error'
     console.error('[ORDERS-API] Error:', errorMsg, error)
 
     return NextResponse.json(
-      { error: `Failed to create order: ${errorMsg}` },
+      { error: `Failed to process request: ${errorMsg}` },
       { status: 500 }
     )
   }

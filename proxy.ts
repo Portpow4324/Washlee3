@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 /**
  * NextJS Middleware for route protection
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // Get the pathname from the request
   const pathname = request.nextUrl.pathname
 
