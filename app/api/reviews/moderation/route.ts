@@ -13,10 +13,11 @@ import { db } from '@/lib/firebase'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const reviewId = params.id
+    const { id } = await params
+    const reviewId = id
     const body = await request.json()
     const { action } = body
 
@@ -93,10 +94,11 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const reviewId = params.id
+    const { id } = await params
+    const reviewId = id
     const reviewRef = doc(db, 'reviews', reviewId)
 
     await deleteDoc(reviewRef)

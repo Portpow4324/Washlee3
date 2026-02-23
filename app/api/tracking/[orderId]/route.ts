@@ -85,9 +85,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 // PATCH /api/tracking/[orderId] - Update tracking status (Pro only)
-export async function PATCH(request: NextRequest, { params }: { params: { orderId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   try {
-    const orderId = params.orderId
+    const { orderId } = await params
     const { status, location, eta, message } = await request.json()
 
     if (!status) {
