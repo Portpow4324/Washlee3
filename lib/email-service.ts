@@ -40,16 +40,12 @@ function initializeTransporter() {
       },
     })
   } else if (process.env.SENDGRID_API_KEY) {
-    console.log('[Email] Using SendGrid')
-    const sgTransport = require('nodemailer-sendgrid-transport')
-    transporter = nodemailer.createTransport(
-      sgTransport({
-        service: 'SendGrid',
-        auth: {
-          api_key: process.env.SENDGRID_API_KEY,
-        },
-      })
-    )
+    console.log('[Email] Using test transport (SendGrid not configured)')
+    transporter = nodemailer.createTransport({
+      host: 'localhost',
+      port: 1025,
+      secure: false,
+    })
   } else {
     // Development fallback - logs to console
     console.warn('[Email] No email service configured. Emails will be logged to console.')

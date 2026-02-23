@@ -80,11 +80,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-  } catch (error) {
-    console.error('Error rejecting inquiry:', error)
-    return NextResponse.json(
-      { error: 'Failed to reject inquiry' },
-      { status: 500 }
-    )
-  }
-}

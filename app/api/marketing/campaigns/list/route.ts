@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { admin } from '@/lib/firebase-admin'
+import { db } from '@/lib/firebase'
 
 export async function GET(request: NextRequest) {
   try {
-    const db = admin.firestore()
     
     // Get all email campaigns, sorted by creation date (newest first)
     const campaignsSnapshot = await db
