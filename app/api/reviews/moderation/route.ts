@@ -12,16 +12,20 @@ import {
 import { db } from '@/lib/firebase'
 
 export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest
 ) {
   try {
-    const { id } = await params
-    const reviewId = id
     const body = await request.json()
-    const { action } = body
+    const { id, action } = body
 
-    const reviewRef = doc(db, 'reviews', reviewId)
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Review ID required' },
+        { status: 400 }
+      )
+    }
+
+    const reviewRef = doc(db, 'reviews', id)
 
     switch (action) {
       case 'approve': {
@@ -93,13 +97,20 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest
 ) {
   try {
-    const { id } = await params
-    const reviewId = id
-    const reviewRef = doc(db, 'reviews', reviewId)
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Review ID required' },
+        { status: 400 }
+      )
+    }
+
+    const reviewRef = doc(db, 'reviews', id)
 
     await deleteDoc(reviewRef)
 
