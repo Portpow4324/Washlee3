@@ -12,9 +12,9 @@ export interface TrackingUpdate {
 }
 
 // GET /api/tracking/[orderId] - Get real-time order status and tracking info
-export async function GET(request: NextRequest, { params }: { params: { orderId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   try {
-    const orderId = params.orderId
+    const { orderId } = await params
 
     if (!orderId) {
       return NextResponse.json({ error: 'Order ID required' }, { status: 400 })

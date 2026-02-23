@@ -7,10 +7,10 @@ import * as admin from 'firebase-admin'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { uid: string } }
+  { params }: { params: Promise<{ uid: string }> }
 ) {
   try {
-    const uid = params.uid
+    const { uid } = await params
     console.log('[API] GET /api/orders/user/' + uid)
 
     if (!uid) {
