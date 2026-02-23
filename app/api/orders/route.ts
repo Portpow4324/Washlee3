@@ -3,20 +3,31 @@ import admin from 'firebase-admin'
 
 // Initialize Firebase Admin if not already done
 if (!admin.apps.length) {
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY
+  if (!privateKey) {
+    console.error('[ORDERS-API] FIREBASE_PRIVATE_KEY is missing!')
+  }
+  
   const serviceAccount = {
     projectId: process.env.FIREBASE_PROJECT_ID || 'washlee-7d3c6',
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL || 'firebase-adminsdk-fbsvc@washlee-7d3c6.iam.gserviceaccount.com',
-    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    privateKey: privateKey?.replace(/\\n/g, '\n'),
   }
 
   try {
+    console.log('[ORDERS-API] Initializing Firebase Admin SDK...')
+    console.log('[ORDERS-API] Project ID:', serviceAccount.projectId)
+    console.log('[ORDERS-API] Client Email:', serviceAccount.clientEmail)
+    
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
       projectId: serviceAccount.projectId,
     })
+    console.log('[ORDERS-API] Firebase Admin SDK initialized successfully')
   } catch (error: any) {
     if (!error.message.includes('already exists')) {
       console.error('[ORDERS-API] Firebase init error:', error.message)
+      console.error('[ORDERS-API] Full error:', error)
     }
   }
 }
@@ -30,20 +41,36 @@ const db = admin.firestore()
  */
 export async function POST(request: NextRequest) {
   try {
+    console.log('[ORDERS-API] POST request received')
+    
     const body = await request.json()
-    const { userId, customerName, customerEmail, customerPhone, bookingData, orderTotal } = body
+    console.log('[ORDERS-API] Request body received:', { 
+      uid: body.uid,
+      customerEmail: body.customerEmail,
+      orderTotal: body.orderTotal,
+      bookingData: body.bookingData ? 'present' : 'missing'
+    })
+    
+    const { uid, userId, customerName, customerEmail, customerPhone, bookingData, orderTotal } = body
 
-    if (!userId || !orderTotal || !bookingData) {
+    // Support both uid and userId for backward compatibility, but store as uid
+    const finalUid = uid || userId
+    
+    console.log('[ORDERS-API] Final UID:', finalUid)
+    
+    if (!finalUid || !orderTotal || !bookingData) {
+      console.log('[ORDERS-API] Validation failed:', { finalUid: !!finalUid, orderTotal: !!orderTotal, bookingData: !!bookingData })
       return NextResponse.json(
-        { error: 'Missing required fields: userId, orderTotal, bookingData' },
+        { error: 'Missing required fields: uid or userId, orderTotal, bookingData' },
         { status: 400 }
       )
     }
 
-    console.log('[ORDERS-API] Creating order for user:', userId)
+    console.log('[ORDERS-API] Creating order for user:', finalUid)
 
     const orderData = {
-      userId,
+      uid: finalUid,
+      email: customerEmail,
       customerName: customerName || 'Customer',
       customerEmail,
       customerPhone: customerPhone || '',
@@ -84,10 +111,15 @@ export async function POST(request: NextRequest) {
     // Create order in Firestore with proper error handling
     let orderId: string
     try {
+      console.log('[ORDERS-API] Getting orders collection reference...')
       const ordersRef = db.collection('orders')
+      console.log('[ORDERS-API] Orders collection reference obtained')
+      
+      console.log('[ORDERS-API] Adding document to Firestore...')
       const docRef = await ordersRef.add(orderData)
       orderId = docRef.id
       console.log('[ORDERS-API] ✓ Order created successfully:', orderId)
+      console.log('[ORDERS-API] Order stored with uid:', finalUid)
       
       return NextResponse.json({
         success: true,
@@ -96,7 +128,9 @@ export async function POST(request: NextRequest) {
       }, { status: 201 })
     } catch (dbError: any) {
       const errorMsg = dbError.message || 'Unknown error'
-      console.error('[ORDERS-API] Database Error:', errorMsg, dbError)
+      console.error('[ORDERS-API] Database Error:', errorMsg)
+      console.error('[ORDERS-API] Error code:', dbError.code)
+      console.error('[ORDERS-API] Full error object:', dbError)
 
       return NextResponse.json(
         { error: `Failed to create order: ${errorMsg}` },
@@ -105,7 +139,9 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
     const errorMsg = error.message || 'Unknown error'
-    console.error('[ORDERS-API] Error:', errorMsg, error)
+    console.error('[ORDERS-API] Outer Error:', errorMsg)
+    console.error('[ORDERS-API] Error stack:', error.stack)
+    console.error('[ORDERS-API] Full error:', error)
 
     return NextResponse.json(
       { error: `Failed to process request: ${errorMsg}` },

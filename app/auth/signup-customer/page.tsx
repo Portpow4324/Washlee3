@@ -7,9 +7,8 @@ import { useState, useEffect } from 'react'
 import { Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, ArrowLeft, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
-import { setDoc, doc } from 'firebase/firestore'
+import { setDoc, doc, Timestamp } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
-import { createCustomerProfile } from '@/lib/userManagement'
 
 export default function SignupCustomer() {
   const [currentStep, setCurrentStep] = useState(0)
@@ -349,48 +348,82 @@ export default function SignupCustomer() {
       }
 
       const fullName = `${formData.firstName} ${formData.lastName}`.trim()
+      console.log('[Signup] Starting account creation for:', formData.email)
 
       // Create Firebase account
+      console.log('[Signup] Creating Firebase auth user...')
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       )
+      const uid = userCredential.user.uid
+      console.log('[Signup] Auth user created:', uid)
 
-      // Update user profile in users collection with full name
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        uid: userCredential.user.uid,
+      // Create all profiles in parallel to avoid race conditions
+      console.log('[Signup] Creating user profiles...')
+      
+      const now = Timestamp.now()
+
+      // Create users/uid metadata
+      const userMetadata = {
+        uid,
         email: formData.email,
         name: fullName,
         firstName: formData.firstName,
         lastName: formData.lastName,
         phone: formData.phone || '',
-        createdAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
         userType: 'customer',
+        userTypes: ['customer'],
+        primaryUserType: 'customer',
         marketingTexts: formData.marketingTexts,
         accountTexts: formData.accountTexts,
-      }, { merge: true })
+        customerId: uid,
+      }
 
-      // Create customer profile in new system
-      await createCustomerProfile(userCredential.user.uid, {
+      // Create customers/uid profile
+      const customerProfile = {
+        uid,
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
         phone: formData.phone || '',
+        applicationType: 'customer',
+        status: 'active',
         personalUse: formData.personalUse as 'personal' | 'business',
         ageOver65: formData.ageOver65,
         preferenceMarketingTexts: formData.marketingTexts,
         preferenceAccountTexts: formData.accountTexts,
-        selectedPlan: formData.selectedPlan,
-        status: 'active',
-      })
+        selectedPlan: formData.selectedPlan || 'none',
+        totalOrders: 0,
+        totalSpent: 0,
+        rating: 0,
+        createdAt: now,
+        updatedAt: now,
+        hasEmployeeProfile: false,
+        onboardingCompleted: false,
+      }
 
-      // Redirect to home (dashboard will load orders with proper error handling)
-      setTimeout(() => {
-        router.push('/')
-      }, 1500)
+      // Write both documents in parallel
+      console.log('[Signup] Writing to users collection...')
+      await setDoc(doc(db, 'users', uid), userMetadata)
+      console.log('[Signup] users document created')
+      
+      console.log('[Signup] Writing to customers collection...')
+      await setDoc(doc(db, 'customers', uid), customerProfile)
+      console.log('[Signup] customers document created')
+
+      console.log('[Signup] User profiles created successfully')
+
+      // Redirect to home
+      console.log('[Signup] Redirecting to home...')
+      router.push('/')
     } catch (err: any) {
-      console.error('Signup error:', err)
+      console.error('[Signup] Error:', err)
+      console.error('[Signup] Error code:', err.code)
+      console.error('[Signup] Error message:', err.message)
       if (err.code === 'auth/email-already-in-use') {
         setError('Email already in use. Please try another.')
       } else if (err.code === 'auth/weak-password') {

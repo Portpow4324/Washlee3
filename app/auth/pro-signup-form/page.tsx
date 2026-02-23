@@ -3,8 +3,9 @@
 import Button from '@/components/Button'
 import Spinner from '@/components/Spinner'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { Mail, Lock, User, Phone, MapPin, CheckCircle, ArrowLeft, Upload, Eye, EyeOff, HelpCircle, Home, AlertCircle, X } from 'lucide-react'
+import { Mail, Lock, User, Phone, MapPin, CheckCircle, ArrowLeft, Upload, Eye, EyeOff, HelpCircle, AlertCircle, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
 import { setDoc, doc, getDoc, updateDoc } from 'firebase/firestore'
@@ -56,6 +57,13 @@ export default function ProSignupForm() {
       sunday: false,
     },
     comments: '',
+    // Inquiry form fields
+    hasWorkRight: null as boolean | null,
+    hasValidLicense: null as boolean | null,
+    hasTransport: null as boolean | null,
+    hasEquipment: null as boolean | null,
+    ageVerified: null as boolean | null,
+    skillsAssessment: '',
   })
 
   // Password validation helpers
@@ -131,6 +139,16 @@ export default function ProSignupForm() {
         return true
       case 5: // Availability and details - optional fields so always true
         return true
+      case 6: // Australian Workplace Verification
+        return (
+          formData.hasWorkRight === true &&
+          formData.hasValidLicense === true &&
+          formData.hasTransport === true &&
+          formData.hasEquipment === true &&
+          formData.ageVerified === true
+        )
+      case 7: // Skills Assessment
+        return formData.skillsAssessment.trim().length >= 50
       default:
         return false
     }
@@ -159,15 +177,116 @@ export default function ProSignupForm() {
     } else if (currentStep === 4) {
       // Auto-pass intro step
       setCurrentStep(currentStep + 1)
+    } else if (currentStep === 5) {
+      // Availability step - just move forward
+      setCurrentStep(currentStep + 1)
     } else if (isStepValid()) {
-      if (currentStep < 5) {
+      if (currentStep < steps.length - 1) {
         setCurrentStep(currentStep + 1)
       } else {
-        // Final submission
-        await handleFinalSubmission()
+        // Final submission - create inquiry
+        await handleSubmitInquiry()
       }
     } else {
       setError('Please complete this step')
+    }
+  }
+
+  const handleSubmitInquiry = async () => {
+    setError('')
+    setIsLoading(true)
+
+    try {
+      const currentUser = auth.currentUser
+      console.log('[Form] Current user:', currentUser?.uid)
+      if (!currentUser) throw new Error('User not found. Please log in again.')
+
+      // If form fields are empty, try to fetch from customer profile
+      let firstName = formData.firstName
+      let lastName = formData.lastName
+      let email = formData.email
+      let phone = formData.phone
+      let state = formData.state
+
+      if (!firstName || !lastName || !email || !phone || !state) {
+        console.log('[Form] Form data incomplete, fetching from customer profile...')
+        try {
+          const customerData = await getCustomerProfile(currentUser.uid)
+          if (customerData) {
+            firstName = firstName || customerData.firstName || ''
+            lastName = lastName || customerData.lastName || ''
+            email = email || customerData.email || currentUser.email || ''
+            phone = phone || customerData.phone || ''
+            state = state || customerData.state || ''
+            console.log('[Form] Loaded customer data:', { firstName, lastName, email, phone, state })
+          }
+        } catch (err) {
+          console.log('[Form] Could not fetch customer profile:', err)
+        }
+      }
+
+      // Validate that all required fields are populated
+      const missingFields = []
+      if (!currentUser.uid) missingFields.push('userId')
+      if (!firstName?.trim()) missingFields.push('firstName')
+      if (!lastName?.trim()) missingFields.push('lastName')
+      if (!email?.trim()) missingFields.push('email')
+      if (!phone?.trim()) missingFields.push('phone')
+      if (!state?.trim()) missingFields.push('state')
+
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}. Please go back to step 1 and fill in your information.`)
+      }
+
+      const inquiryPayload = {
+        userId: currentUser.uid,
+        firstName,
+        lastName,
+        email,
+        phone,
+        state,
+        workVerification: {
+          hasWorkRight: formData.hasWorkRight,
+          hasValidLicense: formData.hasValidLicense,
+          hasTransport: formData.hasTransport,
+          hasEquipment: formData.hasEquipment,
+          ageVerified: formData.ageVerified,
+        },
+        skillsAssessment: formData.skillsAssessment,
+        availability: formData.availability,
+        comments: formData.comments,
+        createdAt: new Date().toISOString(),
+        status: 'pending', // 'pending', 'under-review', 'approved', 'rejected'
+      }
+
+      console.log('[Form] Inquiry payload:', inquiryPayload)
+
+      const inquiryResponse = await fetch('/api/inquiries/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inquiryPayload),
+      })
+
+      if (!inquiryResponse.ok) {
+        const errorData = await inquiryResponse.json().catch(() => ({}))
+        console.error('API Error Response:', {
+          status: inquiryResponse.status,
+          statusText: inquiryResponse.statusText,
+          data: errorData,
+        })
+        throw new Error(`API Error: ${inquiryResponse.status} - ${errorData.error || 'Unknown error'}`)
+      }
+
+      const responseData = await inquiryResponse.json()
+      console.log('Inquiry submitted successfully:', responseData)
+
+      // Move to success screen
+      setCurrentStep(steps.length)
+    } catch (err: any) {
+      console.error('Inquiry submission error:', err.message)
+      setError(err.message || 'Failed to submit application. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -673,10 +792,209 @@ export default function ProSignupForm() {
         </div>
       ),
     },
+    {
+      title: 'Australian Workplace Verification',
+      description: 'Legal requirements to work in Australia',
+      content: (
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-dark">Please confirm you meet all Australian workplace requirements</p>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-dark mb-3">
+                Do you have the right to work in Australia (Australian citizen, PR, or valid visa)?*
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, hasWorkRight: true })}
+                >
+                  <input
+                    type="radio"
+                    name="hasWorkRight"
+                    checked={formData.hasWorkRight === true}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">Yes</span>
+                </label>
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, hasWorkRight: false })}
+                >
+                  <input
+                    type="radio"
+                    name="hasWorkRight"
+                    checked={formData.hasWorkRight === false}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">No</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-dark mb-3">
+                Do you have a valid driver's license and are at least 18 years old?*
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, hasValidLicense: true })}
+                >
+                  <input
+                    type="radio"
+                    name="hasValidLicense"
+                    checked={formData.hasValidLicense === true}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">Yes</span>
+                </label>
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, hasValidLicense: false })}
+                >
+                  <input
+                    type="radio"
+                    name="hasValidLicense"
+                    checked={formData.hasValidLicense === false}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">No</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-dark mb-3">
+                Do you have reliable transportation for pickups and deliveries?*
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, hasTransport: true })}
+                >
+                  <input
+                    type="radio"
+                    name="hasTransport"
+                    checked={formData.hasTransport === true}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">Yes</span>
+                </label>
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, hasTransport: false })}
+                >
+                  <input
+                    type="radio"
+                    name="hasTransport"
+                    checked={formData.hasTransport === false}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">No</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-dark mb-3">
+                Do you have access to laundry equipment (washing machines, dryers)?*
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, hasEquipment: true })}
+                >
+                  <input
+                    type="radio"
+                    name="hasEquipment"
+                    checked={formData.hasEquipment === true}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">Yes</span>
+                </label>
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, hasEquipment: false })}
+                >
+                  <input
+                    type="radio"
+                    name="hasEquipment"
+                    checked={formData.hasEquipment === false}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">No</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-dark mb-3">
+                I confirm that all information provided is true and accurate*
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, ageVerified: true })}
+                >
+                  <input
+                    type="radio"
+                    name="ageVerified"
+                    checked={formData.ageVerified === true}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">I Confirm</span>
+                </label>
+                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                  onClick={() => setFormData({ ...formData, ageVerified: false })}
+                >
+                  <input
+                    type="radio"
+                    name="ageVerified"
+                    checked={formData.ageVerified === false}
+                    onChange={() => {}}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-dark font-medium">I Do Not Confirm</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: 'Skills & Experience Assessment',
+      description: 'Tell us about your laundry service skills',
+      content: (
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-semibold text-dark mb-2">
+              What laundry service skills and experience do you have?*
+            </label>
+            <p className="text-sm text-gray mb-4">
+              Describe your experience with professional laundry services, garment care, stain removal, or any relevant skills.
+            </p>
+            <textarea
+              name="skillsAssessment"
+              value={formData.skillsAssessment}
+              onChange={handleChange}
+              placeholder="e.g., 5 years experience in dry cleaning, expert in stain removal, trained in delicate fabric care, etc."
+              rows={6}
+              className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              required
+            />
+            <p className="text-xs text-gray mt-2">Minimum 50 characters required</p>
+          </div>
+        </div>
+      ),
+    },
   ]
 
   // Success screen
-  if (currentStep === 6) {
+  if (currentStep === steps.length) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
@@ -704,11 +1022,15 @@ export default function ProSignupForm() {
       {/* Header */}
       <header className="bg-white/80 backdrop-blur border-b border-gray/20 py-4 px-4">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          {/* Brand Name - Clickable to Home */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="bg-primary rounded-lg p-2">
-              <Home size={20} className="text-white" />
-            </div>
+          {/* Logo - Clickable to Home */}
+          <Link href="/" className="flex items-center gap-2 group hover:opacity-80 transition">
+            <Image
+              src="/logo-washlee.png"
+              alt="Washlee"
+              width={40}
+              height={40}
+              className="w-10 h-10"
+            />
             <span className="text-xl font-bold text-dark group-hover:text-primary transition">Washlee</span>
           </Link>
 

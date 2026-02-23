@@ -88,11 +88,6 @@ export default function Footer() {
             <h3 className="font-bold mb-4">Resources</h3>
             <ul className="space-y-2 text-sm text-gray">
               <li>
-                <Link href="/gift-cards" className="hover:text-primary transition">
-                  Gift Cards
-                </Link>
-              </li>
-              <li>
                 <Link href="/corporate" className="hover:text-primary transition">
                   Corporate Services
                 </Link>
@@ -163,17 +158,6 @@ export default function Footer() {
         <div className="border-t border-gray pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center text-sm text-gray">
             <p>&copy; 2026 Washlee. All rights reserved.</p>
-            <div className="flex gap-6 mt-4 md:mt-0">
-              <Link href="/privacy-policy" className="hover:text-primary transition">
-                Privacy Policy
-              </Link>
-              <Link href="/terms-of-service" className="hover:text-primary transition">
-                Terms of Service
-              </Link>
-              <Link href="/cookie-policy" className="hover:text-primary transition">
-                Cookie Policy
-              </Link>
-            </div>
           </div>
         </div>
       </div>

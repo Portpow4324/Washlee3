@@ -9,9 +9,6 @@ export function proxy(request: NextRequest) {
 
   // Protected routes - require authentication
   const protectedRoutes = [
-    '/privacy-policy',
-    '/terms-of-service',
-    '/cookie-policy',
     '/dashboard/customer',
     '/dashboard/pro',
   ]
@@ -34,9 +31,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/privacy-policy/:path*',
-    '/terms-of-service/:path*',
-    '/cookie-policy/:path*',
     '/dashboard/:path*',
   ],
 }

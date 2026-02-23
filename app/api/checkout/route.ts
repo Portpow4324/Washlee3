@@ -10,7 +10,7 @@ const Stripe = require('stripe')
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { orderId, orderTotal, customerEmail, customerName, bookingDetails } = body
+    const { orderId, orderTotal, customerEmail, customerName, bookingData, uid } = body
 
     if (!orderId || !orderTotal || !customerEmail) {
       console.error('[CHECKOUT-API] Missing fields:', { orderId, orderTotal, customerEmail })
@@ -19,6 +19,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Log received data
+    console.log('[CHECKOUT-API] Received:', { orderId, orderTotal, customerEmail, uid, hasBookingData: !!bookingData })
 
     // Validate minimum purchase amount ($24)
     if (orderTotal < 24) {
@@ -56,7 +59,7 @@ export async function POST(request: NextRequest) {
           currency: 'aud',
           product_data: {
             name: 'Laundry Service',
-            description: `${bookingDetails?.weight || '5'} kg wash & fold service`,
+            description: `${bookingData?.estimatedWeight || '5'} kg wash & fold service`,
             images: [], // Can add your logo URL here
           },
           unit_amount: laundryAmount,
@@ -81,15 +84,34 @@ export async function POST(request: NextRequest) {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${baseUrl}/payment-success?orderId=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/booking?paymentStatus=cancelled&orderId=${orderId}`,
       customer_email: customerEmail,
       metadata: {
         orderId,
         customerName,
         customerEmail,
+        uid: uid || '', // Firebase user ID - critical for webhook
         laundryAmount: String(laundryAmount / 100),
         deliveryAmount: String(adjustedDeliveryAmount / 100),
+        // Store booking data as JSON strings (metadata only accepts strings)
+        estimatedWeight: bookingData?.estimatedWeight || '5',
+        deliverySpeed: bookingData?.deliverySpeed || 'standard',
+        pickupTime: bookingData?.pickupTime || 'soon',
+        scheduleDate: bookingData?.scheduleDate || '',
+        scheduleTime: bookingData?.scheduleTime || '',
+        detergent: bookingData?.detergent || 'eco-friendly',
+        waterTemp: bookingData?.waterTemp || 'warm',
+        foldingPreference: bookingData?.foldingPreference || 'folded',
+        specialCare: bookingData?.specialCare || '',
+        deliveryAddressLine1: bookingData?.deliveryAddressLine1 || '',
+        deliveryAddressLine2: bookingData?.deliveryAddressLine2 || '',
+        deliveryCity: bookingData?.deliveryCity || '',
+        deliveryState: bookingData?.deliveryState || '',
+        deliveryPostcode: bookingData?.deliveryPostcode || '',
+        deliveryNotes: bookingData?.deliveryNotes || '',
+        // Add-ons as JSON string
+        addOnsJson: JSON.stringify(bookingData?.addOns || {}),
       },
     })
 

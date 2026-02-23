@@ -4,9 +4,18 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { Lock, Users, Briefcase, LogOut, Eye, EyeOff, ShoppingCart, BarChart3, TrendingUp, AlertCircle, Search, Filter, Download, ChevronDown, CheckCircle, AlertTriangle, Clock, Zap, Globe, Bell } from 'lucide-react'
+import { Lock, Users, Briefcase, LogOut, Eye, EyeOff, ShoppingCart, BarChart3, TrendingUp, AlertCircle, Search, Filter, Download, ChevronDown, CheckCircle, AlertTriangle, Clock, Zap, Globe, Bell, RefreshCw } from 'lucide-react'
 import { db, auth } from '@/lib/firebase'
 import { collection, getDocs, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore'
+import { 
+  getPendingPaymentUsers, 
+  getActiveSubscriptionUsers, 
+  getWashClubUsers, 
+  getEmployeeUsers, 
+  getCustomerOnlyUsers,
+  confirmPayment,
+  rejectPayment
+} from '@/lib/adminSortingService'
 
 interface EmployeeAccount {
   uid: string
@@ -93,6 +102,15 @@ export default function SecretAdminDashboard() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [sortBy, setSortBy] = useState('recent')
+
+  // Admin Sorting State
+  const [sortingView, setSortingView] = useState<'pending-payments' | 'subscriptions' | 'wash-club' | 'employees' | 'customers-only'>('pending-payments')
+  const [sortingData, setSortingData] = useState<any[]>([])
+  const [sortingLoading, setSortingLoading] = useState(false)
+  const [sortingError, setSortingError] = useState('')
+  const [sortingLastUpdated, setSortingLastUpdated] = useState<Date | null>(null)
+  const [confirmingUid, setConfirmingUid] = useState<string | null>(null)
+  const [rejectingUid, setRejectingUid] = useState<string | null>(null)
 
   // Filtered employees
   const filteredEmployees = employees
@@ -434,6 +452,69 @@ export default function SecretAdminDashboard() {
     setSelectedUsers(newSelected)
   }
 
+  // Admin Sorting Functions
+  const loadSortingData = async (view: 'pending-payments' | 'subscriptions' | 'wash-club' | 'employees' | 'customers-only') => {
+    setSortingLoading(true)
+    setSortingError('')
+    try {
+      let response
+      switch (view) {
+        case 'pending-payments':
+          response = await getPendingPaymentUsers()
+          break
+        case 'subscriptions':
+          response = await getActiveSubscriptionUsers()
+          break
+        case 'wash-club':
+          response = await getWashClubUsers()
+          break
+        case 'employees':
+          response = await getEmployeeUsers()
+          break
+        case 'customers-only':
+          response = await getCustomerOnlyUsers()
+          break
+      }
+      setSortingData(response?.users || [])
+      setSortingLastUpdated(new Date())
+    } catch (err) {
+      setSortingError(err instanceof Error ? err.message : 'Failed to load data')
+    } finally {
+      setSortingLoading(false)
+    }
+  }
+
+  const handleSortingViewChange = (view: 'pending-payments' | 'subscriptions' | 'wash-club' | 'employees' | 'customers-only') => {
+    setSortingView(view)
+    loadSortingData(view)
+  }
+
+  const handleConfirmPayment = async (uid: string) => {
+    setConfirmingUid(uid)
+    try {
+      await confirmPayment(uid)
+      // Reload data
+      loadSortingData(sortingView)
+    } catch (err) {
+      setSortingError(err instanceof Error ? err.message : 'Failed to confirm payment')
+    } finally {
+      setConfirmingUid(null)
+    }
+  }
+
+  const handleRejectPayment = async (uid: string) => {
+    setRejectingUid(uid)
+    try {
+      await rejectPayment(uid)
+      // Reload data
+      loadSortingData(sortingView)
+    } catch (err) {
+      setSortingError(err instanceof Error ? err.message : 'Failed to reject payment')
+    } finally {
+      setRejectingUid(null)
+    }
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#48C9B0] via-[#7FE3D3] to-[#48C9B0] flex items-center justify-center p-4 relative overflow-hidden">
@@ -489,10 +570,6 @@ export default function SecretAdminDashboard() {
                 Access Dashboard
               </Button>
             </form>
-
-            <p className="text-center text-sm text-gray-500 mt-6 pt-6 border-t border-gray-200">
-              Last access: {new Date().toLocaleDateString()}
-            </p>
           </Card>
         </div>
       </div>
@@ -1083,6 +1160,166 @@ export default function SecretAdminDashboard() {
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+
+            {/* Admin Sorting Section */}
+            <div className="bg-white rounded-2xl shadow-lg p-8 mt-8 border border-gray-200">
+              <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+                <div>
+                  <h2 className="text-3xl font-bold text-[#1f2d2b] mb-1">User Sorting & Sync</h2>
+                  <p className="text-gray-600 text-sm">Manage subscriptions, payments, and user categories</p>
+                </div>
+                
+                {/* Sync Button */}
+                <button
+                  onClick={() => loadSortingData(sortingView)}
+                  disabled={sortingLoading}
+                  className="px-6 py-2 bg-[#48C9B0] text-white rounded-lg hover:bg-[#3aad9a] transition font-medium flex items-center gap-2 disabled:opacity-50"
+                >
+                  <RefreshCw size={18} className={sortingLoading ? 'animate-spin' : ''} />
+                  {sortingLoading ? 'Syncing...' : 'Sync Now'}
+                </button>
+              </div>
+
+              {/* Error Message */}
+              {sortingError && (
+                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start gap-3">
+                  <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Error</p>
+                    <p className="text-sm">{sortingError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Sorting View Tabs */}
+              <div className="flex flex-wrap gap-2 mb-8">
+                {[
+                  { key: 'pending-payments', label: '⏳ Pending Payments', icon: Clock },
+                  { key: 'subscriptions', label: '✓ Active Subscriptions', icon: CheckCircle },
+                  { key: 'wash-club', label: '🧺 Wash Club', icon: Zap },
+                  { key: 'employees', label: '👔 Employees', icon: Briefcase },
+                  { key: 'customers-only', label: '👥 Customers Only', icon: Users },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => handleSortingViewChange(key as any)}
+                    className={`px-4 py-2 rounded-lg transition font-semibold text-sm flex items-center gap-2 ${
+                      sortingView === key
+                        ? 'bg-[#48C9B0] text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Users List */}
+              {sortingLoading ? (
+                <div className="text-center py-12">
+                  <Clock size={48} className="mx-auto text-[#48C9B0] mb-4 animate-spin" />
+                  <p className="text-gray-600 font-semibold">Loading users...</p>
+                </div>
+              ) : sortingData.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+                  <Users size={48} className="mx-auto text-gray-300 mb-4" />
+                  <p className="text-gray-500 font-semibold">No users found in this category</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-4 text-left font-semibold text-[#1f2d2b]">Email</th>
+                        <th className="px-6 py-4 text-left font-semibold text-[#1f2d2b]">User ID</th>
+                        <th className="px-6 py-4 text-left font-semibold text-[#1f2d2b]">Created</th>
+                        {sortingView === 'pending-payments' && (
+                          <>
+                            <th className="px-6 py-4 text-left font-semibold text-[#1f2d2b]">Plan</th>
+                            <th className="px-6 py-4 text-left font-semibold text-[#1f2d2b]">Status</th>
+                          </>
+                        )}
+                        {sortingView === 'subscriptions' && (
+                          <>
+                            <th className="px-6 py-4 text-left font-semibold text-[#1f2d2b]">Plan</th>
+                            <th className="px-6 py-4 text-left font-semibold text-[#1f2d2b]">Active</th>
+                          </>
+                        )}
+                        {sortingView === 'pending-payments' && (
+                          <th className="px-6 py-4 text-center font-semibold text-[#1f2d2b]">Actions</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortingData.map((user) => (
+                        <tr key={user.uid} className="border-t border-gray-200 hover:bg-gray-50 transition">
+                          <td className="px-6 py-4 font-semibold text-[#1f2d2b]">{user.email}</td>
+                          <td className="px-6 py-4 text-[#6b7b78] text-xs font-mono">{user.uid.slice(0, 12)}...</td>
+                          <td className="px-6 py-4 text-[#6b7b78] text-sm">
+                            {new Date(user.createdAt).toLocaleDateString()}
+                          </td>
+                          {sortingView === 'pending-payments' && (
+                            <>
+                              <td className="px-6 py-4 text-[#1f2d2b] font-semibold capitalize">
+                                {user.subscription?.plan || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                  user.subscription?.paymentStatus === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {user.subscription?.paymentStatus || 'N/A'}
+                                </span>
+                              </td>
+                            </>
+                          )}
+                          {sortingView === 'subscriptions' && (
+                            <>
+                              <td className="px-6 py-4 text-[#1f2d2b] font-semibold capitalize">
+                                {user.subscription?.plan || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                  user.subscription?.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {user.subscription?.active ? '✓ Active' : '✕ Inactive'}
+                                </span>
+                              </td>
+                            </>
+                          )}
+                          {sortingView === 'pending-payments' && (
+                            <td className="px-6 py-4 text-center space-x-2">
+                              <button
+                                onClick={() => handleConfirmPayment(user.uid)}
+                                disabled={confirmingUid === user.uid || rejectingUid === user.uid}
+                                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition text-xs font-semibold disabled:opacity-50"
+                              >
+                                {confirmingUid === user.uid ? 'Confirming...' : 'Confirm'}
+                              </button>
+                              <button
+                                onClick={() => handleRejectPayment(user.uid)}
+                                disabled={confirmingUid === user.uid || rejectingUid === user.uid}
+                                className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition text-xs font-semibold disabled:opacity-50"
+                              >
+                                {rejectingUid === user.uid ? 'Rejecting...' : 'Reject'}
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Last Updated */}
+              {sortingLastUpdated && (
+                <p className="text-xs text-gray-500 mt-4">
+                  Last synced: {sortingLastUpdated.toLocaleTimeString()} • Total: {sortingData.length} users
+                </p>
               )}
             </div>
           </div>

@@ -8,8 +8,6 @@ import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { Mail, Send, Calendar, Users, BarChart3, Plus, Edit2, Trash2 } from 'lucide-react'
-import { collection, query, orderBy, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
 import { getEmailTemplates } from '@/lib/sendgrid-email'
 
 interface Campaign {
@@ -21,8 +19,8 @@ interface Campaign {
   sentCount: number
   openCount: number
   clickCount: number
-  createdAt: Date
-  scheduledFor?: Date
+  createdAt: string
+  scheduledFor?: string
 }
 
 export default function EmailCampaignsPage() {
@@ -58,16 +56,17 @@ export default function EmailCampaignsPage() {
   const fetchCampaigns = async () => {
     try {
       setLoading(true)
-      const campaignsRef = collection(db, 'email_campaigns')
-      const q = query(campaignsRef, orderBy('createdAt', 'desc'))
-      const snapshot = await getDocs(q)
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate?.() || new Date(),
-        scheduledFor: doc.data().scheduledFor?.toDate?.(),
-      } as Campaign))
-      setCampaigns(data)
+      const response = await fetch('/api/marketing/campaigns/list')
+      if (!response.ok) throw new Error('Failed to load campaigns')
+      
+      const data = await response.json()
+      // Convert ISO strings back to Date objects for display
+      const campaigns = data.campaigns.map((c: any) => ({
+        ...c,
+        createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
+        scheduledFor: c.scheduledFor ? new Date(c.scheduledFor) : undefined,
+      }))
+      setCampaigns(campaigns)
       setLoading(false)
     } catch (error) {
       console.error('Error fetching campaigns:', error)
@@ -404,7 +403,7 @@ export default function EmailCampaignsPage() {
                         %
                       </td>
                       <td className="py-3 px-4 text-right text-gray text-sm">
-                        {campaign.createdAt.toLocaleDateString()}
+                        {new Date(campaign.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-4 text-center flex justify-center gap-2">
                         <button className="p-2 hover:bg-gray/20 rounded-lg transition">

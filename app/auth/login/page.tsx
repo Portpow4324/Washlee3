@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
+import { signInWithEmailAndPassword, sendPasswordResetEmail, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
 import { doc, getDoc } from 'firebase/firestore'
 
@@ -26,6 +26,40 @@ export default function Login() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [resetSuccessMessage, setResetSuccessMessage] = useState('')
+
+  const handleGoogleSignIn = async () => {
+    setError('')
+    setIsLoading(true)
+
+    try {
+      const provider = new GoogleAuthProvider()
+      const result = await signInWithPopup(auth, provider)
+      const user = result.user
+
+      // Show success message
+      setSuccessMessage(`✅ Welcome! Signing you in with Google...`)
+
+      // Redirect to specified location or home
+      setTimeout(() => {
+        if (redirectTo) {
+          router.push(redirectTo)
+        } else {
+          router.push('/')
+        }
+      }, 1500)
+    } catch (err: any) {
+      console.error('Google sign in error:', err)
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign in was cancelled')
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('Pop-up was blocked. Please allow pop-ups for this site.')
+      } else {
+        setError(err.message || 'Failed to sign in with Google')
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -291,7 +325,12 @@ export default function Login() {
               </div>
 
               {/* Google Login */}
-              <button className="w-full py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition flex items-center justify-center gap-3">
+              <button 
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                className="w-full py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
                     fill="currentColor"
@@ -310,7 +349,7 @@ export default function Login() {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                Sign in with Google
+                {isLoading ? 'Signing in...' : 'Sign in with Google'}
               </button>
             </>
           )}

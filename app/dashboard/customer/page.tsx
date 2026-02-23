@@ -11,7 +11,7 @@ import { Truck, MapPin, Clock, DollarSign, LogOut, Gift, FileText, Settings, Ale
 import Spinner from '@/components/Spinner'
 import { signOut } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc } from 'firebase/firestore'
 
 interface Order {
   id: string
@@ -87,24 +87,47 @@ export default function CustomerDashboard() {
       try {
         setOrdersLoading(true)
         setOrdersError('')
-        const ordersRef = collection(db, 'orders')
-        const q = query(ordersRef, where('userId', '==', user.uid))
-        const querySnapshot = await getDocs(q)
         
-        const fetchedOrders: Order[] = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        // Get auth token from user
+        const token = await user.getIdToken(true)
+        console.log('[Dashboard] Fetching orders with auth token')
+        
+        // Call API endpoint to fetch user's orders
+        const response = await fetch(`/api/orders/user/${user.uid}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        
+        console.log('[Dashboard] Orders API response status:', response.status)
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to fetch orders')
+        }
+        
+        const data = await response.json()
+        console.log('[Dashboard] Got orders:', data.count)
+        
+        const fetchedOrders: Order[] = data.orders.map((order: any) => ({
+          id: order.id || order.orderId,
+          status: order.status,
+          pickupTime: order.pickupTime || 'ASAP',
+          estimatedWeight: order.estimatedWeight || 0,
+          subtotal: order.amount || 0,
+          deliverySpeed: order.deliverySpeed || 'standard',
+          deliveryAddress: order.deliveryAddress?.line1 || order.deliveryAddress || 'Not provided',
+          createdAt: order.createdAt,
+          addOns: order.bookingData?.addOns || [],
         } as Order))
         
-        setOrders(fetchedOrders.sort((a, b) => b.createdAt - a.createdAt))
+        setOrders(fetchedOrders)
         setOrdersError('')
       } catch (err: any) {
-        console.error('Error fetching orders:', err)
-        if (err.code === 'PERMISSION_DENIED' || err.message?.includes('offline')) {
-          setOrdersError('Unable to load orders. Please check your connection and refresh.')
-        } else {
-          setOrdersError('Failed to load orders')
-        }
+        console.error('[Dashboard] Error fetching orders:', err)
+        setOrdersError(err.message || 'Failed to load orders')
         setOrders([])
       } finally {
         setOrdersLoading(false)

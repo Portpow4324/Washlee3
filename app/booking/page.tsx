@@ -132,6 +132,18 @@ export default function Booking() {
     },
   ]
 
+  // Helper function to calculate total order cost
+  const calculateOrderTotal = (data = bookingData) => {
+    let total = parseFloat(data.estimatedWeight) * 3.0
+    if (data.addOns.hangDry) total += parseFloat(data.estimatedWeight) * 3.30
+    if (data.addOns.delicatesCare) total += parseFloat(data.estimatedWeight) * 4.40
+    if (data.addOns.comforterService) total += 25.0
+    if (data.addOns.stainTreatment > 0) total += data.addOns.stainTreatment * 0.50
+    if (data.addOns.ironing) total += parseFloat(data.estimatedWeight) * 6.60
+    if (data.deliverySpeed === 'same-day') total += 5.0
+    return total
+  }
+
   const handleNext = () => {
     if (validateStep(currentStep)) {
       if (currentStep < 5) {
@@ -156,10 +168,9 @@ export default function Booking() {
       case 2:
         return true
       case 3:
-        const weight = parseFloat(bookingData.estimatedWeight)
-        const minTotal = weight * 3.0
-        if (minTotal < 15) {
-          setError('Minimum order is $15.00. Please select at least 5 kg or add premium services.')
+        const orderTotal = calculateOrderTotal()
+        if (orderTotal < 24) {
+          setError('Minimum order is $24.00. Please increase weight or add premium services.')
           return false
         }
         return true
@@ -227,7 +238,7 @@ export default function Booking() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.uid,
+          uid: user.uid,
           customerName: userData?.name || 'Customer',
           customerEmail: user.email,
           customerPhone: userData?.phone || '',
@@ -264,6 +275,7 @@ export default function Booking() {
           orderTotal,
           customerEmail: user.email,
           customerName: userData?.name || 'Customer',
+          uid: user.uid, // Add Firebase user ID for webhook
           bookingData,
         }),
       })
@@ -406,9 +418,24 @@ export default function Booking() {
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-12">
         {/* Progress Indicator with Clickable Steps */}
         <div className="mb-16">
-          <div className="flex justify-between items-end mb-8">
-            {steps.map((step, index) => (
-              <div key={step.number} className="flex-1 flex flex-col items-center">
+          {/* Continuous Background Line */}
+          <div className="flex justify-between items-center mb-12 relative">
+            {/* Full width line behind everything */}
+            <div className="absolute top-6 left-0 right-0 h-1 bg-gray opacity-30 z-0" />
+            
+            {/* Progress line (filled portion) */}
+            {currentStep > 1 && (
+              <div 
+                className="absolute top-6 left-0 h-1 bg-primary z-0 transition-all duration-300"
+                style={{
+                  width: `${((currentStep - 1) / (steps.length - 1)) * 100}%`
+                }}
+              />
+            )}
+
+            {/* Step Circles */}
+            {steps.map((step) => (
+              <div key={step.number} className="flex flex-col items-center relative z-10">
                 {/* Step Button */}
                 <button
                   onClick={() => {
@@ -418,7 +445,7 @@ export default function Booking() {
                     }
                   }}
                   disabled={step.number > currentStep}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition mb-3 ${
+                  className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-lg transition mb-3 border-4 border-light ${
                     step.number <= currentStep
                       ? 'bg-primary text-white cursor-pointer hover:shadow-lg'
                       : 'bg-gray text-white opacity-50 cursor-not-allowed'
@@ -428,20 +455,11 @@ export default function Booking() {
                 </button>
                 
                 {/* Step Name Label */}
-                <p className={`text-sm font-semibold text-center ${
+                <p className={`text-sm font-semibold text-center whitespace-nowrap ${
                   step.number === currentStep ? 'text-primary' : 'text-gray'
                 }`}>
                   {step.title}
                 </p>
-
-                {/* Connector Line */}
-                {index < steps.length - 1 && (
-                  <div
-                    className={`absolute w-12 h-1 mt-6 ml-24 ${
-                      step.number < currentStep ? 'bg-primary' : 'bg-gray opacity-30'
-                    }`}
-                  />
-                )}
               </div>
             ))}
           </div>
@@ -620,7 +638,9 @@ export default function Booking() {
           <div className="max-w-2xl mx-auto">
             <Card className="p-8 mb-8">
               <h2 className="text-2xl font-bold text-dark mb-2">Laundry Weight & Add-ons</h2>
-              <p className="text-gray mb-8">Minimum order: <span className="font-semibold text-primary">$24.00</span> (8 kg base service)</p>
+              {calculateOrderTotal() < 24 && (
+                <p className="text-gray mb-8">Minimum order: <span className="font-semibold text-primary">$24.00</span> (8 kg base service)</p>
+              )}
 
               <div className="space-y-8">
                 {/* Weight Selection */}

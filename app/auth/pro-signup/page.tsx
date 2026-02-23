@@ -47,7 +47,7 @@ export default function ProSignup() {
                 Earn flexible income providing professional laundry services in your community. Work when you want, make your own schedule.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="#apply">
+                <Link href="/auth/pro-signup-form">
                   <Button size="lg">Get Started</Button>
                 </Link>
                 <a href="#learn-more" className="flex items-center justify-center gap-2 px-6 py-3 text-primary font-semibold">
@@ -179,7 +179,6 @@ export default function ProSignup() {
               hours: '25-35 hrs/week',
               earnings: '$700-1,050/week',
               annual: '$35K-52K/year',
-              highlight: true,
               badge: 'Most Popular',
             },
             {
@@ -196,17 +195,11 @@ export default function ProSignup() {
               className={`rounded-xl p-8 relative transition-all duration-300 ease-in-out cursor-pointer border-2 ${
                 activeCard === i
                   ? 'bg-white text-dark shadow-2xl border-primary scale-105'
-                  : tier.highlight
-                  ? 'bg-accent text-dark shadow-lg border-primary scale-105'
                   : 'bg-white text-dark border-gray/20 hover:border-primary hover:shadow-lg'
               }`}
             >
               {tier.badge && (
-                <span className={`text-xs font-bold px-3 py-1 rounded-full mb-3 inline-block ${
-                  tier.highlight
-                    ? 'bg-primary text-white'
-                    : 'bg-primary/10 text-primary'
-                }`}>
+                <span className="text-xs font-bold px-3 py-1 rounded-full mb-3 inline-block bg-primary/10 text-primary">
                   {tier.badge}
                 </span>
               )}

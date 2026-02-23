@@ -30,8 +30,7 @@ export default function Pricing() {
 
   // Calculate pricing
   const basePrice = weight * 3.0
-  const minOrder = 39
-  const totalBeforeAddons = Math.max(basePrice, minOrder)
+  const minOrder = 24
   
   let addonsPrice = 0
   selectedAddons.forEach(addon => {
@@ -54,7 +53,11 @@ export default function Pricing() {
     }
   })
   
-  const totalPrice = totalBeforeAddons + addonsPrice
+  // Only apply minimum order if total (with add-ons) is below $24
+  const totalBeforeAddons = basePrice
+  const totalWithAddons = totalBeforeAddons + addonsPrice
+  const minOrderApplied = totalWithAddons < minOrder ? minOrder - totalBeforeAddons : 0
+  const totalPrice = totalWithAddons + minOrderApplied
 
   return (
     <>
@@ -101,7 +104,7 @@ export default function Pricing() {
 
               <div className="mt-8">
                 <p className="text-gray text-sm font-semibold mb-3">MINIMUM ORDER</p>
-                <p className="text-3xl font-bold text-dark">$39</p>
+                <p className="text-3xl font-bold text-dark">$24</p>
               </div>
             </div>
 
@@ -240,10 +243,10 @@ export default function Pricing() {
                   <span className="text-gray">Base Service ({weight} kg @ $3.00):</span>
                   <span className="font-semibold text-dark">${Math.max(basePrice, 0).toFixed(2)}</span>
                 </div>
-                {basePrice < minOrder && (
+                {minOrderApplied > 0 && (
                   <div className="flex justify-between text-sm text-amber-600">
                     <span>Minimum Order Applied:</span>
-                    <span>+${(minOrder - basePrice).toFixed(2)}</span>
+                    <span>+${minOrderApplied.toFixed(2)}</span>
                   </div>
                 )}
                 {selectedAddons.length > 0 && (

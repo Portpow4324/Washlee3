@@ -27,7 +27,7 @@ export default function CompleteProfile() {
     lastName: '',
     phone: userData?.phone || '',
     personalUse: '', // 'personal' or 'business'
-    ageOver65: false,
+    ageOver65: null as boolean | null, // Track if user has made a selection
     marketingTexts: false,
     accountTexts: false,
   })
@@ -251,7 +251,7 @@ export default function CompleteProfile() {
       case 1:
         return profileData.personalUse
       case 2:
-        return profileData.ageOver65 !== undefined
+        return profileData.ageOver65 !== null // User must explicitly select yes or no
       case 3:
         return true
       case 4:
@@ -294,6 +294,27 @@ export default function CompleteProfile() {
 
     try {
       if (!user) throw new Error('User not found')
+
+      // Check if phone number is already registered to another account
+      if (profileData.phone.trim()) {
+        const phoneCheckResponse = await fetch('/api/users/check-phone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: profileData.phone,
+            excludeUserId: user.uid,
+          }),
+        })
+
+        if (phoneCheckResponse.ok) {
+          const { exists } = await phoneCheckResponse.json()
+          if (exists) {
+            setError('This phone number is already associated with another account. Please use a different phone number.')
+            setIsLoading(false)
+            return
+          }
+        }
+      }
 
       const userRef = doc(db, 'users', user.uid)
       await updateDoc(userRef, {
