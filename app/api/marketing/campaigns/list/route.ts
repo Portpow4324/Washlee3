@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/firebase'
+import { collection, query, orderBy, getDocs } from 'firebase/firestore'
 
 export async function GET(request: NextRequest) {
   try {
     
     // Get all email campaigns, sorted by creation date (newest first)
-    const campaignsSnapshot = await db
-      .collection('email_campaigns')
-      .orderBy('createdAt', 'desc')
-      .get()
+    const campaignsRef = collection(db, 'email_campaigns')
+    const q = query(campaignsRef, orderBy('createdAt', 'desc'))
+    const campaignsSnapshot = await getDocs(q)
 
     const campaigns = campaignsSnapshot.docs.map(doc => {
       const data = doc.data()

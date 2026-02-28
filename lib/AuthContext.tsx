@@ -117,10 +117,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.log('[Auth] User document created successfully')
                 
                 setUserData(newUserData)
-              } catch (createError) {
+              } catch (createError: any) {
                 console.error('[Auth] Failed to create user document:', createError)
-                // Still proceed without the document (will fail on payments, but allows browsing)
-                if (isAdminFromClaims) {
+                // If offline, still proceed with basic user data
+                if (createError?.code === 'failed-precondition' || createError?.message?.includes('offline')) {
+                  console.log('[Auth] Running offline - proceeding with basic user data')
+                  setUserData(newUserData)
+                } else if (isAdminFromClaims) {
                   setUserData(newUserData)
                 } else {
                   setUserData(null)
@@ -128,10 +131,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
               setLoading(false)
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error('[Auth] Error fetching/creating user data:', error)
-            // If Firestore fails but user has admin claims, still allow access
-            if (isAdminFromClaims) {
+            console.error('[Auth] Error code:', error?.code)
+            
+            // Handle offline state gracefully
+            if (error?.code === 'failed-precondition' || error?.message?.includes('offline')) {
+              console.log('[Auth] Offline - allowing basic access')
+              setUserData({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+                createdAt: new Date().toISOString(),
+                userType: 'customer',
+                isAdmin: isAdminFromClaims,
+              })
+            } else if (isAdminFromClaims) {
+              // If Firestore fails but user has admin claims, still allow access
               setUserData({
                 uid: firebaseUser.uid,
                 email: firebaseUser.email || '',
