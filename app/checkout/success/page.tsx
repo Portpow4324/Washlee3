@@ -5,261 +5,296 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
-import Card from '@/components/Card'
-import { CheckCircle, Loader, AlertCircle } from 'lucide-react'
-import { getAuth, onAuthStateChanged } from 'firebase/auth'
+import { CheckCircle, Clock, MapPin, Package, ChevronRight } from 'lucide-react'
 
-function SuccessContent() {
+function CheckoutSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const sessionId = searchParams.get('session_id')
-  const [isProcessing, setIsProcessing] = useState(true)
   const [order, setOrder] = useState<any>(null)
-  const [error, setError] = useState('')
-  const [user, setUser] = useState<any>(null)
-  const [authLoading, setAuthLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Get current user and wait for auth to be ready
+  const sessionId = searchParams.get('session_id')
+  const orderId = searchParams.get('order_id')
+
   useEffect(() => {
-    const auth = getAuth()
-    console.log('[Success] Auth state listener starting...')
-    
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      console.log('[Success] Auth state changed. User:', currentUser?.email || 'none')
-      setUser(currentUser)
-      setAuthLoading(false)
-    })
-    return () => unsubscribe()
-  }, [])
+    if (!sessionId || !orderId) {
+      setError('Invalid checkout session')
+      setLoading(false)
+      return
+    }
 
-  // Fetch order details - only after auth is ready
-  useEffect(() => {
-    let isMounted = true
+    fetchOrderDetails()
+  }, [sessionId, orderId])
 
-    async function fetchOrder() {
-      try {
-        // Wait for auth to be ready
-        if (authLoading) {
-          console.log('[Success] Waiting for auth to load...')
-          return
-        }
+  const fetchOrderDetails = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/orders/${orderId}`)
 
-        if (!user) {
-          console.log('[Success] No user authenticated')
-          setError('Please sign in to view your order')
-          setIsProcessing(false)
-          return
-        }
-
-        console.log('[Success] Fetching orders for user:', user.uid)
-
-        // Get auth token
-        const idToken = await user.getIdToken(true) // Force refresh
-        console.log('[Success] Got ID token:', idToken.substring(0, 20) + '...')
-
-        // First attempt: immediate fetch
-        try {
-          const res = await fetch(`/api/orders/user/${user.uid}`, {
-            headers: {
-              'Authorization': `Bearer ${idToken}`,
-              'Content-Type': 'application/json',
-            }
-          })
-          
-          if (res.ok) {
-            const data = await res.json()
-            console.log('[Success] Got orders on first try:', data.count)
-            if (data.orders && data.orders.length > 0) {
-              if (isMounted) {
-                setOrder(data.orders[0])
-                setIsProcessing(false)
-                return
-              }
-            }
-          } else {
-            console.log('[Success] First fetch returned status:', res.status)
-          }
-        } catch (err) {
-          console.log('[Success] First fetch error:', err)
-        }
-
-        // Wait for webhook to process (increased to 5 seconds)
-        console.log('[Success] Waiting 5 seconds for webhook...')
-        await new Promise(resolve => setTimeout(resolve, 5000))
-
-        // Refresh token and retry
-        const newToken = await user.getIdToken(true)
-        console.log('[Success] Retrying with refreshed token')
-
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            const res = await fetch(`/api/orders/user/${user.uid}`, {
-              headers: {
-                'Authorization': `Bearer ${newToken}`,
-                'Content-Type': 'application/json',
-              }
-            })
-            
-            if (res.ok) {
-              const data = await res.json()
-              console.log(`[Success] Got orders on attempt ${attempt}:`, data.count)
-              if (data.orders && data.orders.length > 0) {
-                if (isMounted) {
-                  setOrder(data.orders[0])
-                  setIsProcessing(false)
-                  return
-                }
-              }
-            } else {
-              console.log(`[Success] Attempt ${attempt} returned status:`, res.status)
-            }
-          } catch (err) {
-            console.log(`[Success] Attempt ${attempt} error:`, err)
-          }
-          
-          if (attempt < 3) {
-            await new Promise(resolve => setTimeout(resolve, 2000))
-          }
-        }
-
-        if (isMounted) {
-          console.log('[Success] All fetch attempts failed, showing fallback')
-          setIsProcessing(false)
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error('[Success] Fetch error:', error)
-          setError('Failed to load order details')
-          setIsProcessing(false)
-        }
+      if (!response.ok) {
+        throw new Error('Failed to fetch order details')
       }
-    }
 
-    // Only fetch when auth is fully loaded and we have a user
-    if (!authLoading && user) {
-      console.log('[Success] Auth ready, fetching orders')
-      fetchOrder()
-    } else if (!authLoading && !user) {
-      console.log('[Success] Auth ready but no user')
-      setIsProcessing(false)
+      const data = await response.json()
+      setOrder(data.order)
+      setError(null)
+    } catch (err: any) {
+      console.error('Error fetching order:', err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-  }, [user, authLoading])
+  }
 
-  if (isProcessing) {
+  if (loading) {
     return (
-      <Card className="p-8 text-center max-w-md">
-        <div className="flex justify-center mb-6">
-          <Loader size={64} className="text-primary animate-spin" />
-        </div>
-        <h1 className="text-2xl font-bold text-dark mb-3">Processing Payment...</h1>
-        <p className="text-gray">Please wait while we confirm your order</p>
-      </Card>
+      <div className="min-h-screen bg-light flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </main>
+        <Footer />
+      </div>
     )
   }
 
+  if (error || !order) {
+    return (
+      <div className="min-h-screen bg-light flex flex-col">
+        <Header />
+        <main className="flex-1 max-w-2xl mx-auto px-4 py-8 w-full">
+          <div className="bg-white rounded-lg border border-red-200 p-8 text-center">
+            <h1 className="text-2xl font-bold text-red-600 mb-2">Error Loading Order</h1>
+            <p className="text-gray mb-6">{error || 'Could not load order details'}</p>
+            <Button variant="primary" onClick={() => router.push('/dashboard')}>
+              Back to Dashboard
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  const estimatedPickupDate = new Date()
+  estimatedPickupDate.setDate(estimatedPickupDate.getDate() + 1)
+  const formattedPickupDate = estimatedPickupDate.toLocaleDateString('en-AU', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+
   return (
-    <Card className="p-8 text-center max-w-md">
-      {error || !order ? (
-        <>
-          <div className="flex justify-center mb-6">
-            <AlertCircle size={64} className="text-red-600" />
+    <div className="min-h-screen bg-light flex flex-col">
+      <Header />
+
+      <main className="flex-1 max-w-4xl mx-auto px-4 py-12 w-full">
+        {/* Success Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-mint rounded-full mb-4">
+            <CheckCircle className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-dark mb-3">Payment Received ✓</h1>
-          <p className="text-gray mb-6">
-            Your payment was successful! Your order is being processed.
+          <h1 className="text-4xl font-bold text-dark mb-2">Payment Successful!</h1>
+          <p className="text-gray text-lg">Your laundry order has been confirmed</p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6 mb-12">
+          {/* Order Confirmation Card */}
+          <div className="bg-white rounded-lg border border-gray/10 p-6">
+            <h2 className="text-sm font-semibold text-gray mb-4 uppercase">Order Number</h2>
+            <p className="text-3xl font-bold text-primary mb-2">{orderId?.slice(0, 8).toUpperCase() || 'N/A'}</p>
+            <p className="text-xs text-gray">{new Date().toLocaleDateString()}</p>
+          </div>
+
+          {/* Estimated Pickup */}
+          <div className="bg-white rounded-lg border border-gray/10 p-6">
+            <h2 className="text-sm font-semibold text-gray mb-4 uppercase flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Estimated Pickup
+            </h2>
+            <p className="text-lg font-semibold text-dark mb-1">{formattedPickupDate}</p>
+            <p className="text-xs text-gray">8:00 AM - 6:00 PM</p>
+          </div>
+
+          {/* Order Total */}
+          <div className="bg-mint rounded-lg p-6">
+            <h2 className="text-sm font-semibold text-gray mb-4 uppercase">Total Amount</h2>
+            <p className="text-3xl font-bold text-primary">${order.totalPrice}</p>
+            <p className="text-xs text-gray">(inc. GST)</p>
+          </div>
+        </div>
+
+        {/* Order Summary */}
+        <div className="bg-white rounded-lg border border-gray/10 p-8 mb-8">
+          <h2 className="text-xl font-bold text-dark mb-6">Order Summary</h2>
+
+          <div className="space-y-4 mb-6 border-b border-gray/10 pb-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-gray">Weight</p>
+                <p className="font-semibold text-dark">{order.weight}kg</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray">Service Type</p>
+                <p className="font-semibold text-dark capitalize">{order.serviceType || 'Standard'}</p>
+              </div>
+              {order.protectionPlan && (
+                <div>
+                  <p className="text-sm text-gray">Protection Plan</p>
+                  <p className="font-semibold text-dark capitalize">{order.protectionPlan}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Pricing Breakdown */}
+          <div className="space-y-3 mb-6">
+            <div className="flex justify-between">
+              <span className="text-gray">{order.weight}kg @ ${(order.subtotal / order.weight).toFixed(2)}/kg</span>
+              <span className="font-semibold text-dark">${order.subtotal}</span>
+            </div>
+            {order.protectionPlan && order.protectionPlan !== 'basic' && (
+              <div className="flex justify-between">
+                <span className="text-gray">{order.protectionPlan} Protection</span>
+                <span className="font-semibold text-dark">
+                  ${(order.totalPrice - order.subtotal).toFixed(2)}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-gray/10 pt-3">
+              <span className="font-bold text-dark">Total</span>
+              <span className="text-lg font-bold text-primary">${order.totalPrice}</span>
+            </div>
+          </div>
+
+          {/* Delivery Address */}
+          {order.deliveryAddressLine1 && (
+            <div className="bg-mint rounded-lg p-4">
+              <p className="text-sm text-gray mb-2 flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Delivery Address
+              </p>
+              <p className="font-semibold text-dark">
+                {order.deliveryAddressLine1}
+                <br />
+                {order.deliveryCity}, {order.deliveryState} {order.deliveryPostcode}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Next Steps */}
+        <div className="bg-white rounded-lg border border-gray/10 p-8 mb-8">
+          <h2 className="text-xl font-bold text-dark mb-6">What Happens Next?</h2>
+
+          <div className="space-y-4">
+            {/* Step 1 */}
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-mint text-primary font-bold text-sm">
+                  1
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-dark">Pro Assignment</h3>
+                <p className="text-sm text-gray">
+                  We're matching your order with a verified Washlee Pro in your area.
+                </p>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-mint text-primary font-bold text-sm">
+                  2
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-dark">Pickup Confirmation</h3>
+                <p className="text-sm text-gray">
+                  Your pro will contact you to confirm the pickup time. You can also check your order status in the app.
+                </p>
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-mint text-primary font-bold text-sm">
+                  3
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-dark">Washing & Delivery</h3>
+                <p className="text-sm text-gray">
+                  Your laundry will be professionally washed and delivered back to you within 3-5 business days.
+                </p>
+              </div>
+            </div>
+
+            {/* Step 4 */}
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-mint text-primary font-bold text-sm">
+                  4
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-dark">Rate Your Experience</h3>
+                <p className="text-sm text-gray">
+                  After delivery, you can rate your pro and help other customers choose the best service.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid md:grid-cols-2 gap-4 mb-8">
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => router.push(`/tracking/${orderId}`)}
+            className="w-full flex items-center justify-center gap-2"
+          >
+            <Package className="w-4 h-4" />
+            Track Order
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => router.push('/dashboard')}
+            className="w-full flex items-center justify-center gap-2"
+          >
+            Go to Dashboard
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {/* Support Info */}
+        <div className="bg-light border border-gray/10 rounded-lg p-6 text-center">
+          <p className="text-gray mb-2">Need help with your order?</p>
+          <a href="/faq" className="text-primary font-semibold hover:underline">
+            Visit our FAQ
+          </a>
+          <p className="text-sm text-gray mt-2">
+            Or contact us at <span className="font-semibold">support@washlee.com</span>
           </p>
-          <div className="bg-yellow-50 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-gray mb-2">
-              <strong>Note:</strong> Your order details are being set up. Please check your dashboard or email for order confirmation.
-            </p>
-          </div>
-          <div className="space-y-3">
-            <Button
-              className="w-full"
-              onClick={() => router.push('/dashboard/customer')}
-            >
-              View Dashboard
-            </Button>
-            <button
-              onClick={() => router.push('/')}
-              className="w-full py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition"
-            >
-              Back to Home
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex justify-center mb-6">
-            <CheckCircle size={64} className="text-primary" />
-          </div>
-          <h1 className="text-3xl font-bold text-dark mb-3">Thank you for choosing Washlee! 🎉</h1>
-          <p className="text-gray mb-6">Your order has been confirmed and payment received</p>
+        </div>
+      </main>
 
-          <div className="bg-light rounded-lg p-4 mb-4 text-left">
-            <p className="text-sm text-gray mb-1">Order Number</p>
-            <p className="font-mono text-dark font-semibold text-sm break-all">{order.orderId}</p>
-          </div>
-
-          <div className="bg-light rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-gray mb-1">Payment ID</p>
-            <p className="font-mono text-dark font-semibold text-sm break-all">{order.paymentId || order.sessionId || 'Processing...'}</p>
-          </div>
-
-          <div className="space-y-3 mb-6 text-left text-sm text-gray">
-            <div className="flex gap-2">
-              <span className="text-primary font-bold">✓</span>
-              <span>Payment confirmed with Stripe</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-primary font-bold">✓</span>
-              <span>Your Washlee service will arrive soon</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-primary font-bold">✓</span>
-              <span>You'll receive updates via email</span>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Button
-              className="w-full"
-              onClick={() => router.push(`/tracking?orderId=${order.orderId}`)}
-            >
-              Track Order
-            </Button>
-            <Button
-              className="w-full"
-              onClick={() => router.push('/dashboard/customer')}
-              variant="outline"
-            >
-              View Dashboard
-            </Button>
-            <button
-              onClick={() => router.push('/')}
-              className="w-full py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition"
-            >
-              Back to Home
-            </button>
-          </div>
-
-          <p className="text-xs text-gray mt-6">Session ID: {sessionId}</p>
-        </>
-      )}
-    </Card>
+      <Footer />
+    </div>
   )
 }
 
-export default function CheckoutSuccess() {
+export default function CheckoutSuccessPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-mint to-white flex flex-col">
-      <Header />
-      <main className="flex-1 flex items-center justify-center px-4 py-12">
-        <Suspense fallback={<div>Loading...</div>}>
-          <SuccessContent />
-        </Suspense>
-      </main>
-      <Footer />
-    </div>
+    <Suspense fallback={<div>Loading...</div>}>
+      <CheckoutSuccessContent />
+    </Suspense>
   )
 }

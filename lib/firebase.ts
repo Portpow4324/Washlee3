@@ -15,27 +15,23 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 
-// Enable persistent login - tries IndexedDB first, falls back to localStorage
+// Set auth persistence IMMEDIATELY without async operations
 if (typeof window !== 'undefined') {
-  // Use IndexedDB for better persistence on modern browsers
+  // Try IndexedDB first for better performance
   setPersistence(auth, indexedDBLocalPersistence)
-    .then(() => {
-      console.log('[Firebase] IndexedDB persistence enabled')
+    .catch((error) => {
+      // Fallback to localStorage
+      console.log('[Firebase] IndexedDB unavailable, using localStorage')
+      return setPersistence(auth, browserLocalPersistence)
     })
     .catch((error) => {
-      console.log('[Firebase] IndexedDB failed, trying localStorage:', error.code)
-      // Fallback to localStorage
-      return setPersistence(auth, browserLocalPersistence)
-        .then(() => {
-          console.log('[Firebase] localStorage persistence enabled')
-        })
-        .catch((fallbackError) => {
-          console.error('[Firebase] Both persistence methods failed:', fallbackError)
-        })
+      console.warn('[Firebase] Persistence setup failed:', error.code)
     })
 }
 
+// Initialize Firestore
 export const db = getFirestore(app)
+
 export const storage = getStorage(app)
 
 export default app

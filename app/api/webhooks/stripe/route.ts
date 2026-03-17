@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import admin from 'firebase-admin'
+import { sendPaymentFailed } from '@/lib/emailService'
 
 // Initialize Firebase Admin if not already done
 if (!admin.apps.length) {
@@ -95,6 +96,57 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      case 'charge.failed': {
+        console.log('[WEBHOOK] Processing charge.failed')
+        const charge = event.data.object
+        
+        // Send payment failed email
+        try {
+          const metadata = charge.metadata || {}
+          const customerEmail = metadata.customerEmail || charge.billing_details?.email
+          const customerName = metadata.customerName || 'Valued Customer'
+          const orderId = metadata.orderId || 'UNKNOWN'
+          const errorMessage = charge.failure_message || 'Card declined or payment failed'
+          const amount = (charge.amount / 100).toFixed(2)
+          const paymentLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/payments`
+
+          if (customerEmail) {
+            const emailResult = await sendPaymentFailed(
+              customerEmail,
+              customerName,
+              orderId,
+              errorMessage,
+              amount,
+              paymentLink
+            )
+
+            if (emailResult.success) {
+              console.log('[WEBHOOK] ✓ Payment failed email sent to:', customerEmail)
+            } else {
+              console.error('[WEBHOOK] Payment failed email send failed:', emailResult.error)
+            }
+          }
+        } catch (emailError: any) {
+          console.error('[WEBHOOK] Error sending payment failed email:', emailError.message)
+          // Continue - webhook shouldn't fail due to email issues
+        }
+
+        // Update order status
+        if (charge.payment_intent) {
+          const paymentIntent = await stripe.paymentIntents.retrieve(charge.payment_intent)
+          const orderId = paymentIntent.metadata?.orderId
+          
+          if (orderId) {
+            await updateOrderStatus(orderId, 'payment_failed', {
+              paymentId: charge.id,
+              failureReason: charge.failure_message,
+              failedAt: new Date().toISOString(),
+            })
+          }
+        }
+        break
+      }
+
       case 'payment_intent.succeeded': {
         console.log('[WEBHOOK] Processing payment_intent.succeeded')
         const paymentIntent = event.data.object
@@ -129,13 +181,32 @@ export async function POST(request: NextRequest) {
         console.log('[WEBHOOK] Processing checkout.session.completed')
         const session = event.data.object
         const orderId = session.metadata?.orderId
+        const uid = session.metadata?.uid
         
         if (orderId && session.payment_status === 'paid') {
-          await updateOrderStatus(orderId, 'confirmed', {
+          await updateOrderStatus(orderId, 'payment_completed', {
             sessionId: session.id,
             amountPaid: session.amount_total / 100,
             paidAt: new Date().toISOString(),
           })
+          
+          // Assign to pro after payment
+          if (uid) {
+            console.log('[WEBHOOK] Triggering pro assignment for order:', orderId)
+            try {
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+              const assignResponse = await fetch(`${baseUrl}/api/orders/assign`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid, orderId }),
+              })
+              const assignResult = await assignResponse.json()
+              console.log('[WEBHOOK] Assignment result:', assignResult)
+            } catch (assignError: any) {
+              console.error('[WEBHOOK] Assignment failed:', assignError.message)
+              // Don't fail the webhook, assignment can be retried
+            }
+          }
         }
         break
       }

@@ -47,7 +47,7 @@ export default function BecomePro() {
                 Become a Washlee Pro and earn flexible income by providing professional laundry services to your community.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/auth/signup?type=pro">
+                <Link href="/auth/signup?type=pro" onClick={(e) => e.stopPropagation()}>
                   <Button size="lg">Apply Now</Button>
                 </Link>
                 <a href="#learn-more" className="flex items-center justify-center gap-2 px-6 py-3 text-primary font-semibold">
@@ -72,8 +72,8 @@ export default function BecomePro() {
       <section className="section bg-white">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { number: '500+', label: 'Active Washlee Pros' },
-            { number: '$25k', label: 'Average Annual Earnings' },
+            { number: '500+', label: 'Pros Earning This Week' },
+            { number: '$70k+', label: 'Highest Annual Earnings' },
             { number: '4.9★', label: 'Customer Rating' },
           ].map((stat, i) => (
             <div key={i} className="text-center">
@@ -92,8 +92,8 @@ export default function BecomePro() {
           {[
             {
               icon: TrendingUp,
-              title: 'Earn More',
-              description: 'Average Washlee Pros earn around $25k annually, with flexible scheduling.',
+              title: 'Earn Per Order',
+              description: 'Get paid for every order you complete. Accept jobs that match your earning goals—earn more by doing more.',
             },
             {
               icon: Clock,
@@ -131,23 +131,23 @@ export default function BecomePro() {
           {[
             {
               number: 1,
-              title: 'Apply',
-              description: 'Complete the online application',
+              title: 'Accept Order',
+              description: 'Browse available orders in your area and accept jobs that fit your schedule',
             },
             {
               number: 2,
-              title: 'Get Approved',
-              description: 'Quick background check & verification',
+              title: 'Pickup',
+              description: 'Collect laundry from customer location',
             },
             {
               number: 3,
-              title: 'Get Equipped',
-              description: 'Receive Washlee Pro starter kit',
+              title: 'Wash & Care',
+              description: 'Professional laundry handling with quality assurance',
             },
             {
               number: 4,
-              title: 'Start Earning',
-              description: 'Accept jobs and start making money',
+              title: 'Deliver & Get Paid',
+              description: 'Return clean laundry and earn your commission plus 100% of tips',
             },
           ].map((step, i) => (
             <Card key={i} hoverable className="text-center">
@@ -169,14 +169,14 @@ export default function BecomePro() {
           {[
             {
               title: 'Casual',
-              hours: '8-12 hrs/week',
+              orders: '8-12 orders/week',
               earnings: '$280-400/week',
               annual: '$15K-20K/year',
               badge: 'Flexible',
             },
             {
               title: 'Regular Pro',
-              hours: '25-35 hrs/week',
+              orders: '25-35 orders/week',
               earnings: '$700-1,050/week',
               annual: '$35K-52K/year',
               highlight: true,
@@ -184,7 +184,7 @@ export default function BecomePro() {
             },
             {
               title: 'Elite Earner',
-              hours: '40+ hrs/week',
+              orders: '40+ orders/week',
               earnings: '$1,400+/week',
               annual: '$70K+/year',
               badge: 'Top 10%',
@@ -213,8 +213,8 @@ export default function BecomePro() {
               <h3 className="text-2xl font-bold mb-4 text-dark">{tier.title}</h3>
               <div className="space-y-4 mb-6">
                 <div>
-                  <p className="text-sm text-gray mb-1">Hours Per Week</p>
-                  <p className="text-2xl font-bold text-dark">{tier.hours}</p>
+                  <p className="text-sm text-gray mb-1">Orders Per Week</p>
+                  <p className="text-2xl font-bold text-dark">{tier.orders}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray mb-1">Weekly Earnings</p>
@@ -225,7 +225,7 @@ export default function BecomePro() {
                   <p className="text-3xl font-bold text-dark">{tier.annual}</p>
                 </div>
               </div>
-              <Link href="/auth/signup?type=pro" className="block">
+              <Link href="/auth/signup?type=pro" className="block" onClick={(e) => e.stopPropagation()}>
                 <Button size="lg" className={`w-full`}>Apply Now</Button>
               </Link>
             </div>
@@ -243,10 +243,11 @@ export default function BecomePro() {
             <ul className="space-y-4">
               {[
                 'Be 18+ years old',
-                'Have a valid driver\'s license and vehicle',
-                'Pass a background check',
+                'Have a valid driver\'s license and reliable vehicle',
+                'Pass a background check (ABN verification)',
                 'Have a smartphone (iOS or Android)',
                 'Be comfortable handling laundry professionally',
+                'Provide your own transport (vehicle fuel/maintenance)',
               ].map((req, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <CheckCircle className="text-primary mt-1 flex-shrink-0" size={20} />
@@ -266,7 +267,7 @@ export default function BecomePro() {
           {[
             {
               q: 'How much does it cost to join?',
-              a: 'Free! There are no upfront fees to become a Washlee Pro. We provide everything you need.',
+              a: 'Free! There are no upfront fees to become a Washlee Pro. You\'ll need your own vehicle and smartphone to get started.',
             },
             {
               q: 'Do I need my own laundry equipment?',
@@ -278,11 +279,23 @@ export default function BecomePro() {
             },
             {
               q: 'How much can I earn per order?',
-              a: 'Earnings vary by location and order size, typically $15-50 per pickup/delivery pair. Plus tips!',
+              a: 'You earn a commission per completed order ($15-50+ depending on location, order size, and complexity) plus 100% of customer tips. Larger or specialty orders pay more.',
             },
             {
               q: 'When do I get paid?',
               a: 'Payments are processed weekly via direct deposit every Monday for work completed the previous week.',
+            },
+            {
+              q: 'Will I receive tax documentation?',
+              a: 'As an independent contractor, you\'ll receive annual income statements for tax purposes. Keep records of your earnings for your records.',
+            },
+            {
+              q: 'What if I decline an order?',
+              a: 'No penalties! You can accept or decline any order. Your acceptance rate doesn\'t affect your ability to get future orders.',
+            },
+            {
+              q: 'How is my rating calculated?',
+              a: 'Ratings are based on customer reviews, on-time delivery, and professional service. Your rating helps you qualify for better-paying orders.',
             },
           ].map((faq, i) => (
             <div key={i} className="border border-gray rounded-lg p-6">

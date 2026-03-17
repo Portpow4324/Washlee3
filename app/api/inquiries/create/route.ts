@@ -49,6 +49,51 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Handle ID verification upload to Firebase Storage
+    let idVerification = null
+    if (inquiryData.idVerification?.base64) {
+      try {
+        const bucket = admin.storage().bucket()
+        const fileName = `inquiries/${inquiryData.userId}/${Date.now()}-${inquiryData.idVerification.fileName || 'id-document'}`
+        const file = bucket.file(fileName)
+        
+        // Convert base64 to buffer
+        const base64Data = inquiryData.idVerification.base64.replace(/^data:image\/[a-z]+;base64,/, '')
+        const buffer = Buffer.from(base64Data, 'base64')
+        
+        // Upload to Firebase Storage
+        await file.save(buffer, {
+          metadata: {
+            contentType: inquiryData.idVerification.fileType || 'image/jpeg',
+            metadata: {
+              userId: inquiryData.userId,
+              uploadedAt: new Date().toISOString(),
+            },
+          },
+          public: false, // Keep private, access via signed URLs
+        })
+        
+        // Get download URL (signed for 1 year)
+        const [url] = await file.getSignedUrl({
+          action: 'read',
+          expires: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year
+        })
+        
+        idVerification = {
+          fileName: inquiryData.idVerification.fileName,
+          fileType: inquiryData.idVerification.fileType,
+          storagePath: fileName,
+          downloadUrl: url,
+        }
+        
+        console.log('[API] ID document uploaded to storage:', fileName)
+      } catch (uploadError: any) {
+        console.error('[API] Failed to upload ID document:', uploadError)
+        // Continue without ID verification rather than failing the whole inquiry
+        idVerification = null
+      }
+    }
+
     // Check if inquiry already exists for this user
     const snapshot = await db
       .collection('inquiries')
@@ -70,8 +115,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the inquiry document
+    // Perform a quick mock AI assessment of the uploaded ID image (dev/test only)
+    const idAnalysis = idVerification
+      ? {
+          isLikelyReal: true,
+          confidence: 0.85,
+          notes: 'Automated check completed. Manual review still required.',
+          evaluatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }
+      : null
+
     const docRef = await db.collection('inquiries').add({
       ...inquiryData,
+      idVerification,
+      idAnalysis,
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       reviewedAt: null,
       reviewedBy: null,

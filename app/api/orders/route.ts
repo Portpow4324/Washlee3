@@ -38,10 +38,19 @@ const db = admin.firestore()
  * POST /api/orders - Create an order in Firestore (server-side)
  * Called from booking/page.tsx when user clicks "Confirm & Pay"
  * This bypasses client-side Firebase issues by using Admin SDK
+ * 
+ * Supports idempotency keys to prevent duplicate orders from retried requests
+ * Use header: Idempotency-Key: <uid>-<timestamp>
  */
 export async function POST(request: NextRequest) {
   try {
     console.log('[ORDERS-API] POST request received')
+    
+    // Extract idempotency key from request header
+    const idempotencyKey = request.headers.get('idempotency-key')
+    if (idempotencyKey) {
+      console.log('[ORDERS-API] Idempotency key provided:', idempotencyKey.substring(0, 20) + '...')
+    }
     
     const body = await request.json()
     console.log('[ORDERS-API] Request body received:', { 
@@ -64,6 +73,31 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: uid or userId, orderTotal, bookingData' },
         { status: 400 }
       )
+    }
+
+    // Check for duplicate order using idempotency key
+    if (idempotencyKey) {
+      try {
+        const idempotencyRef = db.collection('idempotency_keys').doc(idempotencyKey)
+        const idempotencyDoc = await idempotencyRef.get()
+
+        if (idempotencyDoc && idempotencyDoc.exists) {
+          const existingOrder = idempotencyDoc.data()
+          console.log('[ORDERS-API] ⟲ Duplicate request detected. Returning cached order:', existingOrder?.orderId)
+          
+          return NextResponse.json({
+            success: true,
+            isDuplicate: true,
+            data: {
+              orderId: existingOrder?.orderId,
+              message: 'Order already created (duplicate request)'
+            }
+          }, { status: 200 })
+        }
+      } catch (idempotencyError) {
+        console.error('[ORDERS-API] Error checking idempotency:', idempotencyError)
+        // Continue with order creation if idempotency check fails
+      }
     }
 
     console.log('[ORDERS-API] Creating order for user:', finalUid)
@@ -111,20 +145,50 @@ export async function POST(request: NextRequest) {
     // Create order in Firestore with proper error handling
     let orderId: string
     try {
-      console.log('[ORDERS-API] Getting orders collection reference...')
-      const ordersRef = db.collection('orders')
-      console.log('[ORDERS-API] Orders collection reference obtained')
+      // Generate orderId first so we can include it in the document
+      const tempDocRef = db.collection('temp').doc()
+      orderId = tempDocRef.id
+      console.log('[ORDERS-API] Generated orderId:', orderId)
       
-      console.log('[ORDERS-API] Adding document to Firestore...')
-      const docRef = await ordersRef.add(orderData)
-      orderId = docRef.id
+      // Include orderId in orderData
+      const orderDataWithId = { ...orderData, orderId }
+      
+      // Remove undefined values to prevent Firestore errors
+      const cleanedOrderData = Object.fromEntries(
+        Object.entries(orderDataWithId).filter(([_, v]) => v !== undefined)
+      )
+      
+      console.log('[ORDERS-API] Creating order at user subcollection path...')
+      console.log(`[ORDERS-API] Path: users/${finalUid}/orders/${orderId}`)
+      
+      // Create order at user subcollection path so checkout can find it
+      await db.collection('users').doc(finalUid).collection('orders').doc(orderId).set(cleanedOrderData, { merge: false })
+      
+      // Store idempotency key for future requests
+      if (idempotencyKey) {
+        try {
+          await db.collection('idempotency_keys').doc(idempotencyKey).set({
+            orderId,
+            uid: finalUid,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hour TTL
+          })
+          console.log('[ORDERS-API] ✓ Idempotency key stored')
+        } catch (idempotencyError) {
+          console.error('[ORDERS-API] Warning: Failed to store idempotency key:', idempotencyError)
+          // Don't fail the entire request if idempotency key storage fails
+        }
+      }
+      
       console.log('[ORDERS-API] ✓ Order created successfully:', orderId)
-      console.log('[ORDERS-API] Order stored with uid:', finalUid)
+      console.log('[ORDERS-API] Order stored at user subcollection with uid:', finalUid)
       
       return NextResponse.json({
         success: true,
-        orderId,
-        message: 'Order created successfully'
+        data: {
+          orderId,
+          message: 'Order created successfully'
+        }
       }, { status: 201 })
     } catch (dbError: any) {
       const errorMsg = dbError.message || 'Unknown error'

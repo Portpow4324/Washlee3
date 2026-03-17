@@ -30,6 +30,18 @@ interface Inquiry {
   reviewedAt?: string
   reviewedBy?: string
   rejectionReason?: string
+  idVerification?: {
+    fileName?: string
+    fileType?: string
+    storagePath?: string
+    downloadUrl?: string
+  }
+  idAnalysis?: {
+    isLikelyReal?: boolean
+    confidence?: number
+    notes?: string
+    evaluatedAt?: string
+  }
 }
 
 export default function InquiriesManagement() {
@@ -46,6 +58,7 @@ export default function InquiriesManagement() {
   useEffect(() => {
     // Check if user is admin/manager
     if (!authLoading && (!user || !userData?.isAdmin)) {
+      console.error('[AdminInquiries] User is not admin. Current user:', user?.email)
       router.push('/')
       return
     }
@@ -326,6 +339,37 @@ export default function InquiriesManagement() {
                     </div>
                   </div>
                 </div>
+
+                {/* ID Verification */}
+                {selectedInquiry.idVerification?.downloadUrl && (
+                  <div className="mb-6 pb-6 border-b border-gray">
+                    <h3 className="font-semibold text-dark mb-3">ID Verification</h3>
+                    <div className="space-y-3">
+                      <div className="text-sm text-gray">
+                        <p className="font-semibold">Document:</p>
+                        <p>{selectedInquiry.idVerification.fileName || 'Uploaded document'}</p>
+                      </div>
+                      <div className="border rounded-lg overflow-hidden">
+                        <img
+                          src={selectedInquiry.idVerification.downloadUrl}
+                          alt="Uploaded ID"
+                          className="w-full h-auto"
+                        />
+                      </div>
+
+                      {selectedInquiry.idAnalysis && (
+                        <div className="text-sm text-gray">
+                          <p className="font-semibold">AI Analysis</p>
+                          <p>
+                            Likely Real: {selectedInquiry.idAnalysis.isLikelyReal ? 'Yes' : 'No'}{' '}
+                            (confidence {Math.round((selectedInquiry.idAnalysis.confidence ?? 0) * 100)}%)
+                          </p>
+                          <p>{selectedInquiry.idAnalysis.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Skills Assessment */}
                 <div className="mb-6">

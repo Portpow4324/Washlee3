@@ -1,19 +1,56 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/Button'
 import Link from 'next/link'
 import { Mail, Lock, Briefcase, AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 
 export default function EmployeeSignIn() {
   const router = useRouter()
   const [employeeId, setEmployeeId] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+
+  // Strict session check on mount
+  useEffect(() => {
+    const rememberMeExpiry = localStorage.getItem('employeeRememberMeExpiry')
+    const sessionOnly = sessionStorage.getItem('employeeSessionOnly')
+    
+    // If remember me expired, clear it
+    if (rememberMeExpiry && new Date(rememberMeExpiry) < new Date()) {
+      localStorage.removeItem('employeeRememberMe')
+      localStorage.removeItem('employeeToken')
+      localStorage.removeItem('employeeData')
+      localStorage.removeItem('employeeRememberMeExpiry')
+    }
+    
+    // Strict rule: No remember me and new session = log out
+    if (!sessionOnly && !localStorage.getItem('employeeRememberMe')) {
+      localStorage.removeItem('employeeToken')
+      localStorage.removeItem('employeeData')
+    }
+  }, [])
+
+  const saveSessionPreference = (remember: boolean) => {
+    if (remember) {
+      // Store for 7 days (stricter than customer login)
+      localStorage.setItem('employeeRememberMe', 'true')
+      const expiryDate = new Date()
+      expiryDate.setDate(expiryDate.getDate() + 7)
+      localStorage.setItem('employeeRememberMeExpiry', expiryDate.toISOString())
+    } else {
+      // Session-only - cleared on tab close
+      sessionStorage.setItem('employeeSessionOnly', 'true')
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,31 +58,52 @@ export default function EmployeeSignIn() {
     setSuccessMessage('')
 
     // Validate input
-    if (!employeeId.trim() || !password.trim()) {
-      setError('Please enter both employee ID and password')
+    if (!employeeId.trim() || !email.trim() || !password.trim()) {
+      setError('Please enter employee ID, email, and password')
       return
     }
 
-    if (!/^\d{6}$/.test(employeeId.trim())) {
-      setError('Employee ID must be a 6-digit number')
+    // Accept multiple formats:
+    // 1. 6-digit: 123456
+    // 2. Standard: EMP-1773230849589-1ZE64
+    // 3. Payslip: PS-20240304-X9K2L
+    const isSixDigit = /^\d{6}$/.test(employeeId.trim())
+    const isStandardFormat = /^EMP-\d+-[A-Z0-9]+$/.test(employeeId.trim())
+    const isPayslipFormat = /^PS-\d{8}-[A-Z0-9]+$/.test(employeeId.trim())
+
+    if (!isSixDigit && !isStandardFormat && !isPayslipFormat) {
+      setError('Invalid employee ID. Use 6 digits or full format from your email.')
+      return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address')
       return
     }
 
     setIsLoading(true)
 
     try {
+      const requestPayload = {
+        employeeId: employeeId.trim(),
+        email: email.trim(),
+        password,
+      }
+      
+      console.log('[Employee Login] Sending:', { employeeId: requestPayload.employeeId, email: requestPayload.email, password: '***' })
+
       const response = await fetch('/api/auth/employee-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          employeeId: employeeId.trim(),
-          password,
-        }),
+        body: JSON.stringify(requestPayload),
       })
 
       const data = await response.json()
+      console.log('[Employee Login] Response:', { status: response.status, data })
 
       if (!response.ok) {
         setError(data.error || 'Login failed')
@@ -55,14 +113,35 @@ export default function EmployeeSignIn() {
 
       setSuccessMessage(`Welcome, ${data.employee.firstName}!`)
 
-      // Store token and redirect
+      // Save session preference (strict rules for employees)
+      saveSessionPreference(rememberMe)
+
+      // Store token and data
       localStorage.setItem('employeeToken', data.token)
       localStorage.setItem('employeeData', JSON.stringify(data.employee))
+      // Mark as authenticated employee for dashboard fallback
+      localStorage.setItem('isEmployeeUser', 'true')
+      // Set employee mode flag
+      localStorage.setItem('employeeMode', 'true')
+      sessionStorage.setItem('employeeMode', 'true')
 
-      // Redirect to employee dashboard
-      setTimeout(() => {
-        router.push('/dashboard/employee')
-      }, 1500)
+      // Sign into Firebase on the client side using the email and password
+      // This triggers onAuthStateChanged in AuthContext, which then recognizes the user
+      try {
+        await signInWithEmailAndPassword(auth, email.trim(), password)
+        console.log('[Employee Login] Successfully signed into Firebase')
+        
+        // Wait a moment for Firestore to be consistent with the update from the API
+        // This ensures AuthContext reads the updated isEmployee flag
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // Redirect to employee dashboard
+        router.push('/employee/dashboard')
+      } catch (firebaseError: any) {
+        console.error('[Employee Login] Firebase sign-in error:', firebaseError)
+        setError('Firebase authentication failed: ' + firebaseError.message)
+        setIsLoading(false)
+      }
     } catch (err: any) {
       setError(err.message || 'An error occurred during login')
       setIsLoading(false)
@@ -102,20 +181,33 @@ export default function EmployeeSignIn() {
                 <input
                   id="employeeId"
                   type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="Enter 6-digit code"
+                  placeholder="Enter your Employee ID (6 digits or full code)"
                   value={employeeId}
-                  onChange={(e) => {
-                    // Only allow digits
-                    const value = e.target.value.replace(/\D/g, '')
-                    setEmployeeId(value)
-                  }}
-                  className="pl-10 pr-4 py-3 w-full border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#48C9B0] focus:border-transparent transition font-mono text-lg tracking-widest"
+                  onChange={(e) => setEmployeeId(e.target.value)}
+                  className="pl-10 pr-4 py-3 w-full border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#48C9B0] focus:border-transparent transition"
                   disabled={isLoading}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Format: 6 digits (e.g., 234567)</p>
+              <p className="text-xs text-gray-500 mt-1">Format: 6 digits (234567) or full code from email (EMP-xxx-xxx)</p>
+            </div>
+
+            {/* Email Field */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-bold text-[#1f2d2b] mb-2 uppercase tracking-widest">
+                Email
+              </label>
+              <div className="relative">
+                <Mail size={18} className="absolute left-3 top-3.5 text-gray-400" />
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your work email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10 pr-4 py-3 w-full border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#48C9B0] focus:border-transparent transition"
+                  disabled={isLoading}
+                />
+              </div>
             </div>
 
             {/* Password Field */}
@@ -143,6 +235,25 @@ export default function EmployeeSignIn() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+            </div>
+
+            {/* Remember Me - STRICTER for employees */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray"
+                />
+                <span className="text-sm text-gray-600">Remember me for 7 days</span>
+              </label>
+              <span className="text-xs text-red-600 font-semibold">🔒 Strict Security</span>
+            </div>
+
+            {/* Security Warning */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+              <p><strong>⚠️ Security Notice:</strong> If you don't enable "Remember me", you will be logged out when you close this tab or reload the page.</p>
             </div>
 
             {/* Error Message */}

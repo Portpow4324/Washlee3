@@ -1,12 +1,13 @@
 'use client'
 
+import React from 'react'
 import Image from 'next/image'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Link from 'next/link'
-import { CheckCircle, Clock, Sparkles, Shield, Truck, Users } from 'lucide-react'
+import { CheckCircle, Clock, Sparkles, Shield, Truck, Users, Shirt, Cloud, Hand, Droplet } from 'lucide-react'
 
 export default function ServicesPage() {
   const services = [
@@ -14,7 +15,7 @@ export default function ServicesPage() {
       id: 'standard',
       name: 'Standard Wash',
       description: 'Perfect for everyday clothes. Machine wash, machine dry, and professional folding.',
-      price: '$3.00/kg',
+      price: '$5.00/kg',
       image: 'https://images.unsplash.com/photo-1582820529300-e3c99f60a85e?q=80&w=2070&auto=format&fit=crop',
       features: [
         'Machine wash in warm water',
@@ -24,13 +25,13 @@ export default function ServicesPage() {
         'Ideal for cotton & blends',
       ],
       turnaround: '2-3 days',
-      icon: '👕',
+      icon: 'Shirt',
     },
     {
       id: 'delicate',
       name: 'Delicate Fabrics',
       description: 'Gentle care for silk, satin, linen, and other delicate materials.',
-      price: '$3.90/kg',
+      price: '$5.00/kg',
       image: 'https://images.unsplash.com/photo-1559062615-cd4628902d4a?q=80&w=2070&auto=format&fit=crop',
       features: [
         'Hand wash or delicate cycle',
@@ -40,13 +41,13 @@ export default function ServicesPage() {
         'Ideal for silk, satin, linen',
       ],
       turnaround: '3-4 days',
-      icon: '✨',
+      icon: 'Sparkles',
     },
     {
       id: 'express',
       name: 'Express Service',
       description: 'Need your clothes fast? Same-day turnaround available.',
-      price: '$4.50/kg',
+      price: '$10.00/kg',
       image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=2070&auto=format&fit=crop',
       features: [
         'Rush processing',
@@ -56,7 +57,7 @@ export default function ServicesPage() {
         'Perfect for urgent needs',
       ],
       turnaround: '4-6 hours',
-      icon: '⚡',
+      icon: Sparkles,
     },
     {
       id: 'comforter',
@@ -72,13 +73,13 @@ export default function ServicesPage() {
         'Keeps fill full & fluffy',
       ],
       turnaround: '2-3 days',
-      icon: '☁️',
+      icon: Cloud,
     },
     {
       id: 'handwash',
       name: 'Hand Wash Premium',
       description: 'Ultimate care with hand washing for your most precious items.',
-      price: '$5.50/kg',
+      price: '$5.00/kg',
       image: 'https://images.unsplash.com/photo-1546703388-bb4293fe3c61?q=80&w=2070&auto=format&fit=crop',
       features: [
         ' 100% hand washed',
@@ -88,7 +89,7 @@ export default function ServicesPage() {
         'Best for luxury items',
       ],
       turnaround: '3-4 days',
-      icon: '🧤',
+      icon: Hand,
     },
     {
       id: 'stain',
@@ -104,7 +105,7 @@ export default function ServicesPage() {
         'Add to any service',
       ],
       turnaround: 'Included in service',
-      icon: '🧼',
+      icon: Droplet,
     },
   ]
 
@@ -147,7 +148,7 @@ export default function ServicesPage() {
                       <h3 className="text-2xl font-bold text-dark mb-1">{service.name}</h3>
                       <p className="text-sm text-primary font-bold">{service.price}</p>
                     </div>
-                    <span className="text-3xl">{service.icon}</span>
+                    <span className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">{React.createElement(service.icon, { size: 24, className: 'text-primary' })}</span>
                   </div>
                   <p className="text-gray mb-4">{service.description}</p>
                   <ul className="mb-6 flex-1">

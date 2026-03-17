@@ -165,7 +165,8 @@ export function calculatePrice(factors: PricingFactors): PricingBreakdown {
     rushHourAdjustment = subtotal * 0.05 // 5% surcharge for peak
   }
 
-  const total = Math.round((subtotal + rushHourAdjustment) * 100) / 100
+  const subtotalBeforeGST = Math.round((subtotal + rushHourAdjustment) * 100) / 100
+  const total = subtotalBeforeGST
 
   return {
     basePrice: Math.round(basePrice * 100) / 100,

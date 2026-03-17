@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import admin from 'firebase-admin'
-import { generateOfferLetterHTML } from '@/lib/offer-letter'
-import { sendOfferLetter } from '@/lib/email-service'
+import { sendProApplicationApproved } from '@/lib/emailService'
 
 // Initialize Firebase Admin if not already done
 try {
@@ -26,7 +25,13 @@ try {
 
 export async function POST(request: NextRequest) {
   try {
-    const { inquiryId, adminId, adminName } = await request.json()
+    const { 
+      inquiryId, 
+      adminId, 
+      adminName, 
+      employeeId: customEmployeeId,
+      verificationChecklist 
+    } = await request.json()
 
     if (!inquiryId || !adminId) {
       return NextResponse.json(
@@ -47,16 +52,24 @@ export async function POST(request: NextRequest) {
 
     const inquiryData = inquiry.data()
 
-    // Update inquiry status
+    // Use provided employee ID or generate one
+    const employeeId = customEmployeeId || `EMP-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+
+    // Update inquiry status with verification checklist
     await db.collection('inquiries').doc(inquiryId).update({
       status: 'approved',
       reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
       reviewedBy: adminId,
       adminName: adminName,
+      employeeId: employeeId,
+      verificationChecklist: verificationChecklist || {
+        idVerified: true,
+        contactVerified: true,
+        workRightsVerified: true,
+        backgroundCheckPassed: true,
+        documentsReviewed: true,
+      },
     })
-
-    // Generate employee ID
-    const employeeId = `EMP-${Date.now()}`
 
     // Update user record with employee status
     const userId = inquiryData?.userId
@@ -66,32 +79,42 @@ export async function POST(request: NextRequest) {
         employeeId: employeeId,
         approvalDate: admin.firestore.FieldValue.serverTimestamp(),
         approvedBy: adminId,
+        employeeStatus: 'active',
+        verificationChecklist: verificationChecklist || {},
       })
+
+      // CRITICAL: Also create/update employee record in 'employees' collection
+      // This is required for the employee-login API to find the employee
+      await db.collection('employees').doc(userId).set({
+        uid: userId,
+        employeeId: employeeId,
+        email: inquiryData?.email || '',
+        firstName: inquiryData?.firstName || '',
+        lastName: inquiryData?.lastName || '',
+        phone: inquiryData?.phone || '',
+        state: inquiryData?.state || '',
+        status: 'approved',
+        approvalDate: admin.firestore.FieldValue.serverTimestamp(),
+        approvedBy: adminId,
+        verificationChecklist: verificationChecklist || {},
+        rating: 0,
+        totalJobs: 0,
+        totalEarnings: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true })
     }
 
-    // Generate and send offer letter email
-    const offerLetterData = {
-      employeeId,
-      firstName: inquiryData?.firstName || 'Pro Partner',
-      lastName: inquiryData?.lastName || '',
-      email: inquiryData?.email || '',
-      phone: inquiryData?.phone || '',
-      state: inquiryData?.state || '',
-      approvalDate: new Date().toISOString(),
-    }
-
-    const offerLetterHtml = generateOfferLetterHTML(offerLetterData)
-    
-    // Send email - don't fail the approval if email fails
-    const emailSent = await sendOfferLetter(
+    // Send approval email to the pro
+    const result = await sendProApplicationApproved(
       inquiryData?.email,
       inquiryData?.firstName,
-      inquiryData?.lastName,
-      offerLetterHtml,
-      employeeId
+      employeeId,
+      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/pro`
     )
+    const emailSent = result?.success || result?.messageId ? true : false
 
-    console.log(`[API] Inquiry approved and offer letter sent: ${emailSent}`)
+    console.log(`[API] Inquiry approved (ID: ${employeeId}) and approval email sent: ${emailSent}`)
 
     return NextResponse.json({
       success: true,

@@ -4,6 +4,9 @@ import {
   getPaymentMethods,
   processRefund,
 } from '@/lib/paymentService'
+import { PaymentIntentSchema, SavePaymentMethodSchema, validateData } from '@/lib/validationSchemas'
+import { validationError, successResponse, createdResponse, serverError } from '@/lib/apiUtils'
+import { withRateLimit, rateLimits } from '@/lib/middleware/rateLimit'
 
 // NOTE: This API uses Stripe directly and does NOT depend on Firebase Admin SDK
 // Firebase Firestore saves are optional/best-effort only
@@ -12,15 +15,23 @@ import {
 const Stripe = require('stripe')
 
 export async function POST(request: NextRequest) {
+  // Rate limiting (10 per minute)
+  const { allowed, response } = withRateLimit(
+    request,
+    rateLimits.payment.max,
+    rateLimits.payment.window
+  )
+  if (!allowed) return response!
+
   try {
     const body = await request.json()
     const { action, customerId, amount, orderId, paymentMethodId, description } = body
 
-    if (!customerId) {
-      return NextResponse.json(
-        { error: 'Customer ID required' },
-        { status: 400 }
-      )
+    // Validate required customer ID
+    if (!customerId || typeof customerId !== 'string') {
+      return validationError('Invalid customer ID', {
+        customerId: ['Customer ID is required and must be a string']
+      })
     }
 
     // Initialize Stripe with secret key
@@ -30,12 +41,13 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'create_payment_intent': {
-        if (!amount || !orderId) {
-          return NextResponse.json(
-            { error: 'Amount and Order ID required' },
-            { status: 400 }
-          )
+        // Validate input
+        const validation = validateData(PaymentIntentSchema, { customerId, amount, orderId, description })
+        if (!validation.success) {
+          return validationError('Invalid payment intent data', validation.error.flatten().fieldErrors)
         }
+
+        const { amount: validAmount, orderId: validOrderId } = validation.data
 
         console.log('[PAYMENTS-API] Creating payment intent for customerId:', customerId)
         
@@ -58,12 +70,12 @@ export async function POST(request: NextRequest) {
           console.log('[PAYMENTS-API] Step 2: Creating payment intent...')
           
           const paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(amount * 100), // Convert AUD to cents
+            amount: Math.round(validAmount * 100), // Convert AUD to cents
             currency: 'aud',
             customer: stripeCustomerId,
-            description: description || `Order ${orderId}`,
+            description: description || `Order ${validOrderId}`,
             metadata: {
-              orderId,
+              orderId: validOrderId,
               firebaseUid: customerId,
               timestamp: new Date().toISOString()
             }
@@ -76,78 +88,80 @@ export async function POST(request: NextRequest) {
           })
 
           // Step 3: Return payment details to client
-          return NextResponse.json({
+          return createdResponse({
             clientSecret: paymentIntent.client_secret,
             paymentIntentId: paymentIntent.id,
             stripeCustomerId: stripeCustomerId,
             amount: paymentIntent.amount,
             currency: paymentIntent.currency
-          }, { status: 200 })
+          })
 
         } catch (stripeErr: any) {
-          const errorMsg = stripeErr.message || 'Stripe API error'
-          console.error('[PAYMENTS-API] Stripe error:', errorMsg)
-          
-          return NextResponse.json(
-            { error: `Payment processing failed: ${errorMsg}` },
-            { status: 500 }
-          )
+          console.error('[PAYMENTS-API] Stripe error:', stripeErr.message)
+          return serverError(stripeErr, 'Failed to create payment intent')
         }
       }
 
       case 'save_payment_method': {
-        if (!paymentMethodId) {
-          return NextResponse.json(
-            { error: 'Payment method ID required' },
-            { status: 400 }
-          )
+        // Validate input
+        const validation = validateData(SavePaymentMethodSchema, { customerId, paymentMethodId, isDefault: body.isDefault })
+        if (!validation.success) {
+          return validationError('Invalid payment method data', validation.error.flatten().fieldErrors)
         }
 
-        const result = await savePaymentMethod(
-          customerId,
-          paymentMethodId,
-          body.isDefault || false
-        )
+        try {
+          const result = await savePaymentMethod(
+            customerId,
+            validation.data.paymentMethodId,
+            validation.data.isDefault || false
+          )
 
-        return NextResponse.json(result, { status: 200 })
+          return successResponse(result)
+        } catch (error: any) {
+          console.error('[PAYMENTS-API] Error saving payment method:', error.message)
+          return serverError(error, 'Failed to save payment method')
+        }
       }
 
       case 'get_payment_methods': {
-        const methods = await getPaymentMethods(customerId)
-        return NextResponse.json({ methods }, { status: 200 })
+        try {
+          const methods = await getPaymentMethods(customerId)
+          return successResponse({ methods })
+        } catch (error: any) {
+          console.error('[PAYMENTS-API] Error getting payment methods:', error.message)
+          return serverError(error, 'Failed to retrieve payment methods')
+        }
       }
 
       case 'refund_payment': {
         const { paymentIntentId, refundAmount } = body
 
-        if (!paymentIntentId) {
-          return NextResponse.json(
-            { error: 'Payment intent ID required' },
-            { status: 400 }
-          )
+        if (!paymentIntentId || typeof paymentIntentId !== 'string') {
+          return validationError('Invalid refund data', {
+            paymentIntentId: ['Payment intent ID is required and must be a string']
+          })
         }
 
-        const success = await processRefund(
-          paymentIntentId,
-          refundAmount ? Math.round(refundAmount * 100) : undefined
-        )
+        try {
+          const success = await processRefund(
+            paymentIntentId,
+            refundAmount ? Math.round(refundAmount * 100) : undefined
+          )
 
-        return NextResponse.json({ success }, { status: 200 })
+          return successResponse({ success })
+        } catch (error: any) {
+          console.error('[PAYMENTS-API] Error processing refund:', error.message)
+          return serverError(error, 'Failed to process refund')
+        }
       }
 
       default:
-        return NextResponse.json(
-          { error: 'Unknown action' },
-          { status: 400 }
-        )
+        return validationError('Invalid action', {
+          action: ['Unknown action. Valid actions: create_payment_intent, save_payment_method, get_payment_methods, refund_payment']
+        })
     }
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error)
-    console.error('[PAYMENTS-API] Request error:', errorMsg)
-    
-    return NextResponse.json(
-      { error: errorMsg || 'Internal server error' },
-      { status: 500 }
-    )
+  } catch (error: any) {
+    console.error('[PAYMENTS-API] Request error:', error.message)
+    return serverError(error, 'Payment processing failed')
   }
 }

@@ -6,7 +6,7 @@ import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Link from 'next/link'
-import { ArrowRight, CheckCircle, Star, Calendar, Truck, Sparkles, Package, Apple, Play } from 'lucide-react'
+import { ArrowRight, CheckCircle, Star, Calendar, Truck, Sparkles, Package, Apple, Play, Lock, Shield, MapPin, Zap, Gift, Leaf, CheckIcon } from 'lucide-react'
 
 export default function Home() {
   return (
@@ -14,8 +14,9 @@ export default function Home() {
       <Header />
 
       {/* Limited Time Offer Banner */}
-      <div className="bg-primary text-white text-center py-3 text-sm font-semibold">
-        🎉 Limited Time: First pickup FREE on your first order! Use code: WELCOME39
+      <div className="bg-primary text-white text-center py-3 text-sm font-semibold flex items-center justify-center gap-2">
+        <Sparkles size={18} className="inline" />
+        Limited Time: First pickup FREE on your first order! Use code: WELCOME39
       </div>
 
       {/* Hero Section */}
@@ -47,26 +48,26 @@ export default function Home() {
               {/* Trust Badges */}
               <div className="flex flex-wrap gap-4 mb-8 text-xs text-gray">
                 <div className="flex items-center gap-1.5">
-                  <span>🔒</span>
+                  <Lock size={16} className="text-primary" />
                   <span>SSL Encrypted</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span>✓</span>
+                  <CheckCircle size={16} className="text-primary" />
                   <span>100% Money Back</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span>🛡️</span>
+                  <Shield size={16} className="text-primary" />
                   <span>Data Protected</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span>📍</span>
+                  <MapPin size={16} className="text-primary" />
                   <span>Nationwide Service</span>
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/booking">
-                  <Button size="lg" className="text-white font-bold text-lg">Order Now</Button>
+                  <Button size="lg" className="text-white font-bold text-lg">Schedule Your First Pickup</Button>
                 </Link>
                 <Link href="/auth/signup">
                   <Button size="lg" variant="outline">Create Free Account</Button>
@@ -101,7 +102,8 @@ export default function Home() {
                 alt="Professional laundry and delivery service"
                 width={500}
                 height={400}
-                className="w-full h-full object-cover"
+                loading="eager"
+                className="w-full h-full object-cover w-auto h-auto"
               />
             </div>
           </div>
@@ -181,44 +183,47 @@ export default function Home() {
             {
               title: '1-Hour Pickup Confirmation',
               description: 'Get a confirmation within 1 hour (competitors take 24-48 hours).',
-              icon: '⚡',
+              icon: Zap,
             },
             {
               title: 'Lowest Minimum Order',
               description: 'Start with just $15, not $25-$40 like other services.',
-              icon: '💰',
+              icon: Truck,
             },
             {
               title: 'First Pickup FREE',
               description: 'No hidden charges on your first order. Others charge $5-$10.',
-              icon: '🎁',
+              icon: Gift,
             },
             {
               title: 'Eco-Friendly by Default',
               description: 'We use sustainable, hypoallergenic detergents standard—no upcharge.',
-              icon: '🌱',
+              icon: Leaf,
             },
             {
               title: '4.9★ Rating (Highest)',
               description: 'Consistently higher rated than Poppins (4.7★) and Rinse (4.6★).',
-              icon: '⭐',
+              icon: Star,
             },
             {
               title: '100% Money-Back Guarantee',
               description: '30-day satisfaction guarantee, no questions asked. Period.',
-              icon: '✓',
+              icon: CheckCircle,
             },
-          ].map((benefit, i) => (
+          ].map((benefit, i) => {
+            const IconComponent = benefit.icon
+            return (
             <Card key={i} hoverable>
               <div className="flex gap-4">
-                <span className="text-4xl flex-shrink-0">{benefit.icon}</span>
+                <IconComponent size={40} className="text-primary flex-shrink-0" />
                 <div>
                   <h3 className="font-bold text-dark mb-2">{benefit.title}</h3>
                   <p className="text-gray text-sm">{benefit.description}</p>
                 </div>
               </div>
             </Card>
-          ))}
+            )
+          })}
         </div>
 
         {/* Sustainability Message */}
@@ -357,7 +362,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
             <Link href="/booking">
               <Button size="lg" className="bg-primary text-white font-bold hover:shadow-2xl">
-                Order Now
+                Schedule Your First Pickup
               </Button>
             </Link>
           </div>

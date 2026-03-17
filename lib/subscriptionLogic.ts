@@ -1,69 +1,73 @@
 import { Timestamp } from 'firebase/firestore'
 
-export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'enterprise'
+export type SubscriptionPlan = 'payPerOrder' | 'starter' | 'pro' | 'premium'
 export type SubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'expired'
 export type BillingCycle = 'monthly' | 'yearly'
 
 export interface PlanFeatures {
-  maxOrders: number
+  maxWeightPerLoad: number
+  expressDelivery: boolean
   prioritySupport: boolean
+  addOnDiscounts: boolean
   advancedAnalytics: boolean
-  customBranding: boolean
-  apiAccess: boolean
-  bulkOperations: boolean
+  dedicatedAccount: boolean
 }
 
-export const planDetails: Record<SubscriptionPlan, { name: string; monthlyPrice: number; monthlyOrders: number; features: PlanFeatures }> = {
-  free: {
-    name: 'Free',
+export const planDetails: Record<SubscriptionPlan, { name: string; monthlyPrice: number; yearlyPrice: number; monthlyOrders: number; features: PlanFeatures }> = {
+  payPerOrder: {
+    name: 'Pay Per Order',
     monthlyPrice: 0,
+    yearlyPrice: 0,
     monthlyOrders: 10,
     features: {
-      maxOrders: 10,
+      maxWeightPerLoad: 25,
+      expressDelivery: false,
       prioritySupport: false,
+      addOnDiscounts: false,
       advancedAnalytics: false,
-      customBranding: false,
-      apiAccess: false,
-      bulkOperations: false,
+      dedicatedAccount: false,
     },
   },
   starter: {
     name: 'Starter',
     monthlyPrice: 4.99,
-    monthlyOrders: 100,
+    yearlyPrice: 59.88, // $4.99 * 12, could apply discount
+    monthlyOrders: 999999, // Unlimited
     features: {
-      maxOrders: 100,
+      maxWeightPerLoad: 25,
+      expressDelivery: true,
       prioritySupport: false,
-      advancedAnalytics: true,
-      customBranding: false,
-      apiAccess: false,
-      bulkOperations: false,
+      addOnDiscounts: true,
+      advancedAnalytics: false,
+      dedicatedAccount: false,
     },
   },
   pro: {
     name: 'Pro',
     monthlyPrice: 9.99,
-    monthlyOrders: 500,
+    yearlyPrice: 119.88, // $9.99 * 12, could apply discount
+    monthlyOrders: 999999, // Unlimited
     features: {
-      maxOrders: 500,
-      prioritySupport: true,
-      advancedAnalytics: true,
-      customBranding: true,
-      apiAccess: true,
-      bulkOperations: true,
+      maxWeightPerLoad: 45,
+      expressDelivery: true,
+      prioritySupport: false,
+      addOnDiscounts: true,
+      advancedAnalytics: false,
+      dedicatedAccount: false,
     },
   },
-  enterprise: {
-    name: 'Enterprise',
-    monthlyPrice: 29.99,
-    monthlyOrders: 999999,
+  premium: {
+    name: 'Premium+',
+    monthlyPrice: 24.99,
+    yearlyPrice: 299.88, // $24.99 * 12, could apply discount
+    monthlyOrders: 999999, // Unlimited
     features: {
-      maxOrders: 999999,
+      maxWeightPerLoad: 45,
+      expressDelivery: true,
       prioritySupport: true,
+      addOnDiscounts: true,
       advancedAnalytics: true,
-      customBranding: true,
-      apiAccess: true,
-      bulkOperations: true,
+      dedicatedAccount: true,
     },
   },
 }
@@ -118,12 +122,15 @@ export function validateSubscription(sub: Partial<Subscription>) {
 
 // Plan calculations
 export function getPlanPrice(plan: SubscriptionPlan, billingCycle: BillingCycle = 'monthly'): number {
-  const monthlyPrice = planDetails[plan].monthlyPrice
+  const planInfo = planDetails[plan]
   if (billingCycle === 'yearly') {
-    // 20% discount for yearly
-    return Math.round(monthlyPrice * 12 * 0.8 * 100) / 100
+    // Use yearlyPrice if available, otherwise calculate with 20% discount
+    if (planInfo.yearlyPrice) {
+      return planInfo.yearlyPrice
+    }
+    return Math.round(planInfo.monthlyPrice * 12 * 0.8 * 100) / 100
   }
-  return monthlyPrice
+  return planInfo.monthlyPrice
 }
 
 export function calculateTax(amount: number, taxRate: number = 0.1): number {
@@ -169,11 +176,11 @@ export function canDowngrade(fromPlan: SubscriptionPlan): boolean {
 
 // Pro recommendations
 export function recommendUpgrade(ordersThisMonth: number, currentPlan: SubscriptionPlan): SubscriptionPlan | null {
-  const maxOrders = planDetails[currentPlan].features.maxOrders
+  const maxOrders = planDetails[currentPlan].monthlyOrders
   const usagePercent = (ordersThisMonth / maxOrders) * 100
 
   if (usagePercent > 80) {
-    const order: SubscriptionPlan[] = ['free', 'starter', 'pro', 'enterprise']
+    const order: SubscriptionPlan[] = ['payPerOrder', 'starter', 'pro', 'premium']
     const currentIndex = order.indexOf(currentPlan)
     if (currentIndex < order.length - 1) {
       return order[currentIndex + 1]

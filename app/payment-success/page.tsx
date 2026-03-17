@@ -23,7 +23,7 @@ interface OrderDetails {
   createdAt: any
 }
 
-function PaymentSuccessContent() {
+function PaymentSuccessPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const orderId = searchParams.get('orderId')
@@ -218,10 +218,10 @@ function PaymentSuccessContent() {
   )
 }
 
-export default function PaymentSuccessPage() {
+export default function Page() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Spinner /></div>}>
-      <PaymentSuccessContent />
+    <Suspense fallback={<div>Loading...</div>}>
+      <PaymentSuccessPageContent />
     </Suspense>
   )
 }

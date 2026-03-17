@@ -16,9 +16,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         id: null,
         customerId: user.uid,
-        plan: 'free',
+        plan: 'payPerOrder',
         status: 'active',
-        features: planDetails.free.features,
+        features: planDetails.payPerOrder.features,
       })
     }
 

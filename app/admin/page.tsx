@@ -12,7 +12,13 @@ import {
   Eye,
   LogOut,
   Briefcase,
-  Lock
+  Lock,
+  ChevronDown,
+  Shield,
+  Settings,
+  DollarSign,
+  Megaphone,
+  Bell
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -36,51 +42,39 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [hasOwnerAccess, setHasOwnerAccess] = useState(false)
 
+  // Handle logout
+  const handleLogout = () => {
+    sessionStorage.removeItem('ownerAccess')
+    sessionStorage.removeItem('adminLoginTime')
+    router.push('/admin/login')
+  }
+
   // Check admin access
   useEffect(() => {
-    // Check for session-based owner access (from secret-access page)
+    // Check for session-based owner access from password login
     const ownerAccess = sessionStorage.getItem('ownerAccess') === 'true'
     setHasOwnerAccess(ownerAccess)
 
-    console.log('[AdminPage] Auth state:', { user: user?.email, isAdmin: userData?.isAdmin, authLoading, ownerAccess })
+    console.log('[AdminPage] Auth state:', { ownerAccess })
     
-    if (authLoading) return // Wait for auth to load
-
-    // Allow access if either:
-    // 1. User is logged in AND is marked as admin in Firebase, OR
-    // 2. User has owner access via session
-    if (ownerAccess) {
-      console.log('[AdminPage] Owner access granted via secret link')
-      return
-    }
-
-    if (!user) {
-      console.log('[AdminPage] Not logged in, redirecting to login')
-      router.push('/auth/login')
-      return
-    }
-
-    if (!userData?.isAdmin) {
-      console.log('[AdminPage] Not admin, redirecting to home')
-      console.log('[AdminPage] userData:', userData)
-      router.push('/')
+    if (!ownerAccess) {
+      console.log('[AdminPage] No admin access, redirecting to admin login')
+      router.push('/admin/login')
       return
     }
     
     console.log('[AdminPage] Admin access granted')
-  }, [user, userData, authLoading, router])
+  }, [router])
 
   useEffect(() => {
     const fetchAnalytics = async () => {
-      if (!user) return
-
       try {
         const response = await fetch('/api/admin/analytics', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'get_dashboard_summary',
-            adminId: user.uid
+            adminId: 'password-admin'
           })
         })
 
@@ -95,11 +89,13 @@ export default function AdminDashboard() {
       }
     }
 
-    fetchAnalytics()
-  }, [user])
+    if (hasOwnerAccess) {
+      fetchAnalytics()
+    }
+  }, [hasOwnerAccess])
 
-  // Show loading while auth is being checked
-  if (authLoading || (loading && !hasOwnerAccess)) {
+  // Show loading while checking admin access
+  if (!hasOwnerAccess && loading) {
     return (
       <>
         <Header />
@@ -114,15 +110,47 @@ export default function AdminDashboard() {
     )
   }
 
+  // If no admin access, show denied (this shouldn't happen as we redirect in useEffect)
+  if (!hasOwnerAccess) {
+    return (
+      <>
+        <Header />
+        <div className="min-h-screen bg-gray-50 py-12 px-4">
+          <div className="max-w-md mx-auto bg-white rounded-lg shadow p-8 text-center">
+            <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h1>
+            <p className="text-gray-600 mb-6">You don't have admin access.</p>
+            <a
+              href="/admin/login"
+              className="inline-block px-6 py-2 bg-[#48C9B0] text-white rounded hover:bg-[#3aad9a] transition font-semibold"
+            >
+              Go to Admin Setup
+            </a>
+          </div>
+        </div>
+        <Footer />
+      </>
+    )
+  }
+
   return (
     <>
       <Header />
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {userData?.name || 'Admin'}</p>
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+              <p className="text-gray-600">Welcome back, Owner</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition"
+            >
+              <LogOut size={20} />
+              Logout
+            </button>
           </div>
 
           {/* Admin Alert */}
@@ -189,124 +217,259 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Admin Sections */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            {/* Users Management */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-primary to-[#3aad9a] px-6 py-4">
-                <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                  <Users size={24} />
-                  User Management
-                </h2>
+          {/* Collections Organization */}
+          
+          {/* CORE MANAGEMENT */}
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <Briefcase size={28} className="text-primary" />
+              Core Management
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Users Management */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <Users size={24} />
+                    Users
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Manage employees & customers</p>
+                  <a
+                    href="/admin/users"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-center font-semibold text-sm"
+                  >
+                    View All Users
+                  </a>
+                  <a
+                    href="/admin/users?type=pro"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 border-2 border-blue-500 text-blue-500 rounded hover:bg-blue-50 transition text-center font-semibold text-sm"
+                  >
+                    Pro Applications
+                  </a>
+                </div>
               </div>
-              <div className="p-6 space-y-3">
-                <p className="text-gray-600 mb-4">Manage customers and pro users</p>
-                <a
-                  href="/admin/users"
-                  className="block px-4 py-2 bg-primary text-white rounded hover:bg-[#3aad9a] transition text-center font-semibold"
-                >
-                  View All Users
-                </a>
-                <a
-                  href="/admin/users?type=pro"
-                  className="block px-4 py-2 border-2 border-primary text-primary rounded hover:bg-mint transition text-center font-semibold"
-                >
-                  View Pro Applications
-                </a>
+
+              {/* Orders Management */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <ShoppingCart size={24} />
+                    Orders
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">View all orders & status</p>
+                  <a
+                    href="/admin/orders"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition text-center font-semibold text-sm"
+                  >
+                    All Orders
+                  </a>
+                  <a
+                    href="/admin/orders?status=disputed"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 border-2 border-green-500 text-green-500 rounded hover:bg-green-50 transition text-center font-semibold text-sm"
+                  >
+                    Disputed Orders
+                  </a>
+                </div>
+              </div>
+
+              {/* Analytics */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <BarChart3 size={24} />
+                    Analytics
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Revenue & performance</p>
+                  <a
+                    href="/admin/analytics"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition text-center font-semibold text-sm"
+                  >
+                    View Analytics
+                  </a>
+                  <a
+                    href="/admin/reports"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 border-2 border-purple-500 text-purple-500 rounded hover:bg-purple-50 transition text-center font-semibold text-sm"
+                  >
+                    Generate Reports
+                  </a>
+                </div>
               </div>
             </div>
+          </div>
 
-            {/* Orders Management */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
-                <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                  <ShoppingCart size={24} />
-                  Order Management
-                </h2>
+          {/* CONFIGURATION */}
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <Settings size={28} className="text-amber-600" />
+              Configuration
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Pricing Rules */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <DollarSign size={24} />
+                    Pricing Rules
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Manage pricing & rates</p>
+                  <a
+                    href="/admin/pricing/rules"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 transition text-center font-semibold text-sm"
+                  >
+                    Pricing Rules
+                  </a>
+                  <a
+                    href="/admin/pricing/rules"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 border-2 border-amber-500 text-amber-500 rounded hover:bg-amber-50 transition text-center font-semibold text-sm"
+                  >
+                    View All Rates
+                  </a>
+                </div>
               </div>
-              <div className="p-6 space-y-3">
-                <p className="text-gray-600 mb-4">Manage orders and handle disputes</p>
-                <a
-                  href="/admin/orders"
-                  className="block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-center font-semibold"
-                >
-                  View All Orders
-                </a>
-                <a
-                  href="/admin/orders?status=disputed"
-                  className="block px-4 py-2 border-2 border-blue-500 text-blue-500 rounded hover:bg-blue-50 transition text-center font-semibold"
-                >
-                  Disputed Orders
-                </a>
+
+              {/* Marketing */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-pink-500 to-pink-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <Megaphone size={24} />
+                    Marketing
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Campaigns & promotions</p>
+                  <a
+                    href="/admin/marketing/campaigns"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 transition text-center font-semibold text-sm"
+                  >
+                    Campaigns
+                  </a>
+                  <a
+                    href="/admin/marketing/campaigns"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 border-2 border-pink-500 text-pink-500 rounded hover:bg-pink-50 transition text-center font-semibold text-sm"
+                  >
+                    Promotions
+                  </a>
+                </div>
+              </div>
+
+              {/* Security */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <Shield size={24} />
+                    Security
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Compliance & access</p>
+                  <a
+                    href="/admin/security"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition text-center font-semibold text-sm"
+                  >
+                    Security Logs
+                  </a>
+                  <a
+                    href="/admin/security"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 border-2 border-red-500 text-red-500 rounded hover:bg-red-50 transition text-center font-semibold text-sm"
+                  >
+                    Access Control
+                  </a>
+                </div>
               </div>
             </div>
+          </div>
 
-            {/* Analytics */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
-                <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                  <BarChart3 size={24} />
-                  Analytics & Reports
-                </h2>
+          {/* SUPPORT */}
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <Bell size={28} className="text-indigo-600" />
+              Support & Inquiries
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Pro Applications */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <Briefcase size={24} />
+                    Pro Applications
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Review and approve service provider applications</p>
+                  <a
+                    href="/admin/pro-applications"
+                    className="block px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition text-center font-semibold text-sm"
+                  >
+                    View Applications
+                  </a>
+                  <a
+                    href="/admin/pro-applications?status=pending"
+                    className="block px-4 py-2 border-2 border-emerald-500 text-emerald-500 rounded hover:bg-emerald-50 transition text-center font-semibold text-sm"
+                  >
+                    Pending ({analytics?.pendingApplications || 0})
+                  </a>
+                </div>
               </div>
-              <div className="p-6 space-y-3">
-                <p className="text-gray-600 mb-4">View detailed analytics and generate reports</p>
-                <a
-                  href="/admin/analytics"
-                  className="block px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition text-center font-semibold"
-                >
-                  View Analytics
-                </a>
-                <button className="w-full px-4 py-2 border-2 border-purple-500 text-purple-500 rounded hover:bg-purple-50 transition font-semibold">
-                  Export Report
-                </button>
-              </div>
-            </div>
 
-            {/* Support & Settings */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
-                <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                  <Eye size={24} />
-                  Support & Settings
-                </h2>
-              </div>
-              <div className="p-6 space-y-3">
-                <p className="text-gray-600 mb-4">Support tickets and system settings</p>
-                <a
-                  href="/admin/support"
-                  className="block px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition text-center font-semibold"
-                >
-                  Support Tickets
-                </a>
-                <a
-                  href="/admin/settings"
-                  className="block px-4 py-2 border-2 border-green-500 text-green-500 rounded hover:bg-green-50 transition text-center font-semibold"
-                >
-                  System Settings
-                </a>
-              </div>
-            </div>
-
-            {/* Employees & Customers */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-[#48C9B0] to-[#7FE3D3] px-6 py-4">
-                <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                  <Lock size={24} />
-                  Employee & Customer Access
-                </h2>
-              </div>
-              <div className="p-6 space-y-3">
-                <p className="text-gray-600 mb-4">View all employee and customer accounts</p>
-                <a
-                  href="/secret-admin"
-                  className="block px-4 py-2 bg-[#48C9B0] text-white rounded hover:bg-[#3aad9a] transition text-center font-semibold"
-                >
-                  Access Employee & Customer Portal
-                </a>
-                <p className="text-xs text-gray-500 text-center mt-2">
-                  Password-protected portal for viewing all accounts
-                </p>
+              {/* Inquiries */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <Bell size={24} />
+                    Inquiries
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Customer support tickets</p>
+                  <a
+                    href="/admin/inquiries"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-center font-semibold text-sm"
+                  >
+                    View Inquiries
+                  </a>
+                  <a
+                    href="/admin/inquiries"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 border-2 border-indigo-500 text-indigo-500 rounded hover:bg-indigo-50 transition text-center font-semibold text-sm"
+                  >
+                    Pending Applications
+                  </a>
+                </div>
               </div>
             </div>
           </div>

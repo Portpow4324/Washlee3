@@ -25,7 +25,7 @@ interface OrderSummary {
 
 type PaymentMethod = 'card' | 'saved'
 
-function CheckoutContent() {
+function CheckoutPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
@@ -394,10 +394,10 @@ function CheckoutContent() {
   )
 }
 
-export default function CheckoutPage() {
+export default function Page() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Spinner /></div>}>
-      <CheckoutContent />
+    <Suspense fallback={<div>Loading...</div>}>
+      <CheckoutPageContent />
     </Suspense>
   )
 }

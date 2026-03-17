@@ -1,0 +1,94 @@
+# 📊 CSV IMPORT QUICK START
+
+## Location
+`CSV_IMPORTS/` folder (11 files ready)
+
+## Import Order (CRITICAL - Must be in this order!)
+
+```
+1. 01_users.csv → users table
+2. 02_customers.csv → customers table
+3. 03_employees.csv → employees table
+4. 04_wash_clubs.csv → wash_clubs table
+5. 05_wash_club_verification.csv → wash_club_verification table
+6. 06_wash_club_transactions.csv → wash_club_transactions table (after orders!)
+7. 07_orders.csv → orders table
+8. 08_reviews.csv → reviews table
+9. 09_inquiries.csv → inquiries table
+10. 10_transactions.csv → transactions table
+11. 11_verification_codes.csv → verification_codes table
+```
+
+## How to Import (30 seconds per file)
+
+1. Go to **Supabase Dashboard**
+2. Click **Tables** (left sidebar)
+3. Click table name (e.g., `users`)
+4. Click **↓ Import data**
+5. Choose CSV file
+6. Click **Import**
+7. Done! ✅
+
+**Repeat for all 11 files**
+
+---
+
+## Sample Data You're Getting
+
+**5 Users:**
+- John Doe (Customer)
+- Jane Smith (Pro)
+- Admin User (Admin)
+- Mike Johnson (Customer + Wash Club)
+- Sarah Williams (Pro)
+
+**2 Orders, 1 Review, 2 Transactions, 2 Wash Club Memberships, 3 Credit Transactions**
+
+---
+
+## File Reference
+
+| File | Table | Records | Depends On |
+|------|-------|---------|-----------|
+| 01_users.csv | users | 5 | None |
+| 02_customers.csv | customers | 2 | users |
+| 03_employees.csv | employees | 2 | users |
+| 04_wash_clubs.csv | wash_clubs | 2 | users |
+| 05_wash_club_verification.csv | wash_club_verification | 2 | users |
+| 06_wash_club_transactions.csv | wash_club_transactions | 3 | users, wash_clubs, orders |
+| 07_orders.csv | orders | 2 | users |
+| 08_reviews.csv | reviews | 1 | orders, users |
+| 09_inquiries.csv | inquiries | 2 | users (optional) |
+| 10_transactions.csv | transactions | 2 | users, orders |
+| 11_verification_codes.csv | verification_codes | 3 | users |
+
+---
+
+## Test with These UUIDs
+
+After import, use these IDs in your app:
+
+```
+Customer: 550e8400-e29b-41d4-a716-446655440000 (John)
+Pro: 550e8400-e29b-41d4-a716-446655440001 (Jane)
+Admin: 550e8400-e29b-41d4-a716-446655440002
+Test: 550e8400-e29b-41d4-a716-446655440003 (Mike - has Wash Club)
+```
+
+---
+
+## ⚠️ Important
+
+**DO NOT skip any files** - Import all 11 in order
+**DO NOT re-import** - Wait for completion before next
+**DO NOT import out of order** - Foreign keys will fail
+
+---
+
+## Estimated Time: ~5 minutes
+
+~30 seconds per file × 11 files = ~5 minutes total
+
+---
+
+**After import is complete**: Your database will be populated and ready for Phase 3! 🚀

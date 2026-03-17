@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // USERS COLLECTION (Central Hub)
+    // ============================================
+    match /users/{uid} {
+      // Users can read/write their own metadata
+      allow read, write: if request.auth.uid == uid;
+    }
+
+    // ============================================
+    // CUSTOMERS COLLECTION
+    // ============================================
+    match /customers/{uid} {
+      // Users can read/write their own customer profile
+      allow read, write: if request.auth.uid == uid;
+      
+      // Employees can read customer data (for order matching)
+      allow read: if exists(/databases/$(database)/documents/employees/$(request.auth.uid));
+    }
+
+    // ============================================
+    // EMPLOYEES COLLECTION
+    // ============================================
+    match /employees/{uid} {
+      // Users can read/write their own employee profile
+      allow read, write: if request.auth.uid == uid;
+    }
+
+    // ============================================
+    // LOYALTY PROGRAMS COLLECTION
+    // ============================================
+    match /loyalty_programs/{uid} {
+      // Users can read/write their own loyalty profile
+      allow read, write: if request.auth.uid == uid;
+    }
+
+    // ============================================
+    // SUBSCRIPTIONS COLLECTION
+    // ============================================
+    match /subscriptions/{uid} {
+      // Users can read/write their own subscription
+      allow read, write: if request.auth.uid == uid;
+    }
+
+    // ============================================
+    // ORDERS COLLECTION
+    // ============================================
+    match /orders/{orderId} {
+      // Allow document creation (server-side from API)
+      allow create: if true;
+      
+      // Customers can read/write their own orders (after creation)
+      allow read, write: if request.auth.uid == resource.data.customerId || request.auth.uid == resource.data.uid;
+      
+      // Employees can read/write orders assigned to them
+      allow read, write: if request.auth.uid == resource.data.employeeId;
+    }
+
+    // ============================================
+    // ADMIN ACCESS (via custom claims)
+    // ============================================
+    match /{document=**} {
+      // Admins can read all data
+      allow read: if request.auth.token.admin == true;
+      
+      // Admins can write to users and orders for management
+      allow write: if request.auth.token.admin == true && 
+                      (request.path.matches(/users\/.*/) || 
+                       request.path.matches(/orders\/.*/));
+    }
+  }
+}

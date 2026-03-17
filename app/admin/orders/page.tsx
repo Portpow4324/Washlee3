@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-import { ChevronLeft, Search, Eye, Trash2, Package } from 'lucide-react';
+import { ChevronLeft, Search, Eye, Trash2, Package, ArrowLeft } from 'lucide-react';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import { collection, getDocs, orderBy, query, limit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface Order {
   id: string;
@@ -40,7 +44,8 @@ interface Order {
 
 export default function AdminOrdersPage() {
   const { user, userData, loading } = useAuth();
-  const isAdmin = userData?.isAdmin;
+  const [ownerAccess, setOwnerAccess] = useState(false);
+  const isAdmin = userData?.isAdmin || ownerAccess;
   const isLoading = loading;
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
@@ -52,157 +57,67 @@ export default function AdminOrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
 
+  // Check for owner access on mount
+  useEffect(() => {
+    const access = typeof window !== 'undefined' && sessionStorage?.getItem('ownerAccess') === 'true';
+    setOwnerAccess(access);
+  }, []);
+
   // Redirect if not admin
   useEffect(() => {
     if (!isLoading && !isAdmin) {
+      // Check if user is logged in as a different account
+      if (user) {
+        console.error('[AdminOrders] User is not admin. Current user:', user.email);
+      }
       window.location.href = '/';
     }
-  }, [isAdmin, isLoading]);
+  }, [user, isAdmin, isLoading]);
 
-  // Fetch orders
+  // Fetch orders from Firestore
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         setPageLoading(true);
         setError(null);
 
-        const response = await fetch('/api/admin/analytics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'get_order_analytics' })
+        // Fetch directly from Firestore
+        const ordersRef = collection(db, 'orders');
+        const q = query(ordersRef, orderBy('createdAt', 'desc'), limit(100));
+        const querySnapshot = await getDocs(q);
+        
+        const fetchedOrders: Order[] = querySnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            customerId: data.customerId || '',
+            customerName: data.customerName || 'Unknown',
+            customerEmail: data.customerEmail || '',
+            proId: data.proId,
+            proName: data.proName,
+            status: data.status || 'pending',
+            items: data.items || [],
+            pickupDate: data.pickupDate || new Date().toISOString(),
+            estimatedDelivery: data.estimatedDelivery || new Date().toISOString(),
+            actualDelivery: data.actualDelivery,
+            pricing: data.pricing || { subtotal: 0, tax: 0, total: 0 },
+            specialInstructions: data.specialInstructions,
+            address: data.address || { street: '', city: '', state: '', postcode: '' },
+            paymentStatus: data.paymentStatus || 'pending',
+            feedback: data.feedback,
+            createdAt: data.createdAt || new Date().toISOString(),
+            updatedAt: data.updatedAt || new Date().toISOString(),
+          } as Order;
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
-
-        const data = await response.json();
-        console.log('Fetched orders:', data);
-
-        // Mock data if API returns empty
-        const mockOrders: Order[] = [
-          {
-            id: 'ORD-001',
-            customerId: 'user-001',
-            customerName: 'John Doe',
-            customerEmail: 'john.doe@example.com',
-            proId: 'user-002',
-            proName: 'Jane Smith',
-            status: 'completed',
-            items: [
-              { type: 'regular-wash', quantity: 5, instructions: 'Cold water only' }
-            ],
-            pickupDate: '2024-01-24',
-            estimatedDelivery: '2024-01-26',
-            actualDelivery: '2024-01-26',
-            pricing: { subtotal: 45.00, tax: 4.50, total: 49.50 },
-            address: { street: '123 Main St', city: 'Sydney', state: 'NSW', postcode: '2000' },
-            paymentStatus: 'completed',
-            feedback: { rating: 5, review: 'Excellent service!' },
-            createdAt: '2024-01-24',
-            updatedAt: '2024-01-26'
-          },
-          {
-            id: 'ORD-002',
-            customerId: 'user-004',
-            customerName: 'Sarah Johnson',
-            customerEmail: 'sarah.johnson@example.com',
-            proId: 'user-002',
-            proName: 'Jane Smith',
-            status: 'delivering',
-            items: [
-              { type: 'delicate-wash', quantity: 3 },
-              { type: 'comforter', quantity: 1 }
-            ],
-            pickupDate: '2024-01-26',
-            estimatedDelivery: '2024-01-27',
-            pricing: { subtotal: 65.00, tax: 6.50, total: 71.50 },
-            address: { street: '456 Oak Ave', city: 'Melbourne', state: 'VIC', postcode: '3000' },
-            paymentStatus: 'completed',
-            createdAt: '2024-01-26',
-            updatedAt: '2024-01-26'
-          },
-          {
-            id: 'ORD-003',
-            customerId: 'user-001',
-            customerName: 'John Doe',
-            customerEmail: 'john.doe@example.com',
-            status: 'pending',
-            items: [
-              { type: 'regular-wash', quantity: 8 }
-            ],
-            pickupDate: '2024-01-27',
-            estimatedDelivery: '2024-01-28',
-            pricing: { subtotal: 55.00, tax: 5.50, total: 60.50 },
-            address: { street: '123 Main St', city: 'Sydney', state: 'NSW', postcode: '2000' },
-            paymentStatus: 'pending',
-            createdAt: '2024-01-26',
-            updatedAt: '2024-01-26'
-          },
-          {
-            id: 'ORD-004',
-            customerId: 'user-006',
-            customerName: 'Lucy Brown',
-            customerEmail: 'lucy.brown@example.com',
-            proId: 'user-005',
-            proName: 'Mike Wilson',
-            status: 'accepted',
-            items: [
-              { type: 'regular-wash', quantity: 6 }
-            ],
-            pickupDate: '2024-01-25',
-            estimatedDelivery: '2024-01-27',
-            pricing: { subtotal: 52.00, tax: 5.20, total: 57.20 },
-            address: { street: '789 Pine Rd', city: 'Brisbane', state: 'QLD', postcode: '4000' },
-            paymentStatus: 'completed',
-            createdAt: '2024-01-25',
-            updatedAt: '2024-01-26'
-          },
-          {
-            id: 'ORD-005',
-            customerId: 'user-004',
-            customerName: 'Sarah Johnson',
-            customerEmail: 'sarah.johnson@example.com',
-            status: 'cancelled',
-            items: [
-              { type: 'regular-wash', quantity: 4 }
-            ],
-            pickupDate: '2024-01-26',
-            estimatedDelivery: '2024-01-28',
-            pricing: { subtotal: 35.00, tax: 3.50, total: 38.50 },
-            address: { street: '456 Oak Ave', city: 'Melbourne', state: 'VIC', postcode: '3000' },
-            paymentStatus: 'failed',
-            createdAt: '2024-01-26',
-            updatedAt: '2024-01-26'
-          }
-        ];
-
-        setOrders(data.orders || mockOrders);
-      } catch (err) {
-        console.error('Error fetching orders:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load orders');
-        // Still show mock data on error
-        const mockOrders: Order[] = [
-          {
-            id: 'ORD-001',
-            customerId: 'user-001',
-            customerName: 'John Doe',
-            customerEmail: 'john.doe@example.com',
-            proId: 'user-002',
-            proName: 'Jane Smith',
-            status: 'completed',
-            items: [{ type: 'regular-wash', quantity: 5 }],
-            pickupDate: '2024-01-24',
-            estimatedDelivery: '2024-01-26',
-            actualDelivery: '2024-01-26',
-            pricing: { subtotal: 45.00, tax: 4.50, total: 49.50 },
-            address: { street: '123 Main St', city: 'Sydney', state: 'NSW', postcode: '2000' },
-            paymentStatus: 'completed',
-            createdAt: '2024-01-24',
-            updatedAt: '2024-01-26'
-          }
-        ];
-        setOrders(mockOrders);
+        console.log('Fetched orders from Firestore:', fetchedOrders);
+        setOrders(fetchedOrders);
+        setFilteredOrders(fetchedOrders);
+      } catch (error) {
+        console.error('Error fetching orders from Firestore:', error);
+        setError('Failed to fetch orders from Firestore');
+        setOrders([]);
+        setFilteredOrders([]);
       } finally {
         setPageLoading(false);
       }
@@ -362,13 +277,13 @@ export default function AdminOrdersPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link
-            href="/admin"
+          <button
+            onClick={() => window.history.back()}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
             <ChevronLeft className="w-5 h-5" />
             Back to Dashboard
-          </Link>
+          </button>
         </div>
 
         <div className="mb-8">
@@ -565,11 +480,11 @@ export default function AdminOrdersPage() {
                       <td className="px-6 py-4 text-sm">
                         <span
                           className={`px-2 py-1 rounded text-xs font-medium ${getPaymentStatusColor(
-                            order.paymentStatus
+                            order.paymentStatus || 'pending'
                           )}`}
                         >
-                          {order.paymentStatus.charAt(0).toUpperCase() +
-                            order.paymentStatus.slice(1)}
+                          {(order.paymentStatus || 'pending').charAt(0).toUpperCase() +
+                            (order.paymentStatus || 'pending').slice(1)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900 text-right">

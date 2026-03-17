@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { ChevronLeft, Search, Shield, Trash2, Eye } from 'lucide-react';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface User {
   id: string;
@@ -35,147 +37,46 @@ export default function AdminUsersPage() {
   // Redirect if not admin
   useEffect(() => {
     if (!isLoading && !isAdmin) {
+      // Check if user is logged in as a different account
+      if (user) {
+        console.error('[AdminUsers] User is not admin. Current user:', user.email);
+      }
       window.location.href = '/';
     }
-  }, [isAdmin, isLoading]);
+  }, [user, isAdmin, isLoading]);
 
-  // Fetch users
+  // Fetch users from Firestore
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setPageLoading(true);
         setError(null);
 
-        const response = await fetch('/api/admin/analytics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'get_user_analytics' })
-        });
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, orderBy('createdAt', 'desc'), limit(100));
+        const querySnapshot = await getDocs(q);
+        
+        const fetchedUsers: User[] = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          email: doc.data().email || '',
+          displayName: doc.data().name || doc.data().firstName || 'Unknown',
+          userType: doc.data().userType || 'customer',
+          createdAt: doc.data().createdAt || new Date().toISOString(),
+          lastLogin: doc.data().lastLogin || doc.data().createdAt || new Date().toISOString(),
+          isAdmin: doc.data().isAdmin || false,
+          status: 'active',
+          totalOrders: 0,
+          totalSpent: 0
+        } as User));
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch users');
-        }
-
-        const data = await response.json();
-        console.log('Fetched users:', data);
-
-        // Mock data if API returns empty
-        const mockUsers: User[] = [
-          {
-            id: 'user-001',
-            email: 'john.doe@example.com',
-            displayName: 'John Doe',
-            userType: 'customer',
-            createdAt: '2024-01-15',
-            lastLogin: '2024-01-26',
-            isAdmin: false,
-            status: 'active',
-            totalOrders: 12,
-            totalSpent: 450.00
-          },
-          {
-            id: 'user-002',
-            email: 'jane.smith@example.com',
-            displayName: 'Jane Smith',
-            userType: 'pro',
-            createdAt: '2024-01-10',
-            lastLogin: '2024-01-26',
-            isAdmin: false,
-            status: 'active',
-            totalOrders: 45
-          },
-          {
-            id: 'user-003',
-            email: 'admin@example.com',
-            displayName: 'Admin User',
-            userType: 'customer',
-            createdAt: '2024-01-01',
-            lastLogin: '2024-01-26',
-            isAdmin: true,
-            status: 'active',
-            totalOrders: 0,
-            totalSpent: 0
-          },
-          {
-            id: 'user-004',
-            email: 'sarah.johnson@example.com',
-            displayName: 'Sarah Johnson',
-            userType: 'customer',
-            createdAt: '2024-01-20',
-            lastLogin: '2024-01-25',
-            isAdmin: false,
-            status: 'active',
-            totalOrders: 5,
-            totalSpent: 185.50
-          },
-          {
-            id: 'user-005',
-            email: 'mike.wilson@example.com',
-            displayName: 'Mike Wilson',
-            userType: 'pro',
-            createdAt: '2024-01-12',
-            lastLogin: '2024-01-24',
-            isAdmin: false,
-            status: 'inactive',
-            totalOrders: 32
-          },
-          {
-            id: 'user-006',
-            email: 'lucy.brown@example.com',
-            displayName: 'Lucy Brown',
-            userType: 'customer',
-            createdAt: '2024-01-18',
-            lastLogin: '2024-01-26',
-            isAdmin: false,
-            status: 'active',
-            totalOrders: 8,
-            totalSpent: 290.00
-          }
-        ];
-
-        setUsers(data.users || mockUsers);
-      } catch (err) {
-        console.error('Error fetching users:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load users');
-        // Still show mock data on error
-        const mockUsers: User[] = [
-          {
-            id: 'user-001',
-            email: 'john.doe@example.com',
-            displayName: 'John Doe',
-            userType: 'customer',
-            createdAt: '2024-01-15',
-            lastLogin: '2024-01-26',
-            isAdmin: false,
-            status: 'active',
-            totalOrders: 12,
-            totalSpent: 450.00
-          },
-          {
-            id: 'user-002',
-            email: 'jane.smith@example.com',
-            displayName: 'Jane Smith',
-            userType: 'pro',
-            createdAt: '2024-01-10',
-            lastLogin: '2024-01-26',
-            isAdmin: false,
-            status: 'active',
-            totalOrders: 45
-          },
-          {
-            id: 'user-003',
-            email: 'admin@example.com',
-            displayName: 'Admin User',
-            userType: 'customer',
-            createdAt: '2024-01-01',
-            lastLogin: '2024-01-26',
-            isAdmin: true,
-            status: 'active',
-            totalOrders: 0,
-            totalSpent: 0
-          }
-        ];
-        setUsers(mockUsers);
+        console.log('Fetched users from Firestore:', fetchedUsers);
+        setUsers(fetchedUsers);
+        setFilteredUsers(fetchedUsers);
+      } catch (error) {
+        console.error('Error fetching users from Firestore:', error);
+        setError('Failed to fetch users from Firestore');
+        setUsers([]);
+        setFilteredUsers([]);
       } finally {
         setPageLoading(false);
       }
@@ -335,13 +236,13 @@ export default function AdminUsersPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link
-            href="/admin"
+          <button
+            onClick={() => window.history.back()}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
             <ChevronLeft className="w-5 h-5" />
             Back to Dashboard
-          </Link>
+          </button>
         </div>
 
         <div className="mb-8">

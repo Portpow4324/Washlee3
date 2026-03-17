@@ -1,151 +1,176 @@
 'use client'
 
-import Card from '@/components/Card'
-import Button from '@/components/Button'
-import Link from 'next/link'
-import { Truck, CheckCircle, XCircle, ChevronRight } from 'lucide-react'
-import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
-import { db } from '@/lib/firebase'
-import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { useEffect, useState } from 'react'
+import { authenticatedFetch } from '@/lib/firebaseAuthClient'
+import Card from '@/components/Card'
+import Spinner from '@/components/Spinner'
+import { Package, ChevronRight, MapPin, DollarSign, Clock } from 'lucide-react'
+import Button from '@/components/Button'
 
 interface Order {
   id: string
+  status: string
   date: string
-  status: 'in_washing' | 'in_delivery' | 'delivered' | 'cancelled'
+  total: number
   weight: string
-  cost: number
-  items: string[]
 }
 
-export default function Orders() {
-  const { user, loading } = useAuth()
+interface FirebaseOrder {
+  id?: string
+  orderId?: string
+  status: string
+  createdAt: any
+  estimatedWeight?: number
+  subtotal?: number
+}
+
+export default function OrdersPage() {
+  const { user } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [ordersLoading, setOrdersLoading] = useState(true)
+  const [ordersError, setOrdersError] = useState('')
 
-  // Fetch orders from Firebase
+  // Load orders for customers
   useEffect(() => {
-    if (!user || loading) return
+    if (!user) {
+      return
+    }
 
-    setOrdersLoading(true)
-    const ordersRef = collection(db, 'orders')
-    const q = query(ordersRef, where('userId', '==', user.uid))
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const fetchedOrders: Order[] = []
-
-        snapshot.forEach((doc) => {
-          const data = doc.data()
-          fetchedOrders.push({
-            id: doc.id,
-            date: data.date || new Date().toLocaleDateString(),
-            status: data.status,
-            weight: data.weight || 'N/A',
-            cost: data.cost || 0,
-            items: data.items || [],
-          })
+    const fetchOrders = async () => {
+      try {
+        setOrdersLoading(true)
+        console.log('[OrdersPage] Fetching orders for user:', user.uid)
+        
+        const response = await authenticatedFetch(`/api/orders/user/${user.uid}`, {
+          method: 'GET',
         })
-
-        // Sort by date, most recent first
-        fetchedOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
+        
+        console.log('[OrdersPage] Orders API response status:', response.status)
+        
+        if (!response.ok) {
+          console.warn('[OrdersPage] API returned non-OK status:', response.status)
+          setOrdersError('Failed to load orders')
+          setOrders([])
+          setOrdersLoading(false)
+          return
+        }
+        
+        const data = await response.json()
+        console.log('[OrdersPage] Raw API data:', data)
+        
+        const fetchedOrders: Order[] = (data.orders || []).map((order: FirebaseOrder) => {
+          console.log('[OrdersPage] Processing order:', order)
+          
+          // Handle Firestore timestamp
+          let dateStr = 'N/A'
+          if (order.createdAt) {
+            try {
+              if (order.createdAt.seconds) {
+                dateStr = new Date(order.createdAt.seconds * 1000).toLocaleDateString()
+              } else if (order.createdAt._seconds) {
+                dateStr = new Date(order.createdAt._seconds * 1000).toLocaleDateString()
+              } else if (typeof order.createdAt === 'number') {
+                dateStr = new Date(order.createdAt).toLocaleDateString()
+              } else if (typeof order.createdAt === 'string') {
+                dateStr = new Date(order.createdAt).toLocaleDateString()
+              }
+            } catch (e) {
+              console.error('[OrdersPage] Error parsing date:', e)
+              dateStr = 'N/A'
+            }
+          }
+          
+          return {
+            id: order.id || order.orderId || '',
+            status: order.status || 'pending',
+            date: dateStr,
+            total: order.subtotal || 0,
+            weight: (order.estimatedWeight || 0) + ' kg'
+          }
+        })
+        
+        console.log('[OrdersPage] Fetched orders:', fetchedOrders)
         setOrders(fetchedOrders)
-        setOrdersLoading(false)
-      },
-      (error) => {
-        console.error('Error fetching orders:', error)
+      } catch (error) {
+        console.warn('[OrdersPage] Error fetching orders:', error)
+        setOrdersError('Failed to load orders')
+        setOrders([])
+      } finally {
         setOrdersLoading(false)
       }
-    )
-
-    return () => unsubscribe()
-  }, [user, loading])
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'in_washing':
-        return { color: 'bg-blue-100 text-blue-700', label: 'In Washing', icon: Truck }
-      case 'delivered':
-        return { color: 'bg-green-100 text-green-700', label: 'Delivered', icon: CheckCircle }
-      case 'cancelled':
-        return { color: 'bg-red-100 text-red-700', label: 'Cancelled', icon: XCircle }
-      default:
-        return { color: 'bg-gray-100 text-gray-700', label: 'Pending', icon: Truck }
     }
-  }
+
+    fetchOrders()
+  }, [user])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-dark mb-2">Order History</h1>
-        <p className="text-gray">View and manage all your laundry orders</p>
-      </div>
+    <main className="min-h-screen bg-light pt-8 pb-12">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-dark mb-2">My Orders</h1>
+          <p className="text-lg text-gray">View all your laundry orders and track their status</p>
+        </div>
 
-      <div className="space-y-4">
-        {orders.map((order) => {
-          const badge = getStatusBadge(order.status)
-          const BadgeIcon = badge.icon
-          return (
-            <Card key={order.id} hoverable>
-              <div className="flex items-center justify-between gap-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-3">
-                    <p className="font-bold text-lg text-dark">{order.id}</p>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${badge.color}`}>
-                      <BadgeIcon size={14} />
-                      {badge.label}
+        {/* Orders List */}
+        <Card>
+          <div className="space-y-4">
+            {ordersLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Spinner />
+              </div>
+            ) : ordersError ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
+                <p>{ordersError}</p>
+              </div>
+            ) : orders.length > 0 ? (
+              orders.map((order) => (
+                <div key={order.id} className="p-4 bg-light rounded-lg border border-gray/20 hover:border-primary/30 transition">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="font-semibold text-dark text-lg">Order #{order.id.slice(-8)}</p>
+                      <p className="text-sm text-gray">{order.date}</p>
+                    </div>
+                    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                      order.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                      order.status === 'pending_payment' ? 'bg-yellow-100 text-yellow-700' :
+                      order.status === 'in_transit' || order.status === 'in_washing' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {order.status.replace('_', ' ').charAt(0).toUpperCase() + order.status.replace('_', ' ').slice(1)}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-                    <div>
-                      <p className="text-xs text-gray font-semibold mb-1">DATE</p>
-                      <p className="font-semibold text-dark">{order.date}</p>
+                  
+                  <div className="grid grid-cols-3 gap-4 mb-4 py-3 border-y border-gray/20">
+                    <div className="flex items-center gap-2">
+                      <Package className="w-4 h-4 text-primary" />
+                      <span className="text-sm text-dark font-medium">{order.weight}</span>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray font-semibold mb-1">WEIGHT</p>
-                      <p className="font-semibold text-dark">{order.weight}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray font-semibold mb-1">ITEMS</p>
-                      <p className="font-semibold text-dark text-sm">{order.items.join(', ')}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray font-semibold mb-1">COST</p>
-                      <p className="font-bold text-primary text-lg">${order.cost.toFixed(2)}</p>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-primary" />
+                      <span className="text-sm text-dark font-semibold">${order.total.toFixed(2)}</span>
                     </div>
                   </div>
+
+                  <Button variant="outline" className="w-full">
+                    View Details <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
                 </div>
-                <div className="flex gap-2 flex-col">
-                  <Link href={`/tracking/${order.id}`}>
-                    <Button size="sm" variant="outline">
-                      Track
-                    </Button>
-                  </Link>
-                  <button className="px-4 py-2 text-primary font-semibold hover:bg-mint rounded-lg transition text-sm">
-                    Reorder
-                  </button>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <Package size={48} className="mx-auto text-gray-300 mb-4" />
+                <p className="text-gray font-semibold mb-4">No orders yet</p>
+                <p className="text-gray text-sm mb-6">You haven't placed any orders. Start by scheduling your first laundry pickup!</p>
+                <div className="flex justify-center">
+                  <Button href="/booking" variant="primary">Schedule Your First Pickup</Button>
                 </div>
               </div>
-            </Card>
-          )
-        })}
+            )}
+          </div>
+        </Card>
       </div>
-
-      {/* Pagination */}
-      <div className="flex justify-center gap-2">
-        <button className="px-4 py-2 border border-gray rounded-lg text-dark font-semibold hover:bg-light transition">
-          Previous
-        </button>
-        <button className="px-4 py-2 bg-primary text-white rounded-lg font-semibold">1</button>
-        <button className="px-4 py-2 border border-gray rounded-lg text-dark font-semibold hover:bg-light transition">
-          2
-        </button>
-        <button className="px-4 py-2 border border-gray rounded-lg text-dark font-semibold hover:bg-light transition">
-          Next
-        </button>
-      </div>
-    </div>
+    </main>
   )
 }

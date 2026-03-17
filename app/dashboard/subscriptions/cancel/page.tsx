@@ -317,7 +317,7 @@ export default function CancelSubscription() {
             </div>
 
             <div className="flex gap-3">
-              <Link href="/dashboard" className="flex-1">
+              <Link href="/dashboard/customer" className="flex-1">
                 <Button className="w-full">Go to Dashboard</Button>
               </Link>
               <Link href="/dashboard/subscriptions" className="flex-1">

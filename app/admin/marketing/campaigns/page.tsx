@@ -43,9 +43,15 @@ export default function EmailCampaignsPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
+      console.log('[Marketing] Not logged in, redirecting to login')
       router.push('/auth/login')
+      return
     }
-  }, [user, authLoading, router])
+    if (!authLoading && user && !userData?.isAdmin) {
+      console.error('[Marketing] User is not admin. Current user:', user.email)
+      router.push('/')
+    }
+  }, [user, authLoading, userData, router])
 
   useEffect(() => {
     if (user && userData?.isAdmin) {

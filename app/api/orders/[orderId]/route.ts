@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as admin from 'firebase-admin'
+import { adminAuth, adminDb } from '@/lib/firebaseAdmin'
 
 /**
  * GET /api/orders/[orderId]
@@ -38,12 +38,7 @@ export async function GET(
     // Verify the token using Firebase Admin SDK
     let decodedToken
     try {
-      // Initialize Firebase Admin if not already done
-      if (!admin.apps.length) {
-        admin.initializeApp()
-      }
-
-      decodedToken = await admin.auth().verifyIdToken(token)
+      decodedToken = await adminAuth.verifyIdToken(token)
       console.log('[API] Token verified for user:', decodedToken.uid)
     } catch (tokenError) {
       console.error('[API] Token verification failed:', tokenError)
@@ -54,11 +49,11 @@ export async function GET(
     }
 
     // Fetch order from Firestore using Admin SDK
-    const db = admin.firestore()
-    const orderDoc = await db.collection('orders').doc(orderId).get()
+    // Orders are stored at: users/{uid}/orders/{orderId}
+    const orderDoc = await adminDb.collection('users').doc(decodedToken.uid).collection('orders').doc(orderId).get()
 
     if (!orderDoc.exists) {
-      console.log(`[API] Order not found: ${orderId}`)
+      console.log(`[API] Order not found: ${orderId} for user: ${decodedToken.uid}`)
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
@@ -66,22 +61,14 @@ export async function GET(
     }
 
     const orderData = orderDoc.data()
-    
-    // Verify user owns this order
-    if (orderData?.uid !== decodedToken.uid) {
-      console.log('[API] User does not own this order')
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
-    }
 
     const order = {
-      orderId: orderDoc.id,
+      id: orderDoc.id,
+      orderId: orderData?.orderId || orderDoc.id,
       ...orderData,
     }
 
-    console.log(`[API] Order fetched: ${orderId}`)
+    console.log(`[API] Order fetched: ${orderId} for user: ${decodedToken.uid}`)
 
     return NextResponse.json(order)
   } catch (error) {

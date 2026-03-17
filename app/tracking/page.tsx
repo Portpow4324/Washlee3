@@ -9,7 +9,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 
-function TrackingContent() {
+function TrackingPageContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('orderId')
 
@@ -278,10 +278,10 @@ function TrackingContent() {
   )
 }
 
-export default function OrderTracking() {
+export default function Page() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Spinner /></div>}>
-      <TrackingContent />
+    <Suspense fallback={<div>Loading...</div>}>
+      <TrackingPageContent />
     </Suspense>
   )
 }

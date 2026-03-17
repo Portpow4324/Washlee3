@@ -14,7 +14,6 @@ Washlee is a **full-stack service marketplace application** for on-demand laundr
 
 ## Project Structure
 
-```
 app/
   ├── page.tsx              # Homepage (hero, how-it-works, pricing preview, testimonials)
   ├── how-it-works/page.tsx # Detailed 4-step guide

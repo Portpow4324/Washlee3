@@ -98,6 +98,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/protection-plan" className="hover:text-primary transition">
+                  Protection Plan
+                </Link>
+              </li>
+              <li>
                 <Link href="/damage-protection" className="hover:text-primary transition">
                   Protection Guarantee
                 </Link>

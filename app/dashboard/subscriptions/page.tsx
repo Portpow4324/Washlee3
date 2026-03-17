@@ -104,11 +104,10 @@ export default function Subscriptions() {
   const getPlanPrice = (key: string, cycle: 'monthly' | 'yearly') => {
     const plan = planDetails[key as keyof typeof planDetails]
     if (!plan) return 0
-    const monthlyPrice = plan.monthlyPrice
     if (cycle === 'yearly') {
-      return Math.round(monthlyPrice * 12 * 0.8 * 100) / 100 // 20% yearly discount
+      return plan.yearlyPrice || Math.round(plan.monthlyPrice * 12 * 0.8 * 100) / 100 // Use yearlyPrice or calculate with 20% discount
     }
-    return monthlyPrice
+    return plan.monthlyPrice
   }
 
   return (
@@ -192,7 +191,9 @@ export default function Subscriptions() {
 
         {/* Plan Comparison */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {Object.entries(planDetails).map(([key, plan]) => (
+          {Object.entries(planDetails)
+            .filter(([key]) => key !== 'basic') // Remove Basic plan from display
+            .map(([key, plan]) => (
             <Card
               key={key}
               className={`p-6 transition ${
@@ -202,7 +203,7 @@ export default function Subscriptions() {
               }`}
             >
               <div className="mb-4">
-                <h3 className="font-bold text-dark capitalize text-lg">{key}</h3>
+                <h3 className="font-bold text-dark text-lg">{plan.name}</h3>
                 {subscription?.planName.toLowerCase() === key && (
                   <span className="text-xs font-medium text-primary">Current Plan</span>
                 )}
@@ -216,23 +217,31 @@ export default function Subscriptions() {
               </div>
 
               <div className="mb-6 pb-6 border-b border-gray-200">
-                <p className="text-sm font-medium text-dark mb-1">{plan.monthlyOrders} orders/month</p>
+                <p className="text-sm font-medium text-dark mb-1">
+                  {plan.monthlyOrders >= 999999 ? 'Unlimited orders' : `Up to ${plan.monthlyOrders} orders`}/month
+                </p>
                 <p className="text-xs text-gray">
-                  ${(getPlanPrice(key, billingCycle) / plan.monthlyOrders).toFixed(3)} per order
+                  Max {plan.features.maxWeightPerLoad}kg per load
                 </p>
               </div>
 
               <ul className="space-y-2 mb-6 flex-1">
-                {typeof plan.features === 'object' && plan.features !== null
-                  ? Object.entries(plan.features)
-                      .slice(0, 3)
-                      .map(([key, value]) => (
-                        <li key={key} className="flex items-start gap-2 text-xs text-dark">
-                          <Check size={14} className="text-primary flex-shrink-0 mt-0.5" />
-                          <span>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                        </li>
-                      ))
-                  : null}
+                <li className="flex items-start gap-2 text-xs text-dark">
+                  <Check size={14} className="text-primary flex-shrink-0 mt-0.5" />
+                  <span>Max {plan.features.maxWeightPerLoad}kg per load</span>
+                </li>
+                <li className="flex items-start gap-2 text-xs text-dark">
+                  <Check size={14} className={`flex-shrink-0 mt-0.5 ${plan.features.expressDelivery ? 'text-primary' : 'text-gray-300'}`} />
+                  <span className={plan.features.expressDelivery ? 'text-dark' : 'text-gray-400'}>
+                    {plan.features.expressDelivery ? 'Express delivery' : 'Standard delivery only'}
+                  </span>
+                </li>
+                <li className="flex items-start gap-2 text-xs text-dark">
+                  <Check size={14} className={`flex-shrink-0 mt-0.5 ${plan.features.addOnDiscounts ? 'text-primary' : 'text-gray-300'}`} />
+                  <span className={plan.features.addOnDiscounts ? 'text-dark' : 'text-gray-400'}>
+                    {plan.features.addOnDiscounts ? 'Add-on discounts' : 'Standard pricing'}
+                  </span>
+                </li>
               </ul>
 
               {subscription?.planName.toLowerCase() === key ? (

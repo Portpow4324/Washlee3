@@ -4,27 +4,34 @@ import Button from '@/components/Button'
 import Spinner from '@/components/Spinner'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, ArrowLeft, X } from 'lucide-react'
+import { Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, ArrowLeft, X, MapPin } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
-import { setDoc, doc, Timestamp } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
+import { Timestamp } from 'firebase/firestore'
+import { auth } from '@/lib/firebase'
+import { createCustomerProfile } from '@/lib/userManagement'
+import { sendWelcomeEmail } from '@/lib/emailService'
+import { AUSTRALIAN_STATES } from '@/lib/australianValidation'
+import WashClubSignupModal from '@/components/WashClubSignupModal'
 
 export default function SignupCustomer() {
   const [currentStep, setCurrentStep] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
+  const [showWashClubModal, setShowWashClubModal] = useState(false)
+  const [newUserId, setNewUserId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
     phone: '',
+    state: '',
     password: '',
     confirmPassword: '',
     personalUse: '',
-    ageOver65: false,
     marketingTexts: false,
     accountTexts: false,
     selectedPlan: 'none',
@@ -163,6 +170,23 @@ export default function SignupCustomer() {
               className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
+          <div>
+            <label className="block text-sm font-semibold text-dark mb-2">State*</label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
+              <select
+                value={formData.state}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
+                required
+              >
+                <option value="">Choose a state...</option>
+                {AUSTRALIAN_STATES.map(state => (
+                  <option key={state.code} value={state.code}>{state.name} ({state.code})</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       ),
     },
@@ -201,106 +225,14 @@ export default function SignupCustomer() {
       ),
     },
     {
-      title: 'Age Verification',
-      description: 'Are you 65 or over?*',
+      title: 'Subscribe to a Plan?',
+      description: 'Would you like to explore subscription plans to save on orders?',
       content: (
-        <div className="space-y-3">
-          <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
-            onClick={() => setFormData({ ...formData, ageOver65: false })}
-          >
-            <input
-              type="radio"
-              name="age"
-              checked={formData.ageOver65 === false}
-              onChange={() => {}}
-              className="w-4 h-4"
-            />
-            <span className="font-semibold text-dark">No</span>
-          </label>
-          <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
-            onClick={() => setFormData({ ...formData, ageOver65: true })}
-          >
-            <input
-              type="radio"
-              name="age"
-              checked={formData.ageOver65 === true}
-              onChange={() => {}}
-              className="w-4 h-4"
-            />
-            <span className="font-semibold text-dark">Yes</span>
-          </label>
-        </div>
-      ),
-    },
-    {
-      title: 'Choose Your Plan',
-      description: 'Select a subscription to get started or choose to pay per order',
-      content: (
-        <div className="space-y-3">
-          <label className="flex items-start gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
-            onClick={() => setFormData({ ...formData, selectedPlan: 'none' })}
-          >
-            <input
-              type="radio"
-              name="plan"
-              value="none"
-              checked={formData.selectedPlan === 'none'}
-              onChange={() => {}}
-              className="w-4 h-4 mt-1"
-            />
-            <div>
-              <span className="font-semibold text-dark block">Pay Per Order</span>
-              <span className="text-sm text-gray">No commitment, pay as you go</span>
-            </div>
-          </label>
-          <label className="flex items-start gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
-            onClick={() => setFormData({ ...formData, selectedPlan: 'starter' })}
-          >
-            <input
-              type="radio"
-              name="plan"
-              value="starter"
-              checked={formData.selectedPlan === 'starter'}
-              onChange={() => {}}
-              className="w-4 h-4 mt-1"
-            />
-            <div>
-              <span className="font-semibold text-dark block">Starter Plan - $9.99/month</span>
-              <span className="text-sm text-gray">Unlimited orders, discounts on add-ons</span>
-            </div>
-          </label>
-          <label className="flex items-start gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
-            onClick={() => setFormData({ ...formData, selectedPlan: 'professional' })}
-          >
-            <input
-              type="radio"
-              name="plan"
-              value="professional"
-              checked={formData.selectedPlan === 'professional'}
-              onChange={() => {}}
-              className="w-4 h-4 mt-1"
-            />
-            <div>
-              <span className="font-semibold text-dark block">Professional Plan - $19.99/month</span>
-              <span className="text-sm text-gray">Premium services, priority support</span>
-            </div>
-          </label>
-          <label className="flex items-start gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
-            onClick={() => setFormData({ ...formData, selectedPlan: 'washly' })}
-          >
-            <input
-              type="radio"
-              name="plan"
-              value="washly"
-              checked={formData.selectedPlan === 'washly'}
-              onChange={() => {}}
-              className="w-4 h-4 mt-1"
-            />
-            <div>
-              <span className="font-semibold text-dark block">Washly Plan - $49.99/month</span>
-              <span className="text-sm text-gray">All premium features, concierge service</span>
-            </div>
-          </label>
+        <div className="space-y-6">
+          <div className="bg-mint rounded-lg p-6 border-2 border-primary">
+            <p className="text-lg font-semibold text-dark mb-4">Ready to get started?</p>
+            <p className="text-dark mb-6">We offer flexible subscription plans that can help you save on laundry costs. You can always pay per order, or choose a plan that works best for you.</p>
+          </div>
         </div>
       ),
     },
@@ -311,34 +243,37 @@ export default function SignupCustomer() {
       case 0:
         return formData.email && formData.password && formData.confirmPassword && isPasswordValid && formData.password === formData.confirmPassword
       case 1:
-        return formData.firstName.trim() && formData.lastName.trim()
+        return formData.firstName.trim() && formData.lastName.trim() && formData.state
       case 2:
         return formData.personalUse
       case 3:
-        return formData.ageOver65 !== undefined
-      case 4:
         return true
       default:
         return false
     }
   }
 
-  const handleNext = async () => {
+  const handleNext = async (planSelection?: string) => {
     if (isStepValid()) {
       if (currentStep < steps.length - 1) {
         setCurrentStep(currentStep + 1)
       } else {
         // Reached final step - create account
-        await handleCreateAccount()
+        const finalPlanData = planSelection !== undefined ? planSelection : formData.selectedPlan
+        console.log('[Signup] About to create account with data:', { email: formData.email, firstName: formData.firstName, lastName: formData.lastName, selectedPlan: finalPlanData })
+        await handleCreateAccount(finalPlanData)
       }
     } else {
       setError('Please complete this step')
     }
   }
 
-  const handleCreateAccount = async () => {
+  const handleCreateAccount = async (planSelection?: string) => {
     setError('')
     setIsLoading(true)
+
+    const signupStartTime = performance.now()
+    console.log('[Signup] Starting customer account creation at', new Date().toISOString())
 
     try {
       if (!formData.firstName || !formData.lastName || !formData.email) {
@@ -347,79 +282,56 @@ export default function SignupCustomer() {
         return
       }
 
-      const fullName = `${formData.firstName} ${formData.lastName}`.trim()
-      console.log('[Signup] Starting account creation for:', formData.email)
-
       // Create Firebase account
-      console.log('[Signup] Creating Firebase auth user...')
+      const authStartTime = performance.now()
+      console.log('[Signup] Creating Firebase auth...')
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       )
+      const authDuration = performance.now() - authStartTime
       const uid = userCredential.user.uid
-      console.log('[Signup] Auth user created:', uid)
+      console.log(`[Signup] Firebase Auth created: ${Math.round(authDuration)}ms`, uid)
 
-      // Create all profiles in parallel to avoid race conditions
-      console.log('[Signup] Creating user profiles...')
-      
-      const now = Timestamp.now()
-
-      // Create users/uid metadata
-      const userMetadata = {
-        uid,
-        email: formData.email,
-        name: fullName,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phone || '',
-        createdAt: now,
-        updatedAt: now,
-        userType: 'customer',
-        userTypes: ['customer'],
-        primaryUserType: 'customer',
-        marketingTexts: formData.marketingTexts,
-        accountTexts: formData.accountTexts,
-        customerId: uid,
-      }
-
-      // Create customers/uid profile
-      const customerProfile = {
-        uid,
+      // Create customer profile
+      const profileStartTime = performance.now()
+      console.log('[Signup] Creating customer profile...')
+      const finalPlanData = planSelection !== undefined ? planSelection : formData.selectedPlan
+      await createCustomerProfile(uid, {
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
         phone: formData.phone || '',
-        applicationType: 'customer',
-        status: 'active',
+        state: formData.state,
         personalUse: formData.personalUse as 'personal' | 'business',
-        ageOver65: formData.ageOver65,
         preferenceMarketingTexts: formData.marketingTexts,
         preferenceAccountTexts: formData.accountTexts,
-        selectedPlan: formData.selectedPlan || 'none',
-        totalOrders: 0,
-        totalSpent: 0,
-        rating: 0,
-        createdAt: now,
-        updatedAt: now,
-        hasEmployeeProfile: false,
-        onboardingCompleted: false,
+        selectedPlan: finalPlanData || 'none',
+      })
+      const profileDuration = performance.now() - profileStartTime
+      console.log(`[Signup] Customer profile created: ${Math.round(profileDuration)}ms`)
+
+      // Send welcome email
+      try {
+        const bookingLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/booking`
+        await sendWelcomeEmail(
+          formData.email,
+          formData.firstName,
+          bookingLink
+        )
+        console.log('[Signup] ✓ Welcome email sent to:', formData.email)
+      } catch (emailError: any) {
+        console.error('[Signup] Welcome email failed (non-blocking):', emailError.message)
+        // Continue - don't fail signup if email fails
       }
 
-      // Write both documents in parallel
-      console.log('[Signup] Writing to users collection...')
-      await setDoc(doc(db, 'users', uid), userMetadata)
-      console.log('[Signup] users document created')
-      
-      console.log('[Signup] Writing to customers collection...')
-      await setDoc(doc(db, 'customers', uid), customerProfile)
-      console.log('[Signup] customers document created')
+      const totalTime = performance.now() - signupStartTime
+      console.log(`[Signup] ✅ Complete signup in ${Math.round(totalTime)}ms (Auth: ${Math.round(authDuration)}ms, Profile: ${Math.round(profileDuration)}ms)`)
 
-      console.log('[Signup] User profiles created successfully')
-
-      // Redirect to home
-      console.log('[Signup] Redirecting to home...')
-      router.push('/')
+      // Store user ID and show Wash Club modal
+      setNewUserId(uid)
+      setShowWashClubModal(true)
     } catch (err: any) {
       console.error('[Signup] Error:', err)
       console.error('[Signup] Error code:', err.code)
@@ -436,9 +348,42 @@ export default function SignupCustomer() {
     }
   }
 
-  if (currentStep === steps.length) {
+  if (isRedirecting || isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
+        <div className="w-full max-w-md text-center">
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+            <h1 className="text-3xl font-bold text-dark mb-3">Creating Your Account</h1>
+            <p className="text-gray mb-6">Setting up your profile and preparing to redirect you...</p>
+            <p className="text-sm text-gray mb-8">This may take a few moments</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (currentStep === steps.length) {
+    const handleJoinWashClub = () => {
+      setShowWashClubModal(false)
+      router.push(`/wash-club/onboarding?email=${encodeURIComponent(formData.email)}`)
+    }
+
+    const handleSkipWashClub = () => {
+      setShowWashClubModal(false)
+      const finalPlanData = formData.selectedPlan === 'none' ? '/' : '/pricing'
+      router.push(finalPlanData)
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
+        <WashClubSignupModal
+          isOpen={showWashClubModal}
+          onJoin={handleJoinWashClub}
+          onSkip={handleSkipWashClub}
+        />
         <div className="w-full max-w-md text-center">
           <div className="bg-white rounded-2xl shadow-lg p-8">
             <div className="flex justify-center mb-6">
@@ -446,9 +391,9 @@ export default function SignupCustomer() {
             </div>
             <h1 className="text-3xl font-bold text-dark mb-3">Account Created!</h1>
             <p className="text-gray mb-6">Welcome to Washlee. Your account is all set up.</p>
-            <p className="text-sm text-gray mb-8">Redirecting you home...</p>
-            <Link href="/" className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold">
-              Go to Home
+            <p className="text-sm text-gray mb-8">Redirecting you to plans...</p>
+            <Link href="/pricing" className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold">
+              Go to Plans
             </Link>
           </div>
         </div>
@@ -506,20 +451,45 @@ export default function SignupCustomer() {
 
           {/* Navigation */}
           <div className="flex gap-3">
-            <button
-              onClick={() => currentStep > 0 ? setCurrentStep(currentStep - 1) : router.back()}
-              className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              Back
-            </button>
-            <Button
-              onClick={handleNext}
-              size="lg"
-              className="flex-1"
-              disabled={!isStepValid() || isLoading}
-            >
-              {isLoading ? <Spinner /> : (currentStep === steps.length - 1 ? 'Create Account' : 'Next')}
-            </Button>
+            {currentStep === 3 ? (
+              // Custom buttons for plan step
+              <>
+                <button
+                  onClick={() => {
+                    handleNext('view-plans')
+                  }}
+                  className="flex-1 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                >
+                  Yes, Show Me Plans
+                </button>
+                <button
+                  onClick={() => {
+                    handleNext('none')
+                  }}
+                  className="flex-1 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-mint transition"
+                >
+                  No, Go to Home
+                </button>
+              </>
+            ) : (
+              // Standard previous/next buttons
+              <>
+                <button
+                  onClick={() => currentStep > 0 ? setCurrentStep(currentStep - 1) : router.back()}
+                  className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  Back
+                </button>
+                <Button
+                  onClick={handleNext}
+                  size="lg"
+                  className="flex-1"
+                  disabled={!isStepValid() || isLoading}
+                >
+                  {isLoading ? <Spinner /> : (currentStep === steps.length - 1 ? 'Create Account' : 'Next')}
+                </Button>
+              </>
+            )}
           </div>
         </div>
 

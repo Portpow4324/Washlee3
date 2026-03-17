@@ -33,12 +33,16 @@ export async function POST(request: NextRequest) {
 
     // Filter to only Australian addresses
     const predictions = data.predictions || []
+    
+    console.log('Google Places Response Status:', data.status)
+    console.log('Predictions Count:', predictions.length)
+    console.log('Sample Prediction:', predictions[0])
 
     return NextResponse.json({
       predictions: predictions.map((prediction: any) => ({
         placeId: prediction.place_id,
-        mainText: prediction.main_text,
-        secondaryText: prediction.secondary_text,
+        main_text: prediction.main_text || prediction.description,
+        secondary_text: prediction.secondary_text || '',
         description: prediction.description,
       })),
     })

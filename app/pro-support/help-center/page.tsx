@@ -89,7 +89,7 @@ export default function ProHelpCenter() {
               Submit a request
             </Link>
             <Link
-              href="/auth/pro-signin"
+              href="/auth/employee-signin"
               className="hidden sm:flex items-center gap-2 px-4 py-2 text-dark font-semibold hover:text-primary transition"
             >
               Sign In

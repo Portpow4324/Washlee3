@@ -8,7 +8,7 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { AlertCircle } from 'lucide-react'
 
-function CancelContent() {
+function CancelPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const orderId = searchParams.get('order_id')
@@ -66,13 +66,13 @@ function CancelContent() {
   )
 }
 
-export default function CheckoutCancel() {
+export default function Page() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-mint to-white flex flex-col">
+    <div className="min-h-screen bg-light flex flex-col">
       <Header />
       <main className="flex-1 flex items-center justify-center px-4 py-12">
         <Suspense fallback={<div>Loading...</div>}>
-          <CancelContent />
+          <CancelPageContent />
         </Suspense>
       </main>
       <Footer />

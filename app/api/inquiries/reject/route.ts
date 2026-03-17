@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import admin from 'firebase-admin'
-import { sendRejectionEmail } from '@/lib/email-service'
+import { sendProApplicationRejected } from '@/lib/emailService'
 
 // Initialize Firebase Admin if not already done
 try {
@@ -56,11 +56,12 @@ export async function POST(request: NextRequest) {
     })
 
     // Send rejection email
-    const emailSent = await sendRejectionEmail(
+    const result = await sendProApplicationRejected(
       inquiryData?.email,
       inquiryData?.firstName,
       rejectionReason
     )
+    const emailSent = result?.success || result?.messageId ? true : false
 
     console.log(`[API] Inquiry rejected and email sent: ${emailSent}`)
 

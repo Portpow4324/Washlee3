@@ -65,24 +65,25 @@ export default function OrderTracking() {
     if (!orderId || !user) return
 
     setLoading(true)
+    console.log('[Tracking] Fetching order:', orderId, 'for user:', user.uid)
+    
+    // Orders are stored at users/{uid}/orders/{orderId}
     const unsubscribe = onSnapshot(
-      doc(db, 'orders', orderId),
+      doc(db, 'users', user.uid, 'orders', orderId),
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data()
-          if (data.userId === user.uid) {
-            setOrder({ id: docSnap.id, ...data } as OrderData)
-            setError('')
-          } else {
-            setError('Unauthorized access to this order')
-          }
+          console.log('[Tracking] Order found:', data)
+          setOrder({ id: docSnap.id, ...data } as OrderData)
+          setError('')
         } else {
-          setError('Order not found')
+          console.log('[Tracking] Order not found at path: users/', user.uid, '/orders/', orderId)
+          setError('Order not found. Please check your order number.')
         }
         setLoading(false)
       },
-      (err) => {
-        console.error('Error fetching order:', err)
+      (err: any) => {
+        console.error('[Tracking] Error fetching order:', err)
         setError('Failed to load order')
         setLoading(false)
       }

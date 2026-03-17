@@ -5,7 +5,7 @@ import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Link from 'next/link'
-import { Gift, Check, Heart, Users, Zap, Mail } from 'lucide-react'
+import { Gift, Check, Heart, Users, Zap, Mail, Lightbulb, CheckCircle } from 'lucide-react'
 import { useState } from 'react'
 
 export default function GiftCardsPage() {
@@ -125,8 +125,9 @@ export default function GiftCardsPage() {
           </div>
 
           <Card className="bg-mint border-2 border-primary/20">
-            <p className="text-center text-dark">
-              💡 <span className="font-semibold">Tip:</span> A typical load is 8-10 lbs and costs $3-5, so a $50 gift card covers about 10 loads.
+            <p className="text-center text-dark flex items-center justify-center gap-2">
+              <Lightbulb size={18} className="text-primary flex-shrink-0" />
+              <span><span className="font-semibold">Tip:</span> A typical load is 8-10 lbs and costs $3-5, so a $50 gift card covers about 10 loads.</span>
             </p>
           </Card>
         </div>
@@ -290,18 +291,23 @@ export default function GiftCardsPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
-              { feature: '✓ No Expiration Date', desc: 'Use it whenever, no time limit' },
-              { feature: '✓ Easy to Share', desc: 'Forward the email or gift the physical card' },
-              { feature: '✓ Work with Everything', desc: 'Use for any Washlee service' },
-              { feature: '✓ Can Be Combined', desc: 'Stack multiple cards on one order' },
-              { feature: '✓ Easy Balance Check', desc: 'View remaining balance anytime in app' },
-              { feature: '✓ Refundable Balance', desc: 'Unused balance can be transferred or refunded' },
-              { feature: '✓ Team Gifting', desc: 'Bulk discounts available for companies' },
-              { feature: '✓ Corporate Accounts', desc: 'Setup program for employee benefits' },
+              { feature: 'No Expiration Date', desc: 'Use it whenever, no time limit' },
+              { feature: 'Easy to Share', desc: 'Forward the email or gift the physical card' },
+              { feature: 'Work with Everything', desc: 'Use for any Washlee service' },
+              { feature: 'Can Be Combined', desc: 'Stack multiple cards on one order' },
+              { feature: 'Easy Balance Check', desc: 'View remaining balance anytime in app' },
+              { feature: 'Refundable Balance', desc: 'Unused balance can be transferred or refunded' },
+              { feature: 'Team Gifting', desc: 'Bulk discounts available for companies' },
+              { feature: 'Corporate Accounts', desc: 'Setup program for employee benefits' },
             ].map((item, i) => (
               <Card key={i}>
-                <p className="font-bold text-dark text-lg mb-1">{item.feature}</p>
-                <p className="text-gray text-sm">{item.desc}</p>
+                <div className="flex gap-3 items-start">
+                  <CheckCircle size={20} className="text-primary flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-dark text-lg mb-1">{item.feature}</p>
+                    <p className="text-gray text-sm">{item.desc}</p>
+                  </div>
+                </div>
               </Card>
             ))}
           </div>

@@ -1,10 +1,12 @@
 'use client'
 
-import Button from '@/components/Button'
+export const dynamic = 'force-dynamic'
+
 import Spinner from '@/components/Spinner'
+import Button from '@/components/Button'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Mail, Lock, User, Phone, MapPin, CheckCircle, ArrowLeft, Upload, Eye, EyeOff, HelpCircle, AlertCircle, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
@@ -13,12 +15,16 @@ import { auth, db } from '@/lib/firebase'
 import { AUSTRALIAN_STATES, validateAustralianPhone, formatAustralianPhone, validateEmail, getEmailSuggestions } from '@/lib/australianValidation'
 import { WASHLEE_TERMS } from '@/lib/washleeTerms'
 import { createEmployeeProfile, getCustomerProfile, upgradeCustomerToEmployee } from '@/lib/userManagement'
+import { requestVerificationCode, verifyCode, isAdminUser, getVerificationCodeForTesting } from '@/lib/verification'
+import { useAuth } from '@/lib/AuthContext'
+import { getAddressDetails, AddressParts } from '@/lib/googlePlaces'
 
-export default function ProSignupForm() {
+function ProSignupFormContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const stepParam = searchParams?.get('step')
   const fromSignin = searchParams?.get('fromSignin') === 'true'
+  const { user: authUser, loading: authLoading } = useAuth()
   
   const initialStep = stepParam ? parseInt(stepParam) : 0
   const [currentStep, setCurrentStep] = useState(initialStep)
@@ -29,9 +35,18 @@ export default function ProSignupForm() {
   const [emailSuggestions, setEmailSuggestions] = useState<string[]>([])
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false)
   const [showTermsModal, setShowTermsModal] = useState(false)
-  const [termsAccepted, setTermsAccepted] = useState(false)
   const [termsScrolled, setTermsScrolled] = useState(false)
   const [redirectToProSignin, setRedirectToProSignin] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isLoggedInUser, setIsLoggedInUser] = useState(false)
+  const [emailCodeSent, setEmailCodeSent] = useState(false)
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false)
+  const [idProcessing, setIdProcessing] = useState(false)
+  const [testVerificationCode, setTestVerificationCode] = useState<string | null>(null)
+  const [workAddressPredictions, setWorkAddressPredictions] = useState<any[]>([])
+  const [showWorkAddressPredictions, setShowWorkAddressPredictions] = useState(false)
+  const [isValidatingWorkAddress, setIsValidatingWorkAddress] = useState(false)
+  const [workAddressError, setWorkAddressError] = useState('')
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -39,11 +54,13 @@ export default function ProSignupForm() {
     email: '',
     phone: '',
     state: '',
+    workAddress: '',
     password: '',
     confirmPassword: '',
     termsAccepted: false,
     emailConfirmed: false,
     phoneVerificationCode: '',
+    emailVerificationCode: '',
     phoneVerified: false,
     idVerified: false,
     idFile: null as File | null,
@@ -118,6 +135,158 @@ export default function ProSignupForm() {
     }
   }
 
+  // Work Address autocomplete functions
+  const fetchWorkAddressPredictions = async (input: string) => {
+    if (!input || input.length < 2) {
+      setWorkAddressPredictions([])
+      setShowWorkAddressPredictions(false)
+      setWorkAddressError('')
+      return
+    }
+
+    try {
+      setWorkAddressError('')
+      const response = await fetch('/api/places/autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          input,
+          componentRestrictions: { country: 'au' } // Restrict to Australia
+        }),
+      })
+      if (!response.ok) throw new Error('Failed to fetch predictions')
+      const data = await response.json()
+      setWorkAddressPredictions(data.predictions || [])
+      setShowWorkAddressPredictions((data.predictions || []).length > 0)
+    } catch (err) {
+      console.error('Error fetching work address predictions:', err)
+      setWorkAddressPredictions([])
+      setShowWorkAddressPredictions(false)
+    }
+  }
+
+  const selectWorkAddress = async (prediction: any) => {
+    setIsValidatingWorkAddress(true)
+    setWorkAddressError('')
+    
+    try {
+      const addressDetails = await getAddressDetails(prediction.placeId)
+      
+      if (!addressDetails) {
+        setWorkAddressError('Failed to validate address. Please try again.')
+        setIsValidatingWorkAddress(false)
+        return
+      }
+
+      // Verify the address is in Australia
+      if (addressDetails.country?.toLowerCase() !== 'australia') {
+        setWorkAddressError('Work address must be in Australia')
+        setIsValidatingWorkAddress(false)
+        return
+      }
+
+      setFormData({
+        ...formData,
+        workAddress: addressDetails.formattedAddress
+      })
+      setShowWorkAddressPredictions(false)
+      setWorkAddressPredictions([])
+    } catch (err) {
+      console.error('Error selecting work address:', err)
+      setWorkAddressError('Failed to validate address. Please try again.')
+    } finally {
+      setIsValidatingWorkAddress(false)
+    }
+  }
+
+  // Load customer profile data on component mount if user is already logged in
+  useEffect(() => {
+    // Wait for auth to finish loading before checking user status
+    if (authLoading) {
+      console.log('[ProSignup] Waiting for auth to load...')
+      return
+    }
+
+    const loadCustomerData = async () => {
+      try {
+        // First, check if we have data in sessionStorage (from redirect)
+        const savedFormData = sessionStorage.getItem('proSignupFormData')
+        if (savedFormData) {
+          console.log('[ProSignup] Loading form data from sessionStorage')
+          const parsedData = JSON.parse(savedFormData)
+          setFormData(prev => ({ ...prev, ...parsedData }))
+          sessionStorage.removeItem('proSignupFormData') // Clear after loading
+          return
+        }
+
+        if (authUser) {
+          console.log('[ProSignup] Loading customer data for user:', authUser.uid)
+          setIsLoggedInUser(true)
+          const customerData = await getCustomerProfile(authUser.uid)
+          
+          if (customerData) {
+            console.log('[ProSignup] Customer data loaded:', {
+              firstName: customerData.firstName,
+              lastName: customerData.lastName,
+              email: customerData.email,
+              phone: customerData.phone,
+              state: customerData.state,
+            })
+            setFormData(prev => ({
+              ...prev,
+              firstName: customerData.firstName || prev.firstName,
+              lastName: customerData.lastName || prev.lastName,
+              email: customerData.email || prev.email,
+              phone: customerData.phone || prev.phone,
+              state: customerData.state || prev.state,
+              termsAccepted: true, // Auto-accept for logged-in users with complete data
+            }))
+            
+            // AUTO-ADVANCE: Only advance if customer has ALL required Pro fields including state
+            // If state is missing, user needs to stay on Step 0 to fill it in
+            if (initialStep === 0 && customerData.state) {
+              console.log('[ProSignup] User has existing customer profile WITH state - advancing to step 1')
+              setCurrentStep(1)
+            } else if (initialStep === 0 && !customerData.state) {
+              console.log('[ProSignup] User has customer profile but NO state - staying on step 0 to collect it')
+              // Stay on Step 0 to allow user to fill in the state field
+            }
+          } else {
+            console.log('[ProSignup] No customer data found for user')
+            // Logged-in user with no customer profile - still needs to fill Step 0 fields
+            // They'll fill in firstName, lastName, phone, state and click Next to proceed
+          }
+        } else {
+          console.log('[ProSignup] No current user logged in')
+        }
+      } catch (err) {
+        console.error('[ProSignup] Error loading customer data:', err)
+        // Don't show error to user - they can still fill in manually
+      }
+    }
+
+    loadCustomerData()
+  }, [authLoading, authUser, initialStep])
+
+  // Update test verification code when email or phone changes
+  useEffect(() => {
+    const updateTestCode = async () => {
+      if (formData.email && formData.phone) {
+        try {
+          const code = await getVerificationCodeForTesting(formData.email, formData.phone)
+          setTestVerificationCode(code)
+        } catch (err) {
+          console.error('[ProSignup] Error fetching test code:', err)
+          setTestVerificationCode(null)
+        }
+      } else {
+        setTestVerificationCode(null)
+      }
+    }
+
+    updateTestCode()
+  }, [formData.email, formData.phone])
+
   const isStepValid = () => {
     switch (currentStep) {
       case 0: // Initial application form
@@ -127,7 +296,10 @@ export default function ProSignupForm() {
           validateEmail(formData.email) &&
           validateAustralianPhone(formData.phone) &&
           formData.state && 
-          termsAccepted // Must have accepted terms in modal
+          formData.workAddress.trim() &&
+          isPasswordValid &&
+          formData.password === formData.confirmPassword &&
+          formData.termsAccepted // Only check formData.termsAccepted now
         )
       case 1: // Email confirmation - just show info, Next button will confirm
         return true
@@ -154,25 +326,156 @@ export default function ProSignupForm() {
     }
   }
 
+  // Send email verification code
+  const sendEmailVerification = async () => {
+    if (emailCodeSent) return // Already sent
+
+    setError('')
+    setIsLoading(true)
+    try {
+      const result = await requestVerificationCode(
+        formData.email,
+        formData.phone,
+        formData.firstName,
+        'email'
+      )
+
+      if (result.success) {
+        setEmailCodeSent(true)
+        setSuccessMessage('Verification code sent to your email')
+      } else {
+        setError(result.error || 'Failed to send email verification')
+      }
+    } catch (err: any) {
+      setError('Failed to send email verification')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Send phone verification code
+  const sendPhoneVerification = async () => {
+    if (phoneCodeSent) return // Already sent
+
+    setError('')
+    setIsLoading(true)
+    try {
+      const result = await requestVerificationCode(
+        formData.email,
+        formData.phone,
+        formData.firstName,
+        'phone'
+      )
+
+      if (result.success) {
+        setPhoneCodeSent(true)
+        setSuccessMessage('Verification code sent to your phone')
+      } else {
+        setError(result.error || 'Failed to send phone verification')
+      }
+    } catch (err: any) {
+      setError('Failed to send phone verification')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Process ID verification
+  const processIdVerification = async () => {
+    if (!formData.idFile) {
+      setError('Please upload an ID document')
+      return
+    }
+
+    setIdProcessing(true)
+    setError('')
+    try {
+      // TODO: Implement AI ID verification
+      // For now, just simulate processing
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // In real implementation, this would:
+      // 1. Upload to cloud storage
+      // 2. Run AI analysis for realism and fact checking
+      // 3. Store result in database
+      // 4. Send notification to admin
+      
+      setFormData({ ...formData, idVerified: true })
+      setSuccessMessage('ID verification submitted for review')
+    } catch (err: any) {
+      setError('Failed to process ID verification')
+    } finally {
+      setIdProcessing(false)
+    }
+  }
+
   const handleNext = async () => {
     if (currentStep === 0) {
-      // Create account on first step completion
-      await handleCreateAccount()
+      // Send verification codes before creating an account.
+      // Account creation happens later (after email/phone/ID verification)
+      await Promise.all([sendEmailVerification(), sendPhoneVerification()])
+      setCurrentStep(1)
     } else if (currentStep === 1) {
-      // Email confirmation - mark as confirmed and move to next step
-      setFormData({ ...formData, emailConfirmed: true })
-      setTimeout(() => setCurrentStep(currentStep + 1), 100)
-    } else if (currentStep === 2) {
-      // Phone verification - verify and move to next step
-      if (formData.phoneVerificationCode.length !== 6) {
+      // Email verification - verify the code
+      if (!emailCodeSent) {
+        await sendEmailVerification()
+        return // Don't advance yet
+      }
+      // If code was sent, verify it
+
+      const trimmedEmailCode = formData.emailVerificationCode.trim().replace(/\s+/g, '')
+      if (trimmedEmailCode.length !== 6) {
         setError('Please enter a 6-digit verification code')
         return
       }
+      const emailVerified = await verifyCode(
+        formData.email,
+        formData.phone,
+        trimmedEmailCode
+      )
+      if (!emailVerified) {
+        setError('Invalid verification code')
+        return
+      }
+
+      setFormData({ ...formData, emailConfirmed: true })
+      setTimeout(() => setCurrentStep(currentStep + 1), 100)
+    } else if (currentStep === 2) {
+      // Phone verification - verify the entered code
+      if (!phoneCodeSent) {
+        await sendPhoneVerification()
+        return // Don't advance yet
+      }
+      
+
+      const trimmedPhoneCode = formData.phoneVerificationCode.trim().replace(/\s+/g, '')
+      if (trimmedPhoneCode.length !== 6) {
+        setError('Please enter a 6-digit verification code')
+        return
+      }
+      const phoneVerified = await verifyCode(
+        formData.email,
+        formData.phone,
+        trimmedPhoneCode
+      )
+      if (!phoneVerified) {
+        setError('Invalid verification code')
+        return
+      }
+      
       setFormData({ ...formData, phoneVerified: true })
       setTimeout(() => setCurrentStep(currentStep + 1), 100)
     } else if (currentStep === 3) {
-      // ID verification - mark as verified and move to next step
-      setFormData({ ...formData, idVerified: true })
+      // ID verification - process the uploaded ID
+      if (!formData.idVerified) {
+        await processIdVerification()
+        return // Don't advance yet
+      }
+
+      // After completing ID verification, create the account and profile.
+      // This ensures the user is only created once they complete the core verification steps.
+      const accountCreated = await handleCreateAccount()
+      if (!accountCreated) return
       setTimeout(() => setCurrentStep(currentStep + 1), 100)
     } else if (currentStep === 4) {
       // Auto-pass intro step
@@ -197,9 +500,19 @@ export default function ProSignupForm() {
     setIsLoading(true)
 
     try {
-      const currentUser = auth.currentUser
-      console.log('[Form] Current user:', currentUser?.uid)
-      if (!currentUser) throw new Error('User not found. Please log in again.')
+      const getFileBase64 = (file: File): Promise<string> =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+
+      console.log('[Form] Current user:', authUser?.uid)
+      if (!authUser) throw new Error('User not found. Please log in again.')
+
+      // Small delay to ensure Firebase is ready
+      await new Promise(resolve => setTimeout(resolve, 500))
 
       // If form fields are empty, try to fetch from customer profile
       let firstName = formData.firstName
@@ -211,11 +524,11 @@ export default function ProSignupForm() {
       if (!firstName || !lastName || !email || !phone || !state) {
         console.log('[Form] Form data incomplete, fetching from customer profile...')
         try {
-          const customerData = await getCustomerProfile(currentUser.uid)
+          const customerData = await getCustomerProfile(authUser.uid)
           if (customerData) {
             firstName = firstName || customerData.firstName || ''
             lastName = lastName || customerData.lastName || ''
-            email = email || customerData.email || currentUser.email || ''
+            email = email || customerData.email || authUser.email || ''
             phone = phone || customerData.phone || ''
             state = state || customerData.state || ''
             console.log('[Form] Loaded customer data:', { firstName, lastName, email, phone, state })
@@ -227,7 +540,7 @@ export default function ProSignupForm() {
 
       // Validate that all required fields are populated
       const missingFields = []
-      if (!currentUser.uid) missingFields.push('userId')
+      if (!authUser.uid) missingFields.push('userId')
       if (!firstName?.trim()) missingFields.push('firstName')
       if (!lastName?.trim()) missingFields.push('lastName')
       if (!email?.trim()) missingFields.push('email')
@@ -239,12 +552,19 @@ export default function ProSignupForm() {
       }
 
       const inquiryPayload = {
-        userId: currentUser.uid,
+        userId: authUser.uid,
         firstName,
         lastName,
         email,
         phone,
         state,
+        idVerification: formData.idFile
+          ? {
+              fileName: formData.idFile.name,
+              fileType: formData.idFile.type,
+              base64: await getFileBase64(formData.idFile),
+            }
+          : null,
         workVerification: {
           hasWorkRight: formData.hasWorkRight,
           hasValidLicense: formData.hasValidLicense,
@@ -280,6 +600,59 @@ export default function ProSignupForm() {
       const responseData = await inquiryResponse.json()
       console.log('Inquiry submitted successfully:', responseData)
 
+      // Send confirmation email to employee
+      try {
+        await fetch('/api/email/send-employee-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeEmail: email,
+            employeeData: {
+              firstName,
+              lastName,
+              email,
+              phone,
+              employeeId: responseData.inquiryId,
+            },
+          }),
+        })
+        console.log('[Form] Employee confirmation email sent')
+      } catch (emailErr) {
+        console.error('[Form] Error sending employee confirmation email:', emailErr)
+      }
+
+      // Send employer notification with all application details
+      try {
+        await fetch('/api/email/send-employer-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeData: {
+              firstName,
+              lastName,
+              email,
+              phone,
+              state,
+              employeeId: responseData.inquiryId,
+              applicationType: 'pro',
+              workVerification: {
+                hasWorkRight: formData.hasWorkRight,
+                hasValidLicense: formData.hasValidLicense,
+                hasTransport: formData.hasTransport,
+                hasEquipment: formData.hasEquipment,
+                ageVerified: formData.ageVerified,
+              },
+              availability: formData.availability,
+              skillsAssessment: formData.skillsAssessment,
+              comments: formData.comments,
+            },
+          }),
+        })
+        console.log('[Form] Employer notification email sent')
+      } catch (emailErr) {
+        console.error('[Form] Error sending employer notification email:', emailErr)
+      }
+
       // Move to success screen
       setCurrentStep(steps.length)
     } catch (err: any) {
@@ -290,24 +663,86 @@ export default function ProSignupForm() {
     }
   }
 
-  const handleCreateAccount = async () => {
+  const handleCreateAccount = async (): Promise<boolean> => {
     setError('')
     setIsLoading(true)
 
+    const signupStartTime = performance.now()
+    console.log('[Signup] Starting account creation at', new Date().toISOString())
+
     try {
+      // Check if user is already logged in
+      if (isLoggedInUser && authUser) {
+        // Check if user has customer data
+        const customerData = await getCustomerProfile(authUser.uid)
+        if (customerData && customerData.state) {
+          console.log('[Signup] User already logged in with complete profile, advancing to email verification')
+          // Already logged in with complete data
+          setIsLoading(false)
+          return true
+        } else {
+          console.log('[Signup] User logged in but needs to complete profile - creating customer profile')
+          // User is logged in but needs customer profile - create it using existing auth user
+          try {
+            await createEmployeeProfile(authUser.uid, {
+              email: formData.email,
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              phone: formData.phone,
+              state: formData.state,
+              workAddress: formData.workAddress,
+              employmentType: 'contractor',
+              status: 'pending',
+              availability: formData.availability,
+              applicationStep: 1,
+            })
+            console.log('[Signup] Customer profile created for existing user')
+            
+            // Auto-accept terms for logged-in users
+            setFormData(prev => ({ ...prev, termsAccepted: true }))
+            
+            // Send verification codes automatically for logged-in users too
+            const adminStatus = await isAdminUser(authUser.uid)
+            setIsAdmin(adminStatus)
+            if (!adminStatus) {
+              // Send codes in background (development uses test code / logs)
+              sendEmailVerification().catch((err: any) => {
+                console.error('[ProSignup] Error sending email verification:', err)
+              })
+              sendPhoneVerification().catch((err: any) => {
+                console.error('[ProSignup] Error sending phone verification:', err)
+              })
+            }
+            
+            // Now advance to email verification
+            setIsLoading(false)
+            return true
+          } catch (profileErr: any) {
+            console.error('[Signup] Error creating profile for existing user:', profileErr)
+            setError('Failed to complete profile setup')
+            setIsLoading(false)
+            return false
+          }
+        }
+      }
+
       if (formData.password !== formData.confirmPassword) {
         setError('Passwords do not match')
         setIsLoading(false)
-        return
+        return false
       }
 
       if (!isPasswordValid) {
         setError('Password does not meet requirements')
         setIsLoading(false)
-        return
+        return false
       }
 
       let userCredential
+
+      // Log Auth creation start
+      const authStartTime = performance.now()
+      console.log('[Signup] Creating Firebase auth...')
 
       try {
         // Try to create new account
@@ -317,91 +752,83 @@ export default function ProSignupForm() {
           formData.password
         )
 
-        // Create employee profile in new system
+        const authDuration = performance.now() - authStartTime
+        console.log('[Signup] Auth created in', Math.round(authDuration) + 'ms', 'UID:', userCredential.user.uid)
+
+        // Log Employee Profile creation start
+        const profileStartTime = performance.now()
+        console.log('[Signup] Creating employee profile...')
+
+        // Create employee profile
         await createEmployeeProfile(userCredential.user.uid, {
           email: formData.email,
           firstName: formData.firstName,
           lastName: formData.lastName,
           phone: formData.phone,
           state: formData.state,
+          workAddress: formData.workAddress,
           employmentType: 'contractor',
           status: 'pending',
           availability: formData.availability,
           applicationStep: 1,
         })
 
+        const profileDuration = performance.now() - profileStartTime
+        console.log('[Signup] Employee profile created (ID pending in background):', Math.round(profileDuration) + 'ms')
+
       } catch (createErr: any) {
+        const authDuration = performance.now() - authStartTime
+        console.log('[Signup] Error after', Math.round(authDuration) + 'ms:', createErr.code)
+
         if (createErr.code === 'auth/email-already-in-use') {
-          // Email already exists - this customer wants to become an employee
-          try {
-            userCredential = await signInWithEmailAndPassword(
-              auth,
-              formData.email,
-              formData.password
-            )
-
-            // Check if they already have an employee profile
-            const existingCustomer = await getCustomerProfile(userCredential.user.uid)
-            
-            if (existingCustomer?.hasEmployeeProfile) {
-              setError('This account is already registered as a Washlee Pro.')
-              setIsLoading(false)
-              return
-            }
-
-            if (existingCustomer) {
-              // Upgrade customer to also have employee profile
-              await upgradeCustomerToEmployee(userCredential.user.uid, {
-                email: formData.email,
-                firstName: formData.firstName || existingCustomer.firstName,
-                lastName: formData.lastName || existingCustomer.lastName,
-                phone: formData.phone || existingCustomer.phone,
-                state: formData.state,
-                employmentType: 'contractor',
-                status: 'pending',
-                availability: formData.availability,
-                applicationStep: 1,
-              })
-
-              setSuccessMessage('Existing account upgraded to Pro! Moving to next step...')
-            } else {
-              setError('Account found but could not process. Please try again.')
-              setIsLoading(false)
-              return
-            }
-          } catch (signInErr: any) {
-            if (signInErr.code === 'auth/wrong-password') {
-              setError('Email exists. Please enter the correct password.')
-            } else if (signInErr.code === 'auth/user-not-found') {
-              setError('Account not found.')
-            } else {
-              setError('Unable to access existing account. Please try again.')
-            }
-            setIsLoading(false)
-            return
-          }
+          // Email already exists - customer account found
+          setError(
+            'This email is already registered as a Washlee customer. ' +
+            'Click "Already have a customer account? Sign in here" to sign in and upgrade to Pro.'
+          )
+          setIsLoading(false)
+          return false
         } else if (createErr.code === 'auth/weak-password') {
           setError('Password is too weak.')
           setIsLoading(false)
-          return
+          return false
         } else {
           setError(createErr.message || 'Failed to create account')
           setIsLoading(false)
-          return
+          return false
         }
       }
-
-      setCurrentStep(1)
       if (!userCredential) {
         setError('Failed to process account')
         setIsLoading(false)
-        return
+        return false
+      }
+
+      // Check if admin and set state
+      const adminStatus = await isAdminUser(userCredential.user.uid)
+      setIsAdmin(adminStatus)
+      
+      // Generate and send verification codes ASYNC (don't wait for these)
+      if (!adminStatus) {
+        // Send codes in background (development uses test code / logs)
+        sendEmailVerification().catch((err: any) => {
+          console.error('[ProSignup] Error sending email verification:', err)
+        })
+        sendPhoneVerification().catch((err: any) => {
+          console.error('[ProSignup] Error sending phone verification:', err)
+        })
       }
       
+      const totalTime = performance.now() - signupStartTime
+      console.log('[Signup] ✅ Account creation completed in', Math.round(totalTime), 'ms')
+      
       setTimeout(() => setSuccessMessage(''), 2000)
+      return true
     } catch (err: any) {
-      console.error('Signup error:', err)
+      const totalTime = performance.now() - signupStartTime
+      console.error('[Signup] ❌ Error after', Math.round(totalTime), 'ms:', err)
       setError(err.message || 'Failed to process signup')
+      return false
     } finally {
       setIsLoading(false)
     }
@@ -527,6 +954,51 @@ export default function ProSignupForm() {
             </div>
           </div>
           <div>
+            <label className="block text-sm font-semibold text-dark mb-2">Work Address*</label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
+              <input
+                type="text"
+                name="workAddress"
+                value={formData.workAddress}
+                onChange={(e) => {
+                  handleChange(e)
+                  fetchWorkAddressPredictions(e.target.value)
+                }}
+                placeholder="Enter your work location or main service area"
+                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                autoComplete="off"
+                required
+              />
+              {isValidatingWorkAddress && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  <Spinner />
+                </div>
+              )}
+              {showWorkAddressPredictions && workAddressPredictions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                  {workAddressPredictions.map((prediction, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => selectWorkAddress(prediction)}
+                      className="w-full text-left px-4 py-2 hover:bg-light transition border-b border-light last:border-b-0"
+                    >
+                      <div className="font-semibold text-dark text-sm">{prediction.main_text}</div>
+                      <div className="text-gray text-xs">{prediction.secondary_text}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {workAddressError && (
+                <div className="flex items-center gap-2 mt-2 text-red-600 text-sm">
+                  <AlertCircle size={16} />
+                  <span>{workAddressError}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div>
             <label className="block text-sm font-semibold text-dark mb-2">Create Password*</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
@@ -586,64 +1058,137 @@ export default function ProSignupForm() {
               />
             </div>
           </div>
-          <div className="flex items-start gap-3 py-2">
-            <input
-              type="checkbox"
-              name="termsAccepted"
-              checked={formData.termsAccepted && termsAccepted}
-              onChange={(e) => {
-                const checked = e.target.checked
-                if (checked && !termsAccepted) {
-                  // Open modal without changing checkbox yet
-                  setShowTermsModal(true)
-                  setTermsScrolled(false)
-                } else {
-                  // Allow unchecking
-                  setFormData({ ...formData, termsAccepted: false })
-                  setTermsAccepted(false)
-                }
-              }}
-              className="w-4 h-4 rounded border-gray mt-1"
-              required
-            />
-            <span className="text-xs text-gray">
-              I agree to the <button type="button" onClick={() => { setShowTermsModal(true); setTermsScrolled(false) }} className="text-primary hover:underline">Terms & Conditions</button> and <Link href="/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link>
-            </span>
+          {/* Terms and Conditions Acceptance */}
+          <div className="bg-mint/20 rounded-lg p-4 border-2 border-primary/30 mb-6">
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                name="termsAccepted"
+                checked={formData.termsAccepted}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  if (checked) {
+                    // Open modal when trying to check
+                    setShowTermsModal(true)
+                    setTermsScrolled(false)
+                  } else {
+                    // Allow unchecking without modal
+                    setFormData({ ...formData, termsAccepted: false })
+                  }
+                }}
+                className="w-5 h-5 rounded border-2 border-gray mt-0.5 cursor-pointer accent-primary flex-shrink-0"
+                required
+              />
+              <div className="flex-1">
+                <label className="text-sm font-semibold text-dark cursor-pointer block mb-1">
+                  I agree to the Terms & Conditions
+                </label>
+                <p className="text-xs text-gray mb-2">
+                  Please review and accept our{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTermsModal(true)
+                      setTermsScrolled(false)
+                    }}
+                    className="text-primary font-semibold hover:underline"
+                  >
+                    Terms & Conditions
+                  </button>
+                  {' '}and{' '}
+                  <Link href="/privacy-policy" className="text-primary font-semibold hover:underline">
+                    Privacy Policy
+                  </Link>
+                </p>
+                {formData.termsAccepted && (
+                  <div className="flex items-center gap-2 text-xs text-primary font-semibold">
+                    <CheckCircle size={16} />
+                    <span>✓ Terms accepted</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="pt-4 border-t border-gray/20">
+
+          {/* Divider */}
+          <div className="py-4 border-t border-gray/20 border-b border-gray/20">
             <p className="text-xs text-gray text-center">
               Already have a customer account?{' '}
-              <Link 
-                href="/auth/login?redirect=/auth/pro-signup-form?step=1"
+              <button
+                type="button"
+                onClick={() => {
+                  if (isLoggedInUser) {
+                    // If already logged in as a customer, show terms modal and prepare to advance
+                    setFormData({ ...formData, termsAccepted: true })
+                    setRedirectToProSignin(true)
+                    setShowTermsModal(true)
+                    setTermsScrolled(true)
+                  } else {
+                    // If not logged in, save form data and redirect to login
+                    sessionStorage.setItem('proSignupFormData', JSON.stringify(formData))
+                    router.push('/auth/login?redirect=/auth/pro-signup-form?step=0')
+                  }
+                }}
                 className="text-primary font-semibold hover:underline"
               >
                 Click here to sign in
-              </Link>
+              </button>
             </p>
           </div>
         </div>
       ),
     },
     {
-      title: 'Confirmation Email Sent',
-      description: `A confirmation link was sent to ${formData.email}`,
+      title: 'Verify Your Email',
+      description: 'Enter the verification code we sent to your email',
       content: (
-        <div className="space-y-6">
-          <div className="bg-mint/30 border-2 border-primary rounded-lg p-6 text-center">
-            <Mail size={48} className="text-primary mx-auto mb-4" />
-            <h3 className="font-bold text-dark mb-2">Check Your Email</h3>
-            <p className="text-gray text-sm mb-4">
-              A confirmation link was sent to <strong>{formData.email}</strong>. Click the link in your email to verify your address.
-            </p>
-            <p className="text-gray text-xs">
-              Once verified, click the button below to continue.
-            </p>
-          </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-900">
-              <strong>Note:</strong> In production, this would send a real confirmation email. For testing, marking as confirmed will allow you to proceed.
-            </p>
-          </div>
+        <div className="space-y-4">
+          {isAdmin ? (
+            <div className="bg-green-50 border-2 border-green-500 rounded-lg p-6 text-center">
+              <CheckCircle size={48} className="text-green-600 mx-auto mb-4" />
+              <h3 className="font-bold text-dark mb-2">✓ Email Verification Bypassed</h3>
+              <p className="text-gray text-sm">
+                Admin account detected. Email verification has been bypassed.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-semibold text-dark mb-2">Email Verification Code</label>
+                <p className="text-sm text-gray mb-3">
+                  We sent a verification code to <strong>{formData.email}</strong>
+                </p>
+                <input
+                  type="text"
+                  name="emailVerificationCode"
+                  value={formData.emailVerificationCode}
+                  onChange={handleChange}
+                  placeholder="Enter 6-digit code"
+                  className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-center text-2xl tracking-widest"
+                  maxLength={6}
+                />
+                <div className="flex justify-between items-center mt-4">
+                  <button
+                    onClick={() => sendEmailVerification()}
+                    disabled={emailCodeSent || isLoading}
+                    className="text-primary font-semibold hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {emailCodeSent ? 'Code Sent' : 'Send Code'}
+                  </button>
+                  <div className="text-xs text-gray">
+                    <strong>🔧 Development Mode:</strong> Test code: <code className="bg-white px-2 py-1 rounded font-bold">
+                      {formData.email && formData.phone ? (testVerificationCode || 'Loading...') : 'Enter email/phone first'}
+                    </code>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Tip:</strong> Check your spam folder if you don't see the email. The verification code will expire in 15 minutes.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       ),
     },
@@ -652,26 +1197,52 @@ export default function ProSignupForm() {
       description: 'Enter the verification code we sent to your phone',
       content: (
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-dark mb-2">Phone Verification Code</label>
-            <p className="text-sm text-gray mb-3">
-              We sent a verification code to <strong>{formData.phone}</strong>
-            </p>
-            <input
-              type="text"
-              name="phoneVerificationCode"
-              value={formData.phoneVerificationCode}
-              onChange={handleChange}
-              placeholder="Enter 6-digit code"
-              className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-center text-2xl tracking-widest"
-              maxLength={6}
-            />
-          </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-900">
-              <strong>Note:</strong> For testing, enter any 6-digit code and click Next to proceed.
-            </p>
-          </div>
+          {isAdmin ? (
+            <div className="bg-green-50 border-2 border-green-500 rounded-lg p-6 text-center">
+              <CheckCircle size={48} className="text-green-600 mx-auto mb-4" />
+              <h3 className="font-bold text-dark mb-2">✓ Phone Verification Bypassed</h3>
+              <p className="text-gray text-sm">
+                Admin account detected. Phone verification has been bypassed.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-semibold text-dark mb-2">Phone Verification Code</label>
+                <p className="text-sm text-gray mb-3">
+                  We sent a verification code to <strong>{formData.phone}</strong>
+                </p>
+                <input
+                  type="text"
+                  name="phoneVerificationCode"
+                  value={formData.phoneVerificationCode}
+                  onChange={handleChange}
+                  placeholder="Enter 6-digit code"
+                  className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-center text-2xl tracking-widest"
+                  maxLength={6}
+                />
+                <div className="flex justify-between items-center mt-4">
+                  <button
+                    onClick={() => sendPhoneVerification()}
+                    disabled={phoneCodeSent || isLoading}
+                    className="text-primary font-semibold hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {phoneCodeSent ? 'Code Sent' : 'Resend Code'}
+                  </button>
+                  <div className="text-xs text-gray">
+                    <strong>🔧 Development Mode:</strong> Test code: <code className="bg-white px-2 py-1 rounded font-bold">
+                      {formData.email && formData.phone ? (testVerificationCode || 'Loading...') : 'Enter email/phone first'}
+                    </code>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Tip:</strong> Check your SMS messages for the 6-digit verification code. The code will expire in 15 minutes.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       ),
     },
@@ -1017,6 +1588,20 @@ export default function ProSignupForm() {
   const step = steps[currentStep]
   const progress = ((currentStep + 1) / steps.length) * 100
 
+  // Safety check: if step doesn't exist, redirect to home
+  if (!step) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
+          <Link href="/">
+            <Button>Go Home</Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-mint to-white flex flex-col">
       {/* Header */}
@@ -1094,6 +1679,40 @@ export default function ProSignupForm() {
             {step.content}
           </div>
 
+          {/* Step 0 Validation Helper */}
+          {currentStep === 0 && !isStepValid() && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-sm">
+              <div className="flex gap-2">
+                <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-amber-900">
+                  <p className="font-semibold mb-2">Complete the form to continue:</p>
+                  <ul className="space-y-1 text-xs ml-2">
+                    {!formData.firstName.trim() && <li>✗ First name required</li>}
+                    {!formData.lastName.trim() && <li>✗ Last name required</li>}
+                    {!formData.email && <li>✗ Valid email required</li>}
+                    {!formData.phone && <li>✗ Phone number required</li>}
+                    {!formData.state && <li>✗ State required</li>}
+                    {!formData.termsAccepted && (
+                      <li className="text-amber-700 font-medium">
+                        ✗{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowTermsModal(true)
+                            setTermsScrolled(false)
+                          }}
+                          className="text-primary font-semibold hover:underline"
+                        >
+                          Accept Terms & Conditions
+                        </button>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Navigation */}
           <div className="flex gap-3">
             <button
@@ -1107,6 +1726,7 @@ export default function ProSignupForm() {
               size="lg"
               className="flex-1 flex items-center justify-center gap-2"
               disabled={!isStepValid() || isLoading}
+              title={!isStepValid() && currentStep === 0 ? 'Please complete all fields and accept the terms' : ''}
             >
               {isLoading ? <Spinner /> : 'Next'}
             </Button>
@@ -1129,19 +1749,39 @@ export default function ProSignupForm() {
 
       {/* Terms & Conditions Modal */}
       {showTermsModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray/20">
-              <h2 className="text-2xl font-bold text-dark">Terms & Conditions</h2>
+            <div className="flex items-center justify-between p-6 border-b-2 border-gray/20 bg-gradient-to-r from-mint/10 to-primary/5">
+              <div>
+                <h2 className="text-3xl font-bold text-dark">Terms & Conditions</h2>
+                <p className="text-sm text-gray mt-1">Please read and scroll to accept</p>
+              </div>
               <button
                 onClick={() => {
                   setShowTermsModal(false)
                 }}
                 className="p-2 hover:bg-light rounded-full transition"
+                title="Close"
               >
-                <X size={24} className="text-dark" />
+                <X size={28} className="text-dark" />
               </button>
+            </div>
+
+            {/* Scroll Progress Indicator */}
+            <div className="px-6 pt-4 pb-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-gray">Scroll Progress</span>
+                <span className="text-xs font-semibold text-primary">{termsScrolled ? '✓ Complete' : 'Scroll to bottom'}</span>
+              </div>
+              <div className="h-1 bg-gray/20 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${termsScrolled ? 'bg-primary w-full' : 'bg-primary'}`}
+                  style={{
+                    width: termsScrolled ? '100%' : '0%',
+                  }}
+                />
+              </div>
             </div>
 
             {/* Content */}
@@ -1153,49 +1793,75 @@ export default function ProSignupForm() {
                 setTermsScrolled(isAtBottom)
               }}
             >
-              <div className="prose prose-sm max-w-none text-gray whitespace-pre-wrap">
+              <div className="prose prose-sm max-w-none text-gray whitespace-pre-wrap font-normal leading-relaxed">
                 {WASHLEE_TERMS}
               </div>
+              
+              {/* Sticky bottom hint */}
+              {!termsScrolled && (
+                <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+                  <p className="text-xs text-yellow-900 font-medium">
+                    👇 Please scroll down to the bottom to accept the terms
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Footer */}
-            <div className="border-t border-gray/20 p-6 bg-light/30 flex gap-3">
+            {/* Footer - Sticky */}
+            <div className="border-t-2 border-gray/20 p-6 bg-gradient-to-r from-light/50 to-white flex gap-3">
               <button
                 onClick={() => {
                   setShowTermsModal(false)
                   // Don't change formData, user can try again
                 }}
-                className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-white transition"
+                className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition active:scale-95"
+                title="Decline and close"
               >
                 Decline
               </button>
               <button
                 onClick={() => {
-                  setTermsAccepted(true)
                   setFormData({ ...formData, termsAccepted: true })
                   setShowTermsModal(false)
                   
-                  // If user clicked "Already have account" link, redirect them to pro-signin
-                  if (redirectToProSignin) {
+                  // If user clicked "Already have account" link, advance to Step 1
+                  if (redirectToProSignin && isLoggedInUser) {
                     setRedirectToProSignin(false)
+                    console.log('[ProSignup] Logged-in user accepted terms, advancing to Step 1')
                     setTimeout(() => {
-                      router.push('/auth/pro-signin')
-                    }, 500)
+                      setCurrentStep(1)
+                    }, 100)
                   }
                 }}
                 disabled={!termsScrolled}
-                className={`flex-1 py-3 rounded-lg font-semibold transition ${
+                className={`flex-1 py-3 rounded-lg font-bold transition transform active:scale-95 flex items-center justify-center gap-2 ${
                   termsScrolled
-                    ? 'bg-primary text-white hover:bg-primary/90'
-                    : 'bg-gray/20 text-gray cursor-not-allowed'
+                    ? 'bg-primary text-white hover:bg-primary/90 shadow-lg hover:shadow-xl cursor-pointer'
+                    : 'bg-gray/20 text-gray cursor-not-allowed opacity-50'
                 }`}
+                title={termsScrolled ? 'Accept and continue' : 'Scroll down to unlock'}
               >
-                {termsScrolled ? 'I Accept' : 'Scroll to Accept'}
+                {termsScrolled ? (
+                  <>
+                    <CheckCircle size={20} />
+                    <span>I Accept & Agree</span>
+                  </>
+                ) : (
+                  'Scroll to Bottom to Accept'
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+export default function ProSignupForm() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ProSignupFormContent />
+    </Suspense>
   )
 }

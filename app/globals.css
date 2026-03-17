@@ -42,11 +42,32 @@ body {
   }
 
   .section-title {
-    @apply text-3xl sm:text-4xl font-bold text-dark mb-4;
+    @apply text-4xl sm:text-5xl font-bold text-dark mb-4;
   }
 
   .section-subtitle {
-    @apply text-gray text-lg mb-12;
+    @apply text-gray text-xl sm:text-2xl mb-12;
+  }
+
+  /* Additional heading sizes for consistency */
+  .h1 {
+    @apply text-5xl sm:text-6xl font-bold;
+  }
+
+  .h2 {
+    @apply text-4xl sm:text-5xl font-bold;
+  }
+
+  .h3 {
+    @apply text-2xl sm:text-3xl font-bold;
+  }
+
+  .text-lg-base {
+    @apply text-base sm:text-lg md:text-xl;
+  }
+
+  .text-lg-sm {
+    @apply text-sm sm:text-base md:text-lg;
   }
 }
 

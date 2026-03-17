@@ -3,10 +3,32 @@
 import Button from '@/components/Button'
 import Link from 'next/link'
 import { ArrowLeft, Users, Briefcase } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useAuth } from '@/lib/AuthContext'
+import { useEffect, Suspense } from 'react'
 
-export default function SignupChoice() {
+function SignupChoiceContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user, loading } = useAuth()
+
+  // If user is already logged in, redirect them
+  useEffect(() => {
+    if (loading) return // Wait for auth to load
+    
+    // Check for type parameter first and redirect accordingly
+    const type = searchParams?.get('type')
+    if (type === 'pro') {
+      router.push('/auth/pro-signup')
+      return
+    }
+    
+    if (user) {
+      // User is already logged in - redirect to home
+      router.push('/')
+      return
+    }
+  }, [user, loading, router, searchParams])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-mint to-white flex flex-col">
@@ -90,5 +112,20 @@ export default function SignupChoice() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SignupChoice() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-[#48C9B0] to-[#7FE3D3] rounded-full animate-pulse mx-auto mb-4"></div>
+          <p className="text-gray font-semibold">Loading...</p>
+        </div>
+      </div>
+    }>
+      <SignupChoiceContent />
+    </Suspense>
   )
 }

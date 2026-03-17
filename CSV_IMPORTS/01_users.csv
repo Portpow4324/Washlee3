@@ -1,0 +1,14 @@
+id,email,name,phone,user_type,is_admin,is_employee,is_loyalty_member,profile_picture_url,created_at,updated_at
+3r6ekKwI9hRvcqPvlyHgWAIr3Jf1,lukaverde22@gmail.com,lukaverde22,+61412458144,admin,true,false,false,,2026-03-08T10:00:34Z,2026-03-08T21:00:48Z
+wjghrQ9IrTc8oo656F96YoQokOw1,test999@gmail.com,test999,+61412458144,admin,true,false,false,,2026-03-08T01:23:00Z,2026-03-08T01:23:00Z
+zeHABUIJ5YRbEheRBUe9N5pqVIF2,lukaverde0476653333@gmail.com,lukaverde0476653333,,admin,true,true,false,,2026-03-11T20:06:45Z,2026-03-11T20:06:45Z
+5jf51pTMCFW4aPQs6mxBQXGvq9G3,lukaverde02t45@gmail.com,Luka Verde,+61412458144,customer,false,false,false,,2026-03-08T12:59:19Z,2026-03-08T12:59:19Z
+7PmGcp5TBuU8Uh3H4lMrnmgJWjE3,lukaverde624@gmail.com,Luka Verde,+61412458144,customer,false,false,false,,2026-03-06T15:43:06Z,2026-03-06T15:43:06Z
+82rSLdhYL5hWakhBcVFMXFpFTXC2,lukaverde326@gmail.com,Luka Verde,+61412458144,customer,false,false,false,,2026-03-06T15:42:32Z,2026-03-06T15:42:32Z
+4Jir52dHXMN9s4EM40zbOgwsGFT2,lukaverde6@gmail.com,lukaverde6,,customer,false,false,false,,2026-03-03T07:52:45Z,2026-03-03T07:52:45Z
+CvSbK8LmoWWp8OLdejbTh8AdvlT2,test99999@gmail.com,Luka Verde,+61412458144,customer,false,false,false,,2026-03-02T07:54:43Z,2026-03-02T07:54:43Z
+KXZBhIY4JPagpoGLcIvWp60Vxzq1,test999923429@gmail.com,Luka Verde,+61412458144,customer,false,false,false,,2026-03-03T17:18:21Z,2026-03-03T17:18:21Z
+7QNDo1Cox2VCu09Yka5P2CiwsgJ3,lukaverde62242@gmail.com,lukaverde62242,+61412458144,pro,false,true,false,,2026-03-08T22:04:32Z,2026-03-08T22:04:32Z
+7QptZl1pmjTioD4rt4HGZnLiyt43,lukaverde3@gmail.com,lukaverde3,+61412458144,pro,false,true,false,,2026-03-14T12:20:31Z,2026-03-14T12:20:31Z
+IhV7F0NopWgQxo3ZGyIpl7vqlGF3,lukaverde62322343@gmail.com,lukaverde62322343,+61412458144,pro,false,true,false,,2026-03-03T17:47:42Z,2026-03-03T17:47:42Z
+otQv0kQ0xvb9jlgm9k7si7oT2A52,lukaverde3@gmail.com,lukaverde3,+61412458144,pro,false,true,false,,2026-03-15T20:14:55Z,2026-03-15T20:14:55Z

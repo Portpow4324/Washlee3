@@ -2,8 +2,8 @@
 
 import { useAuth } from '@/lib/AuthContext'
 import Spinner from '@/components/Spinner'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { 
@@ -16,14 +16,77 @@ import { auth } from '@/lib/firebase'
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, userData, loading } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const hasCheckedAuthRef = useRef(false)
 
+  // Centralized auth check for the entire dashboard
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/login')
+    if (hasCheckedAuthRef.current) {
+      return
     }
-  }, [user, loading, router])
+
+    // Still loading auth state OR user not set
+    if (loading || !user) {
+      return
+    }
+
+    // User exists and loading is done - now check if we have user data
+    if (!userData) {
+      return
+    }
+
+    // Mark as checked FIRST before any async operations
+    hasCheckedAuthRef.current = true
+    console.log('[DashboardLayout] Auth check starting...')
+    console.log('[DashboardLayout] Current pathname:', pathname)
+    console.log('[DashboardLayout] User type:', userData.userType)
+
+    // Don't redirect if on settings page (customer settings)
+    const isSettingsPage = pathname?.includes('/dashboard/settings')
+    
+    // If user is pro/employee, redirect them to employee dashboard (but not from settings)
+    if (userData.userType === 'pro' && !isSettingsPage) {
+      console.log('[DashboardLayout] User is pro, redirecting to employee dashboard')
+      router.push('/employee/dashboard')
+      return
+    }
+
+    // User is authenticated customer with data loaded - proceed
+    console.log('[DashboardLayout] User authenticated as customer, rendering dashboard')
+  }, [loading, user, userData, router])
+
+  // Show loading state while auth checks happen
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-light">
+        <div className="text-center">
+          <Spinner />
+          <p className="mt-4 text-gray font-semibold">Loading your dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If loading is done but user is not set, redirect to login
+  if (!loading && !user) {
+    console.log('[DashboardLayout] Auth check complete - no user, redirecting to login')
+    router.push('/auth/login')
+    return null
+  }
+
+  // If user data is not loaded yet, show loading
+  if (!userData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-light">
+        <div className="text-center">
+          <Spinner />
+          <p className="mt-4 text-gray font-semibold">Loading profile...</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleLogout = async () => {
     try {
@@ -34,16 +97,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <Spinner />
-        <p className="text-gray font-semibold">Loading your dashboard...</p>
-      </div>
-    )
-  }
-
-  if (!user) return null
+  // Render the sidebar layout regardless of auth state
+  // Child pages handle their own auth checks
 
   const menuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: Home },
@@ -68,6 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               width={40}
               height={40}
               className="rounded-full"
+              style={{ width: 'auto', height: 'auto' }}
             />
           </Link>
           <button
@@ -125,6 +181,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 width={40}
                 height={40}
                 className="rounded-full"
+                style={{ width: 'auto', height: 'auto' }}
               />
               <span className="font-bold text-dark">Washlee</span>
             </Link>

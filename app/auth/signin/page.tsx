@@ -7,15 +7,19 @@ import { useRouter } from 'next/navigation'
 
 export default function SigninChoice() {
   const router = useRouter()
+  
+  const handleBackClick = () => {
+    router.push('/')
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-mint to-white flex flex-col">
       {/* Header Navigation */}
       <div className="px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
         <button
-          onClick={() => router.back()}
+          onClick={handleBackClick}
           className="p-2 hover:bg-white hover:rounded-full transition"
-          title="Go back"
+          title="Go back to home"
         >
           <ArrowLeft size={24} className="text-primary" />
         </button>
@@ -60,7 +64,7 @@ export default function SigninChoice() {
             </Link>
 
             {/* Washlee Pro Sign In */}
-            <Link href="/auth/pro-signin">
+            <Link href="/auth/employee-signin">
               <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 h-full flex flex-col items-center justify-center cursor-pointer hover:scale-105">
                 <div className="bg-accent rounded-full p-6 mb-6">
                   <Briefcase size={48} className="text-primary" />

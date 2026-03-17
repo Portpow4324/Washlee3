@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebaseAdmin'
 import { getServerSession } from 'next-auth'
-import { sendTemplateEmail, sendBulkEmail, sendCampaignEmail } from '@/lib/sendgrid-email'
+import { sendTemplateEmail, sendCampaignEmail } from '@/lib/sendgrid-email'
 
 export async function POST(request: NextRequest) {
   try {

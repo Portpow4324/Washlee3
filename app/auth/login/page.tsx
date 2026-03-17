@@ -4,14 +4,14 @@ import Image from 'next/image'
 import Button from '@/components/Button'
 import Spinner from '@/components/Spinner'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signInWithEmailAndPassword, sendPasswordResetEmail, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
 import { doc, getDoc } from 'firebase/firestore'
 
-export default function Login() {
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams?.get('redirect')
@@ -135,12 +135,16 @@ export default function Login() {
     }
   }
 
+  const handleBackClick = () => {
+    router.push('/auth/signin')
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
       <button
-        onClick={() => router.back()}
+        onClick={handleBackClick}
         className="absolute top-6 left-6 p-2 hover:bg-white rounded-full transition"
-        title="Go back"
+        title="Go back to sign in"
       >
         <ArrowLeft size={24} className="text-primary" />
       </button>
@@ -364,5 +368,13 @@ export default function Login() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }

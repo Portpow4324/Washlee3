@@ -7,7 +7,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { DollarSign, Users, TrendingUp, ShoppingCart, ArrowUp } from 'lucide-react'
+import { DollarSign, Users, TrendingUp, ShoppingCart, ArrowUp, ChevronLeft } from 'lucide-react'
 import { collection, query, where, getDocs, orderBy, limit, startAt, endAt } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -25,6 +25,18 @@ interface RevenueChartData {
   revenue: number
 }
 
+interface OrderStatusItem {
+  status: string
+  count: number
+}
+
+interface ProStats {
+  proId: string
+  proName: string
+  ordersCompleted: number
+  totalEarnings: number
+}
+
 export default function AnalyticsDashboard() {
   const router = useRouter()
   const { user, userData, loading: authLoading } = useAuth()
@@ -37,8 +49,8 @@ export default function AnalyticsDashboard() {
     revenueGrowth: 0,
   })
   const [revenueData, setRevenueData] = useState<RevenueChartData[]>([])
-  const [orderStatusData, setOrderStatusData] = useState<any[]>([])
-  const [topPros, setTopPros] = useState<any[]>([])
+  const [orderStatusData, setOrderStatusData] = useState<OrderStatusItem[]>([])
+  const [topPros, setTopPros] = useState<ProStats[]>([])
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d'>('30d')
 
@@ -47,13 +59,13 @@ export default function AnalyticsDashboard() {
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth/login')
+      return
     }
-  }, [user, authLoading, router])
-
-  useEffect(() => {
-    if (!user || !userData?.isAdmin) return
-    fetchAnalytics()
-  }, [user, userData, dateRange])
+    if (!authLoading && user && !userData?.isAdmin) {
+      console.error('[Analytics] User is not admin. Current user:', user.email)
+      router.push('/')
+    }
+  }, [user, authLoading, userData, router])
 
   const getDaysInRange = () => {
     return dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90
@@ -74,7 +86,16 @@ export default function AnalyticsDashboard() {
         orderBy('createdAt', 'desc')
       )
       const ordersSnapshot = await getDocs(ordersQuery)
-      const orders = ordersSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as any))
+      const orders = ordersSnapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          status: data.status || 'pending',
+          subtotal: data.subtotal || 0,
+          createdAt: data.createdAt,
+          assignedPro: data.assignedPro,
+        }
+      })
 
       // Calculate metrics
       const totalRevenue = orders.reduce((sum, order) => sum + (order.subtotal || 0), 0)
@@ -123,9 +144,9 @@ export default function AnalyticsDashboard() {
         }
       })
 
-      const orderStatusChartData = Object.entries(statusCount).map(([name, value]) => ({
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        value,
+      const orderStatusChartData = Object.entries(statusCount).map(([status, count]) => ({
+        status: status.charAt(0).toUpperCase() + status.slice(1),
+        count,
       }))
 
       // Top pros by orders
@@ -145,9 +166,21 @@ export default function AnalyticsDashboard() {
         }
       })
 
-      const topProsData = Object.values(proOrderCount)
-        .sort((a, b) => b.orders - a.orders)
+      const topProsData = Object.entries(proOrderCount).map(([proId, data]) => ({
+        proId,
+        proName: data.name,
+        ordersCompleted: data.orders,
+        totalEarnings: data.revenue,
+      }))
+        .sort((a, b) => b.ordersCompleted - a.ordersCompleted)
         .slice(0, 5)
+
+      // Calculate revenue growth (compare first half to second half of date range)
+      const midDate = new Date()
+      midDate.setDate(midDate.getDate() - Math.floor(days / 2))
+      const firstHalf = orders.filter(o => new Date(o.createdAt.toDate()) < midDate).reduce((sum, o) => sum + (o.subtotal || 0), 0)
+      const secondHalf = orders.filter(o => new Date(o.createdAt.toDate()) >= midDate).reduce((sum, o) => sum + (o.subtotal || 0), 0)
+      const revenueGrowth = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf * 100) : 0
 
       setAnalytics({
         totalRevenue,
@@ -155,17 +188,22 @@ export default function AnalyticsDashboard() {
         completedOrders,
         totalUsers,
         averageOrderValue,
-        revenueGrowth: 12.5, // Mock growth percentage
+        revenueGrowth: Math.round(revenueGrowth * 10) / 10,
       })
       setRevenueData(revenueChartData)
       setOrderStatusData(orderStatusChartData)
       setTopPros(topProsData)
-      setLoading(false)
     } catch (error) {
       console.error('Error fetching analytics:', error)
+    } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!user || !userData?.isAdmin) return
+    fetchAnalytics()
+  }, [user, userData, dateRange])
 
   const completionRate = analytics.totalOrders > 0 ? (analytics.completedOrders / analytics.totalOrders * 100).toFixed(1) : 0
 
@@ -180,7 +218,7 @@ export default function AnalyticsDashboard() {
   if (!userData?.isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray">You don't have access to this page</p>
+        <p className="text-gray">You don&rsquo;t have access to this page</p>
       </div>
     )
   }
@@ -189,6 +227,13 @@ export default function AnalyticsDashboard() {
     <div className="min-h-screen bg-light flex flex-col">
       <Header />
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-2 text-gray mb-6 hover:text-dark transition"
+        >
+          <ChevronLeft className="w-5 h-5" />
+          Back to Dashboard
+        </button>
         <div className="mb-8">
           <div className="flex justify-between items-start">
             <div>
@@ -332,10 +377,10 @@ export default function AnalyticsDashboard() {
               <tbody>
                 {topPros.map((pro, index) => (
                   <tr key={index} className="border-b border-gray/10 hover:bg-gray/5 transition">
-                    <td className="py-3 px-4 text-dark font-semibold">{pro.name}</td>
-                    <td className="py-3 px-4 text-right text-gray">{pro.orders}</td>
-                    <td className="py-3 px-4 text-right text-dark font-semibold">${pro.revenue.toFixed(2)}</td>
-                    <td className="py-3 px-4 text-right text-gray">${(pro.revenue / pro.orders).toFixed(2)}</td>
+                    <td className="py-3 px-4 text-dark font-semibold">{pro.proName}</td>
+                    <td className="py-3 px-4 text-right text-gray">{pro.ordersCompleted}</td>
+                    <td className="py-3 px-4 text-right text-dark font-semibold">${pro.totalEarnings.toFixed(2)}</td>
+                    <td className="py-3 px-4 text-right text-gray">${(pro.totalEarnings / pro.ordersCompleted).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

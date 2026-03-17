@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as admin from 'firebase-admin'
+import { adminAuth, adminDb } from '@/lib/firebaseAdmin'
 
 /**
  * GET /api/orders/user/[uid]
@@ -38,12 +38,7 @@ export async function GET(
     // Verify the token using Firebase Admin SDK
     let decodedToken
     try {
-      // Initialize Firebase Admin if not already done
-      if (!admin.apps.length) {
-        admin.initializeApp()
-      }
-
-      decodedToken = await admin.auth().verifyIdToken(token)
+      decodedToken = await adminAuth.verifyIdToken(token)
       console.log('[API] Token verified for user:', decodedToken.uid)
     } catch (tokenError) {
       console.error('[API] Token verification failed:', tokenError)
@@ -63,17 +58,19 @@ export async function GET(
     }
 
     // Fetch orders from Firestore using Admin SDK
-    const db = admin.firestore()
-    const ordersRef = db.collection('orders')
-    const querySnap = await ordersRef
-      .where('uid', '==', uid)
+    // Orders are stored in user subcollection: users/{uid}/orders/{orderId}
+    const ordersSnapshot = await adminDb
+      .collection('users')
+      .doc(uid)
+      .collection('orders')
       .orderBy('createdAt', 'desc')
       .get()
 
     const orders: any[] = []
-    querySnap.forEach((doc) => {
+    ordersSnapshot.forEach((doc) => {
       orders.push({
         orderId: doc.id,
+        id: doc.id,
         ...doc.data(),
       })
     })

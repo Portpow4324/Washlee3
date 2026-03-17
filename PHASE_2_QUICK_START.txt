@@ -1,0 +1,80 @@
+# QUICK START: Phase 2 Schema Setup
+
+## In 3 Easy Steps:
+
+### Step 1: Open SQL Editor
+```
+https://app.supabase.com
+→ Select "Washlee" project
+→ Click "SQL Editor" (left sidebar)
+→ Click "+ New query"
+```
+
+### Step 2: Copy & Paste SQL
+**File**: `SUPABASE_MIGRATION_SCHEMA.sql` (348 lines)
+- Copy entire contents
+- Paste into the SQL Editor
+- It will look like a large block of code
+
+### Step 3: Run & Verify
+```
+Click "Run" button (or Cmd+Enter)
+↓
+Wait for "Success. No rows returned"
+↓
+Check "Tables" sidebar
+↓
+Should see 11 tables ✓
+```
+
+---
+
+## What Gets Created:
+
+✅ 11 tables (users, customers, employees, wash_clubs, orders, reviews, etc.)
+✅ 30+ indexes (for fast queries)
+✅ Security policies (RLS - Row Level Security)
+✅ Utility functions (card generation, auto-timestamps)
+✅ Triggers (automatic timestamp updates)
+
+---
+
+## Estimated Time: 5 minutes
+
+---
+
+## After Phase 2 is Done:
+
+Move to **Phase 3: Update AuthContext.tsx**
+- File: `lib/AuthContext.tsx`
+- Replace Firebase Auth with Supabase Auth
+- Update state management
+
+---
+
+## If Something Goes Wrong:
+
+**"Success" message didn't appear?**
+→ Scroll down in SQL Editor to see errors
+
+**Tables not visible?**
+→ Refresh the page (F5)
+
+**"Function already exists" error?**
+→ This is fine - schema has `IF NOT EXISTS`
+
+**Still stuck?**
+→ Check SUPABASE_PHASE_2_SETUP.md for detailed troubleshooting
+
+---
+
+## Confirmation
+
+Once you see all 11 tables in the "Tables" sidebar:
+- ✅ Phase 2 is complete
+- ✅ Ready for Phase 3 (AuthContext)
+- ✅ Database schema is ready
+
+Go to: https://app.supabase.com/projects → Your Project → SQL Editor
+
+Done? Reply "Phase 2 complete" and we'll move to Phase 3!

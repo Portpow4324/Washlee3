@@ -21,6 +21,9 @@ export default function OrderDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false)
+  const [newPickupDate, setNewPickupDate] = useState('')
+  const [rescheduleReason, setRescheduleReason] = useState('')
   const [showReview, setShowReview] = useState(false)
   const [rating, setRating] = useState(5)
   const [review, setReview] = useState('')
@@ -52,10 +55,12 @@ export default function OrderDetailPage() {
 
     try {
       setIsUpdating(true)
-      const response = await fetch(`/api/orders/${orderId}`, {
+      const response = await fetch(`/api/orders/modify`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          orderId,
+          customerId: user?.uid,
           action: 'cancel',
           reason: cancelReason || 'Customer requested'
         })
@@ -68,6 +73,36 @@ export default function OrderDetailPage() {
       setCancelReason('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error cancelling order')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  async function handleReschedule() {
+    if (!order || !newPickupDate) return
+
+    try {
+      setIsUpdating(true)
+      const response = await fetch(`/api/orders/modify`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          customerId: user?.uid,
+          action: 'reschedule',
+          newPickupDate,
+          reason: rescheduleReason || 'Customer requested'
+        })
+      })
+
+      if (!response.ok) throw new Error('Failed to reschedule order')
+      
+      await fetchOrder()
+      setShowRescheduleDialog(false)
+      setNewPickupDate('')
+      setRescheduleReason('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error rescheduling order')
     } finally {
       setIsUpdating(false)
     }
@@ -420,6 +455,25 @@ export default function OrderDetailPage() {
 
               {/* Actions */}
               {['pending', 'accepted'].includes(order.status) && (
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setShowRescheduleDialog(true)}
+                    disabled={isUpdating}
+                    className="w-full py-3 px-4 border border-[#48C9B0] text-[#48C9B0] rounded-lg hover:bg-[#E8FFFB] font-semibold disabled:opacity-50"
+                  >
+                    Reschedule Order
+                  </button>
+                  <button
+                    onClick={() => setShowCancelDialog(true)}
+                    disabled={isUpdating}
+                    className="w-full py-3 px-4 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <Trash2 size={18} />
+                    Cancel Order
+                  </button>
+                </div>
+              )}
+              {['pending', 'accepted'].includes(order.status) === false && (
                 <button
                   onClick={() => setShowCancelDialog(true)}
                   disabled={isUpdating}
@@ -431,6 +485,49 @@ export default function OrderDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Reschedule Dialog */}
+          {showRescheduleDialog && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Reschedule Order</h3>
+                <p className="text-gray-600 mb-4">Choose a new pickup date for your order</p>
+                <input
+                  type="date"
+                  value={newPickupDate}
+                  onChange={(e) => setNewPickupDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#48C9B0] mb-4"
+                />
+                <textarea
+                  value={rescheduleReason}
+                  onChange={(e) => setRescheduleReason(e.target.value)}
+                  placeholder="Reason for rescheduling (optional)"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#48C9B0] mb-4"
+                  rows={2}
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleReschedule}
+                    disabled={isUpdating || !newPickupDate}
+                    className="flex-1 py-2 px-4 bg-[#48C9B0] text-white rounded-lg hover:bg-[#3aad9a] disabled:bg-gray-400 font-semibold"
+                  >
+                    {isUpdating ? 'Rescheduling...' : 'Reschedule'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowRescheduleDialog(false)
+                      setNewPickupDate('')
+                      setRescheduleReason('')
+                    }}
+                    className="flex-1 py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Cancel Dialog */}
           {showCancelDialog && (
