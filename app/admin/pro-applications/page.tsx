@@ -168,7 +168,7 @@ export default function ProApplicationsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inquiryId: selectedApp.id,
-          adminId: user?.uid,
+          adminId: user?.id,
           adminName: userData?.name || 'Admin',
           employeeId: employeeId,
           verificationChecklist: verificationChecklist,
@@ -226,7 +226,7 @@ export default function ProApplicationsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inquiryId: selectedApp.id,
-          adminId: user?.uid,
+          adminId: user?.id,
           adminName: userData?.name || 'Admin',
           rejectionReason: rejectionReason,
         }),

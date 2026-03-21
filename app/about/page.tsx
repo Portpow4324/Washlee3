@@ -17,7 +17,7 @@ export default function AboutUs() {
           <div className="max-w-6xl mx-auto px-4">
             <h1 className="text-5xl md:text-6xl font-bold text-dark mb-6">About Washlee</h1>
             <p className="text-xl text-gray max-w-2xl">
-              We&rsquo;re on a mission to free people from the burden of laundry so they can focus on what truly matters.
+              We're on a mission to free people from the burden of laundry so they can focus on what truly matters.
             </p>
           </div>
         </section>
@@ -28,7 +28,7 @@ export default function AboutUs() {
             <div>
               <h2 className="text-4xl font-bold text-dark mb-6">Our Story</h2>
               <p className="text-gray text-lg mb-4">
-                Washlee was born from a simple observation: people are busier than ever, and laundry is one of life&rsquo;s most tedious chores.
+                Washlee was born from a simple observation: people are busier than ever, and laundry is one of life's most tedious chores.
               </p>
               <p className="text-gray text-lg mb-4">
                 In 2023, our founder realized that laundry services were either non-existent or outdated. They imagined a world where professional laundry care was as accessible as ordering a ride or food.
@@ -175,11 +175,9 @@ export default function AboutUs() {
           {/* CTA */}
           <div className="text-center">
             <h2 className="text-3xl font-bold text-dark mb-6">Ready to Experience Washlee?</h2>
-            <div className="flex justify-center">
-              <Link href="/booking">
-                <Button size="lg" className="text-white">Book Your First Order</Button>
-              </Link>
-            </div>
+            <Link href="/booking">
+              <Button size="lg" className="text-white">Book Your First Order</Button>
+            </Link>
           </div>
         </section>
       </main>

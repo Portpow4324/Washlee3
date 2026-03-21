@@ -1,21 +1,17 @@
-import { db } from '@/lib/firebase'
-import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore'
-import COLLECTIONS from './collections'
+import { supabase } from '@/lib/supabaseClient'
+
 /**
  * Server-side verification utilities.
  *
- * This module is intended to run only on the server (API routes) and is used to
- * store verification codes in a process-local store. This is a lightweight
- * stand-in for a more durable solution (Redis, database, etc.) in production.
+ * This module stores verification codes in Supabase verification_codes table.
+ * Codes expire after 15 minutes.
  */
 
 type VerificationRecord = {
   code: string
   expiresAt: number
-  verified: boolean
+  used: boolean
 }
-
-// Firestore-based, no in-memory Map
 
 const EXPIRY_MS = 15 * 60 * 1000 // 15 minutes
 
@@ -38,33 +34,55 @@ export function generateVerificationCode(): string {
 
 export async function storeVerificationCode(email: string, phone: string, code: string): Promise<void> {
   const key = makeKey(email, phone)
-  const record: VerificationRecord = {
+  const record = {
+    email: email.trim().toLowerCase(),
+    phone: phone.replace(/\D/g, ''),
     code,
-    expiresAt: Date.now() + EXPIRY_MS,
-    verified: false,
+    expires_at: new Date(Date.now() + EXPIRY_MS).toISOString(),
+    used: false,
   }
-  await setDoc(doc(db, COLLECTIONS.VERIFICATION_CODES, key), record)
-  console.log('[ServerVerification] Stored code in Firestore:', { key, code })
+  
+  const { error } = await supabase
+    .from('verification_codes')
+    .insert([record])
+  
+  if (error) {
+    console.error('[ServerVerification] Failed to store code:', error)
+    throw error
+  }
+  
+  console.log('[ServerVerification] Stored code in Supabase:', { key, code })
 }
 
 export async function verifyCode(email: string, phone: string, code: string): Promise<boolean> {
-  const key = makeKey(email, phone)
-  const ref = doc(db, COLLECTIONS.VERIFICATION_CODES, key)
-  const snap = await getDoc(ref)
-  if (!snap.exists()) {
-    console.log('[ServerVerification] No code stored for', key)
+  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedPhone = phone.replace(/\D/g, '')
+  
+  const { data, error } = await supabase
+    .from('verification_codes')
+    .select('*')
+    .eq('email', normalizedEmail)
+    .eq('phone', normalizedPhone)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  
+  if (error || !data || data.length === 0) {
+    console.log('[ServerVerification] No code stored for', normalizedEmail, normalizedPhone)
     return false
   }
-  const stored = snap.data() as VerificationRecord
+  
+  const stored = data[0]
+  const key = `${normalizedEmail}:${normalizedPhone}`
   console.log('[ServerVerification] Attempting to verify code:', { key, inputCode: code, stored })
 
-  if (Date.now() > stored.expiresAt) {
+  if (new Date(stored.expires_at) < new Date()) {
     console.log('[ServerVerification] Code expired for', key)
-    await deleteDoc(ref)
+    // Delete expired code
+    await supabase.from('verification_codes').delete().eq('id', stored.id)
     return false
   }
 
-  if (stored.verified) {
+  if (stored.used) {
     console.log('[ServerVerification] Code already verified for', key)
     return true
   }
@@ -77,16 +95,36 @@ export async function verifyCode(email: string, phone: string, code: string): Pr
     return false
   }
 
-  await setDoc(ref, { ...stored, verified: true })
+  // Mark code as used
+  const { error: updateError } = await supabase
+    .from('verification_codes')
+    .update({ used: true, used_at: new Date().toISOString() })
+    .eq('id', stored.id)
+  
+  if (updateError) {
+    console.error('[ServerVerification] Failed to mark code as used:', updateError)
+    throw updateError
+  }
+  
   console.log('[ServerVerification] Code verified for', key)
   return true
 }
 
 export async function getVerificationCodeForTesting(email: string, phone: string): Promise<string | null> {
-  const key = makeKey(email, phone)
-  const ref = doc(db, COLLECTIONS.VERIFICATION_CODES, key)
-  const snap = await getDoc(ref)
-  if (!snap.exists()) return null
-  const stored = snap.data() as VerificationRecord
-  return stored.code
+  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedPhone = phone.replace(/\D/g, '')
+  
+  const { data, error } = await supabase
+    .from('verification_codes')
+    .select('code')
+    .eq('email', normalizedEmail)
+    .eq('phone', normalizedPhone)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  
+  if (error || !data || data.length === 0) {
+    return null
+  }
+  
+  return data[0].code
 }

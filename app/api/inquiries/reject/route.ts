@@ -1,27 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import admin from 'firebase-admin'
+import { createClient } from '@supabase/supabase-js'
 import { sendProApplicationRejected } from '@/lib/emailService'
 
-// Initialize Firebase Admin if not already done
-try {
-  if (!admin.apps.length) {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-    
-    if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
-      throw new Error('Missing Firebase Admin SDK credentials in environment variables')
-    }
-
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey,
-      } as any),
-    })
-  }
-} catch (initError: any) {
-  console.error('[API] Firebase Admin initialization failed:', initError.message)
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,31 +18,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const db = admin.firestore()
-    const inquiry = await db.collection('inquiries').doc(inquiryId).get()
+    // Fetch inquiry details
+    const { data: inquiry, error: fetchError } = await supabase
+      .from('inquiries')
+      .select('*')
+      .eq('id', inquiryId)
+      .single()
 
-    if (!inquiry.exists) {
+    if (fetchError || !inquiry) {
       return NextResponse.json(
         { error: 'Inquiry not found' },
         { status: 404 }
       )
     }
 
-    const inquiryData = inquiry.data()
-
     // Update inquiry status
-    await db.collection('inquiries').doc(inquiryId).update({
-      status: 'rejected',
-      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-      reviewedBy: adminId,
-      adminName: adminName,
-      rejectionReason: rejectionReason,
-    })
+    const { error: updateError } = await supabase
+      .from('inquiries')
+      .update({
+        status: 'rejected',
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: adminId,
+        admin_name: adminName,
+        rejection_reason: rejectionReason,
+      })
+      .eq('id', inquiryId)
+
+    if (updateError) throw updateError
 
     // Send rejection email
     const result = await sendProApplicationRejected(
-      inquiryData?.email,
-      inquiryData?.firstName,
+      inquiry.email,
+      inquiry.first_name,
       rejectionReason
     )
     const emailSent = result?.success || result?.messageId ? true : false
@@ -71,10 +62,7 @@ export async function POST(request: NextRequest) {
       emailSent,
     })
   } catch (error: any) {
-    console.error('[API] Error rejecting inquiry:', {
-      message: error.message,
-      code: error.code,
-    })
+    console.error('[API] Error rejecting inquiry:', error.message)
     return NextResponse.json(
       { error: error.message || 'Failed to reject inquiry' },
       { status: 500 }

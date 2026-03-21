@@ -57,7 +57,7 @@ export default function InquiriesManagement() {
 
   useEffect(() => {
     // Check if user is admin/manager
-    if (!authLoading && (!user || !userData?.isAdmin)) {
+    if (!authLoading && (!user || !userData?.is_admin)) {
       console.error('[AdminInquiries] User is not admin. Current user:', user?.email)
       router.push('/')
       return
@@ -91,7 +91,7 @@ export default function InquiriesManagement() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inquiryId: selectedInquiry.id,
-          adminId: user?.uid,
+          adminId: user?.id,
           adminName: userData?.name || 'Admin',
         }),
       })
@@ -127,7 +127,7 @@ export default function InquiriesManagement() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inquiryId: selectedInquiry.id,
-          adminId: user?.uid,
+          adminId: user?.id,
           adminName: userData?.name || 'Admin',
           rejectionReason: rejectionReason,
         }),

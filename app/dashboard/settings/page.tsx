@@ -1,365 +1,305 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
-import { db } from '@/lib/firebase'
-import { doc, updateDoc, getDoc } from 'firebase/firestore'
-import Card from '@/components/Card'
-import Button from '@/components/Button'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import { AlertCircle, CheckCircle, Settings, Lock, Bell, MapPin, FileText, Shield } from 'lucide-react'
+import Card from '@/components/Card'
+import Spinner from '@/components/Spinner'
+import Button from '@/components/Button'
+import Link from 'next/link'
+import { Bell, Lock, Eye, EyeOff, LogOut, AlertCircle, CheckCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
-interface CustomerSettings {
-  firstName?: string
-  lastName?: string
-  email?: string
-  phone?: string
-  address?: string
-}
-
-export default function CustomerSettings() {
-  const { user, userData } = useAuth()
-  const [settings, setSettings] = useState<CustomerSettings>({
-    firstName: userData?.firstName || '',
-    lastName: userData?.lastName || '',
-    email: user?.email || '',
-    phone: userData?.phone || '',
-    address: userData?.address || '',
+export default function SettingsPage() {
+  const { user, userData, loading: authLoading } = useAuth()
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
   })
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-  const [tab, setTab] = useState<'profile' | 'notifications' | 'legal'>('profile')
+  const [preferences, setPreferences] = useState({
+    marketingEmails: false,
+    orderUpdates: true,
+    promoNotifications: false,
+  })
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [passwords, setPasswords] = useState({
+    current: '',
+    new: '',
+    confirm: '',
+  })
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
-    if (!user) return
-
-    const fetchSettings = async () => {
-      try {
-        setLoading(true)
-        const userRef = doc(db, 'users', user.uid)
-        const docSnap = await getDoc(userRef)
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data()
-          setSettings(prev => ({
-            ...prev,
-            firstName: data.firstName || prev.firstName,
-            lastName: data.lastName || prev.lastName,
-            phone: data.phone || prev.phone,
-            address: data.address || prev.address,
-            acceptNotifications: data.acceptNotifications !== false,
-            acceptPromotions: data.acceptPromotions !== false,
-          }))
-        }
-      } catch (error) {
-        console.error('Error fetching settings:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchSettings()
-  }, [user])
-
-  const handleSaveSettings = async () => {
-    if (!user) return
-    
-    try {
-      setSaving(true)
-      const userRef = doc(db, 'users', user.uid)
-      await updateDoc(userRef, {
-        firstName: settings.firstName,
-        lastName: settings.lastName,
-        phone: settings.phone,
-        address: settings.address,
+    if (!authLoading && userData) {
+      setFormData({
+        firstName: userData.first_name || '',
+        lastName: userData.last_name || '',
+        email: user?.email || '',
+        phone: userData.phone || '',
       })
-      
-      setMessage({ type: 'success', text: 'Settings saved successfully!' })
-      setTimeout(() => setMessage(null), 3000)
-    } catch (error: any) {
-      console.error('Error saving settings:', error)
-      setMessage({ type: 'error', text: error.message || 'Failed to save settings' })
+    }
+  }, [userData, user, authLoading])
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    try {
+      setIsLoading(true)
+      setError('')
+      setSuccess('')
+
+      const { error: updateError } = await supabase
+        .from('customers')
+        .update({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone: formData.phone,
+        })
+        .eq('id', user.id)
+
+      if (updateError) throw updateError
+
+      setSuccess('Profile updated successfully')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err: any) {
+      setError(err.message || 'Failed to update profile')
     } finally {
-      setSaving(false)
+      setIsLoading(false)
     }
   }
 
-  const handleInputChange = (field: keyof CustomerSettings, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [field]: value
-    }))
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    if (passwords.new !== passwords.confirm) {
+      setError('Passwords do not match')
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      setError('')
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwords.new,
+      })
+
+      if (updateError) throw updateError
+
+      setSuccess('Password changed successfully')
+      setPasswords({ current: '', new: '', confirm: '' })
+      setShowChangePassword(false)
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err: any) {
+      setError(err.message || 'Failed to change password')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  if (loading) {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/')
+    } catch (err: any) {
+      setError(err.message || 'Failed to logout')
+    }
+  }
+
+  if (authLoading) {
     return (
-      <div className="min-h-screen bg-light">
+      <>
         <Header />
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          <div className="space-y-4">
-            <h1 className="text-3xl font-bold text-dark">Settings</h1>
-            <div className="h-96 bg-gray-200 rounded-lg animate-pulse" />
-          </div>
-        </main>
+        <div className="min-h-screen flex items-center justify-center">
+          <Spinner />
+        </div>
         <Footer />
-      </div>
+      </>
+    )
+  }
+
+  if (!user) {
+    return (
+      <>
+        <Header />
+        <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white flex items-center justify-center p-4">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-[#1f2d2b] mb-4">Sign In Required</h1>
+            <Link href="/auth/login" className="text-[#48C9B0] hover:text-[#7FE3D3] font-medium">
+              Sign In →
+            </Link>
+          </div>
+        </div>
+        <Footer />
+      </>
     )
   }
 
   return (
-    <div className="min-h-screen bg-light">
+    <>
       <Header />
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="space-y-8">
+      <main className="min-h-screen bg-gradient-to-b from-[#E8FFFB] to-white py-12 px-4">
+        <div className="max-w-2xl mx-auto">
           {/* Header */}
-          <div>
-            <h1 className="text-3xl font-bold text-dark mb-2">Account Settings</h1>
-            <p className="text-gray">Manage your profile and preferences</p>
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-[#1f2d2b] mb-2">Settings</h1>
+            <p className="text-[#6b7b78]">Manage your account and preferences</p>
           </div>
 
-          {/* Message Alert */}
-          {message && (
-            <div className={`flex items-start gap-3 p-4 rounded-lg ${
-              message.type === 'success' 
-                ? 'bg-green-50 border border-green-200' 
-                : 'bg-red-50 border border-red-200'
-            }`}>
-              {message.type === 'success' ? (
-                <CheckCircle size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
-              ) : (
-                <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
-              )}
-              <p className={message.type === 'success' ? 'text-green-800' : 'text-red-800'}>
-                {message.text}
-              </p>
-            </div>
+          {error && (
+            <Card className="p-4 mb-8 bg-red-50 border border-red-200 flex items-start gap-3">
+              <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+              <p className="text-red-700">{error}</p>
+            </Card>
           )}
 
-          {/* Tabs */}
-          <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
-            {[
-              { id: 'profile', label: 'Profile', icon: Settings },
-              { id: 'notifications', label: 'Notifications', icon: Bell },
-              { id: 'legal', label: 'Legal', icon: FileText }
-            ].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id as any)}
-                className={`px-4 py-3 font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap ${
-                  tab === t.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray hover:text-dark'
-                }`}
-              >
-                <t.icon size={18} />
-                {t.label}
-              </button>
-            ))}
-          </div>
+          {success && (
+            <Card className="p-4 mb-8 bg-green-50 border border-green-200 flex items-start gap-3">
+              <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+              <p className="text-green-700">{success}</p>
+            </Card>
+          )}
 
-          {/* Tab Content */}
-          <div className="space-y-6">
-            {/* Profile Tab */}
-            {tab === 'profile' && (
-              <Card className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-dark mb-2">First Name</label>
-                    <input
-                      type="text"
-                      value={settings.firstName}
-                      onChange={(e) => handleInputChange('firstName', e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:outline-none"
-                      placeholder="First name"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-dark mb-2">Last Name</label>
-                    <input
-                      type="text"
-                      value={settings.lastName}
-                      onChange={(e) => handleInputChange('lastName', e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:outline-none"
-                      placeholder="Last name"
-                    />
-                  </div>
-                </div>
-
+          {/* Profile Section */}
+          <Card className="p-8 mb-6">
+            <h2 className="text-2xl font-bold text-[#1f2d2b] mb-6">Profile Information</h2>
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-dark mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={settings.email}
-                    disabled
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray cursor-not-allowed"
-                  />
-                  <p className="text-xs text-gray mt-2">Email cannot be changed here. Contact support to change email.</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-dark mb-2">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={settings.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:outline-none"
-                    placeholder="+1 (555) 123-4567"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-dark mb-2">Address</label>
+                  <label className="block text-sm font-semibold text-[#1f2d2b] mb-2">First Name</label>
                   <input
                     type="text"
-                    value={settings.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:outline-none"
-                    placeholder="Your delivery address"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#48C9B0]"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#1f2d2b] mb-2">Last Name</label>
+                  <input
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#48C9B0]"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#1f2d2b] mb-2">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  disabled
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-[#6b7b78] cursor-not-allowed"
+                />
+                <p className="text-xs text-[#6b7b78] mt-1">Email cannot be changed</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#1f2d2b] mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#48C9B0]"
+                />
+              </div>
+              <Button type="submit" disabled={isLoading}>
+                Save Changes
+              </Button>
+            </form>
+          </Card>
 
-                <Button
-                  variant="primary"
-                  onClick={handleSaveSettings}
-                  disabled={saving}
-                  className="w-full"
+          {/* Password Section */}
+          <Card className="p-8 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Lock className="text-[#48C9B0]" size={24} />
+                <h2 className="text-2xl font-bold text-[#1f2d2b]\">Password</h2>
+              </div>
+              {!showChangePassword && (
+                <button
+                  onClick={() => setShowChangePassword(true)}
+                  className="text-[#48C9B0] hover:text-[#7FE3D3] font-medium"
                 >
-                  {saving ? 'Saving...' : 'Save Profile'}
-                </Button>
-              </Card>
-            )}
+                  Change
+                </button>
+              )}
+            </div>
 
-            {/* Notifications Tab */}
-            {tab === 'notifications' && (
-              <Card className="p-6 space-y-6">
-                <div className="space-y-4">
-                  <p className="text-gray">Notification preferences are currently managed through your email account. Check your email settings for order updates and promotional notifications.</p>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="font-semibold text-blue-900 mb-2">Email Notifications</p>
-                    <p className="text-sm text-blue-800">
-                      We'll send you important updates about your orders to {settings.email}. To manage email preferences, check your email account settings or contact our support team.
-                    </p>
+            {showChangePassword ? (
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[#1f2d2b] mb-2">New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={passwords.new}
+                      onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                      className="w-full pl-4 pr-12 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#48C9B0]"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6b7b78]"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
                   </div>
                 </div>
-              </Card>
+                <div>
+                  <label className="block text-sm font-semibold text-[#1f2d2b] mb-2">Confirm Password</label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={passwords.confirm}
+                    onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#48C9B0]"
+                    required
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={isLoading}>
+                    Update Password
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setShowChangePassword(false)}
+                    className="px-4 py-2 border border-gray-200 rounded-lg text-[#1f2d2b] hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <p className="text-[#6b7b78]">Update your password to keep your account secure</p>
             )}
+          </Card>
 
-            {/* Legal Tab */}
-            {tab === 'legal' && (
-              <div className="space-y-6">
-                <Card className="p-6">
-                  <div className="flex items-start gap-4 mb-6">
-                    <FileText size={24} className="text-primary flex-shrink-0 mt-1" />
-                    <div>
-                      <h3 className="font-bold text-dark mb-1">Legal Documents</h3>
-                      <p className="text-sm text-gray">Review our terms, policies, and other legal information</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <a
-                      href="/terms-of-service"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-primary/5 transition"
-                    >
-                      <div>
-                        <p className="font-semibold text-dark">Terms of Service</p>
-                        <p className="text-sm text-gray mt-1">Conditions and rules for using Washlee</p>
-                      </div>
-                      <span className="text-primary">→</span>
-                    </a>
-
-                    <a
-                      href="/privacy-policy"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-primary/5 transition"
-                    >
-                      <div>
-                        <p className="font-semibold text-dark">Privacy Policy</p>
-                        <p className="text-sm text-gray mt-1">How we collect and protect your data</p>
-                      </div>
-                      <span className="text-primary">→</span>
-                    </a>
-
-                    <a
-                      href="/terms-of-service"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-primary/5 transition"
-                    >
-                      <div>
-                        <p className="font-semibold text-dark">Cookie Policy</p>
-                        <p className="text-sm text-gray mt-1">Information about cookies we use</p>
-                      </div>
-                      <span className="text-primary">→</span>
-                    </a>
-
-                    <a
-                      href="/terms-of-service"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-primary/5 transition"
-                    >
-                      <div>
-                        <p className="font-semibold text-dark">Accessibility</p>
-                        <p className="text-sm text-gray mt-1">Our commitment to accessibility</p>
-                      </div>
-                      <span className="text-primary">→</span>
-                    </a>
-
-                    <a
-                      href="/terms-of-service"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-primary/5 transition"
-                    >
-                      <div>
-                        <p className="font-semibold text-dark">Liability Waiver</p>
-                        <p className="text-sm text-gray mt-1">Service disclaimers and limitations</p>
-                      </div>
-                      <span className="text-primary">→</span>
-                    </a>
-                  </div>
-                </Card>
-
-                <Card className="p-6 bg-blue-50 border-2 border-blue-200">
-                  <div className="flex items-start gap-3">
-                    <Shield size={20} className="text-blue-600 flex-shrink-0 mt-1" />
-                    <div>
-                      <p className="font-semibold text-blue-900 mb-2">Your Privacy Matters</p>
-                      <p className="text-sm text-blue-800">
-                        We take your privacy and data security seriously. All personal information is encrypted and protected according to industry standards. For questions about your data, please contact our privacy team.
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            )}
-          </div>
-
-          {/* Security Section */}
-          <Card className="p-6 border-2 border-primary/30">
-            <div className="flex items-start gap-4">
-              <Lock size={24} className="text-primary flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="font-bold text-dark mb-2">Password & Security</h3>
-                <p className="text-sm text-gray mb-4">
-                  Manage your password and two-factor authentication settings
-                </p>
-                <button className="px-4 py-2 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-primary/10 transition">
-                  Change Password
-                </button>
-              </div>
-            </div>
+          {/* Logout Section */}
+          <Card className="p-8">
+            <h2 className="text-2xl font-bold text-[#1f2d2b] mb-4">Account</h2>
+            <p className="text-[#6b7b78] mb-6">Sign out of your account on this device</p>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-6 py-3 bg-red-50 border border-red-200 text-red-600 rounded-lg font-semibold hover:bg-red-100 transition"
+            >
+              <LogOut size={20} />
+              Sign Out
+            </button>
           </Card>
         </div>
       </main>
       <Footer />
-    </div>
+    </>
   )
 }

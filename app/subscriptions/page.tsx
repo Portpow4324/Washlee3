@@ -114,14 +114,11 @@ function SubscriptionsPageContent() {
           return
         }
 
-        // Get the ID token from Firebase
-        const token = await user.getIdToken()
-
+        // For Supabase, use the session directly or get token from auth
         const response = await fetch('/api/subscriptions/create-checkout-session', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ plan: planId }),
         })
@@ -168,7 +165,7 @@ function SubscriptionsPageContent() {
   // Check if a plan is the user's current plan
   const isCurrentPlan = (planId: string): boolean => {
     if (!isAuthenticated || !userData) return false
-    const userPlan = userData.currentPlan || 'none'
+    const userPlan = (userData as any).currentPlan || 'none'
     return userPlan === planId
   }
 

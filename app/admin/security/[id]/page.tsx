@@ -42,7 +42,7 @@ export default function ResolutionGuidePage() {
       return
     }
 
-    if (!userData?.isAdmin) {
+    if (!userData?.is_admin) {
       router.push('/')
       return
     }

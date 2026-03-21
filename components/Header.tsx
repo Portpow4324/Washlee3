@@ -6,8 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { Menu, X, ArrowLeft, LogOut, User, Droplets, Shield, Briefcase, Settings, ChevronDown, Home, Package, DollarSign } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
-import { signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { createClient } from '@supabase/supabase-js'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
@@ -36,7 +35,11 @@ export default function Header() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth)
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      await supabase.auth.signOut()
       setShowUserMenu(false)
       router.push('/')
     } catch (error) {
@@ -166,7 +169,7 @@ export default function Header() {
                         </button>
                         {showRoleSwitch && (
                           <div className="absolute top-full left-0 right-0 bg-white border-t border-gray/20 shadow-lg">
-                            {userData?.userType === 'employee' && (
+                            {userData?.is_employee && (
                               <button
                                 onClick={switchToEmployeeDashboard}
                                 className="w-full px-4 py-2 text-dark hover:bg-mint transition text-sm text-left flex items-center gap-2 border-b border-gray/20"
@@ -175,7 +178,7 @@ export default function Header() {
                                 Employee Dashboard
                               </button>
                             )}
-                            {userData?.userType === 'pro' && (
+                            {userData?.user_type === 'pro' && (
                               <button
                                 onClick={switchToProMode}
                                 className="w-full px-4 py-2 text-dark hover:bg-mint transition text-sm text-left flex items-center gap-2 border-b border-gray/20"
@@ -292,7 +295,7 @@ export default function Header() {
                   <Droplets size={18} className="text-primary" />
                   Dashboard
                 </Link>
-                {userData?.userType === 'employee' && (
+                {userData?.is_employee && (
                   <button
                     onClick={() => {
                       switchToEmployeeDashboard()
@@ -304,7 +307,7 @@ export default function Header() {
                     Employee Dashboard
                   </button>
                 )}
-                {userData?.userType === 'pro' && (
+                {userData?.user_type === 'pro' && (
                   <button
                     onClick={() => {
                       switchToProMode()
@@ -316,7 +319,7 @@ export default function Header() {
                     Pro Dashboard
                   </button>
                 )}
-                {userData?.isAdmin && (
+                {userData?.is_admin && (
                   <Link
                     href="/admin"
                     className="block px-4 py-3 text-white bg-red-600 hover:bg-red-700 rounded-full transition font-semibold border-2 border-red-700 flex items-center gap-2 text-base"

@@ -7,8 +7,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import { Bell, Check, Trash2, Archive, AlertCircle, Zap, Gift, DollarSign, Clock } from 'lucide-react'
-import { collection, query, where, orderBy, onSnapshot, updateDoc, deleteDoc, doc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { supabase } from '@/lib/supabaseClient'
 
 interface Notification {
   id: string
@@ -17,9 +16,8 @@ interface Notification {
   type: 'order_update' | 'promo' | 'points' | 'alert' | 'system'
   read: boolean
   archived: boolean
-  createdAt: any
+  created_at: string
   data?: any
-  icon?: string
 }
 
 export default function NotificationsPage() {
@@ -38,47 +36,73 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!user) return
 
-    const notificationsRef = collection(db, 'notifications')
-    const q = query(
-      notificationsRef,
-      where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
-    )
+    loadNotifications()
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Notification))
+    // Subscribe to real-time updates
+    const subscription = supabase
+      .channel(`notifications:${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        loadNotifications()
+      })
+      .subscribe()
 
-      setNotifications(docs)
-      setLoading(false)
-    })
-
-    return () => unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [user])
+
+  const loadNotifications = async () => {
+    if (!user) return
+    try {
+      const response = await fetch(`/api/notifications?userId=${user.id}`)
+      const result = await response.json()
+      setNotifications(result.data || [])
+    } catch (error) {
+      console.error('Failed to load notifications:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const notifDoc = doc(db, 'notifications', notificationId)
-      await updateDoc(notifDoc, { read: true })
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'markAsRead', notificationId }),
+      })
+      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n))
     } catch (error) {
       console.error('Error marking as read:', error)
     }
   }
 
-  const archiveNotification = async (notificationId: string) => {
+  const handleArchive = async (notificationId: string) => {
     try {
-      const notifDoc = doc(db, 'notifications', notificationId)
-      await updateDoc(notifDoc, { archived: true })
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive', notificationId }),
+      })
+      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, archived: true } : n))
     } catch (error) {
       console.error('Error archiving:', error)
     }
   }
 
-  const deleteNotification = async (notificationId: string) => {
+  const handleDelete = async (notificationId: string) => {
     try {
-      await deleteDoc(doc(db, 'notifications', notificationId))
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', notificationId }),
+      })
+      setNotifications(prev => prev.filter(n => n.id !== notificationId))
     } catch (error) {
       console.error('Error deleting:', error)
     }
@@ -183,7 +207,7 @@ export default function NotificationsPage() {
                         <p className="text-gray text-sm mt-1">{notification.body}</p>
                         {notification.data && (
                           <p className="text-xs text-gray/70 mt-2">
-                            {new Date(notification.createdAt.toDate()).toLocaleDateString()}
+                            {new Date((notification as any)?.created_at?.toDate?.() || Date.now()).toLocaleDateString()}
                           </p>
                         )}
                       </div>
@@ -205,14 +229,14 @@ export default function NotificationsPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => archiveNotification(notification.id)}
+                        onClick={() => handleArchive(notification.id)}
                         className="text-xs px-3 py-1 bg-gray/10 text-gray rounded hover:bg-gray/20 transition flex items-center gap-1"
                       >
                         <Archive size={14} />
                         Archive
                       </button>
                       <button
-                        onClick={() => deleteNotification(notification.id)}
+                        onClick={() => handleDelete(notification.id)}
                         className="text-xs px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition flex items-center gap-1"
                       >
                         <Trash2 size={14} />

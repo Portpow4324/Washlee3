@@ -5,23 +5,37 @@ import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, CheckCircle, Package, Calendar, Zap, Lock, Briefcase } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/AuthContext'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function Wholesale() {
   const router = useRouter()
   const { user, userData } = useAuth()
+  const [businessAccount, setBusinessAccount] = useState<any>(null)
+  const [accountLoading, setAccountLoading] = useState(true)
   
-  // Check if user has business account (TODO: Add businessAccountType to userData after Firebase collection setup)
-  // TODO: REMINDERS - Business Features To Implement:
-  // 1. Create business account signup flow at /auth/signup?type=business
-  // 2. Add businessAccountType field to Firebase users collection
-  // 3. Create business dashboard at /dashboard/business
-  // 4. Add businessAccounts collection to Firestore with fields: companyName, abn, businessType, verificationStatus
-  // 5. Update UserData interface to include businessAccountType
-  const hasBusinessAccount = userData?.businessAccountType !== undefined && userData?.businessAccountType !== null
+  useEffect(() => {
+    if (user) {
+      loadBusinessAccount()
+    }
+  }, [user])
+
+  const loadBusinessAccount = async () => {
+    try {
+      const response = await fetch(`/api/business-accounts?customerId=${user?.id}`)
+      const result = await response.json()
+      setBusinessAccount(result.data || null)
+    } catch (error) {
+      console.error('Failed to load business account:', error)
+    } finally {
+      setAccountLoading(false)
+    }
+  }
+
+  const hasBusinessAccount = businessAccount !== null
   
   const [formData, setFormData] = useState({
     name: userData?.name || '',
@@ -72,16 +86,25 @@ export default function Wholesale() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/wholesale', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          uid: user?.uid || '',
-        }),
-      })
+      // Create business inquiry in Supabase
+      const { error } = await supabase
+        .from('wholesale_inquiries')
+        .insert({
+          customer_id: user?.id,
+          company_name: formData.company,
+          contact_name: formData.name,
+          contact_email: formData.email,
+          contact_phone: formData.phone,
+          order_type: formData.orderType,
+          estimated_weight: formData.estimatedWeight,
+          frequency: formData.frequency,
+          preferred_dates: formData.preferredDates,
+          notes: formData.notes,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+        })
 
-      if (!response.ok) throw new Error('Failed to submit wholesale inquiry')
+      if (error) throw error
 
       setSubmitted(true)
       setTimeout(() => {

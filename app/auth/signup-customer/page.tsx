@@ -6,9 +6,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, ArrowLeft, X, MapPin } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
-import { Timestamp } from 'firebase/firestore'
-import { auth } from '@/lib/firebase'
+import { supabase } from '@/lib/supabaseClient'
 import { createCustomerProfile } from '@/lib/userManagement'
 import { sendWelcomeEmail } from '@/lib/emailService'
 import { AUSTRALIAN_STATES } from '@/lib/australianValidation'
@@ -35,6 +33,7 @@ export default function SignupCustomer() {
     marketingTexts: false,
     accountTexts: false,
     selectedPlan: 'none',
+    verificationCode: '',
   })
 
   const [showPassword, setShowPassword] = useState(false)
@@ -51,6 +50,8 @@ export default function SignupCustomer() {
 
   const passwordRules = validatePassword(formData.password)
   const isPasswordValid = Object.values(passwordRules).every(Boolean)
+
+  // No email verification state needed - Supabase handles it built-in
 
   const steps = [
     {
@@ -161,14 +162,15 @@ export default function SignupCustomer() {
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-dark mb-2">Phone Number</label>
+            <label className="block text-sm font-semibold text-dark mb-2">Phone Number <span className="text-gray">(Optional but recommended)</span></label>
             <input
               type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="+1 (555) 123-4567"
+              placeholder="+61 (2) 1234 5678"
               className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
+            <p className="text-xs text-gray mt-1">We recommend providing a phone number for delivery confirmations</p>
           </div>
           <div>
             <label className="block text-sm font-semibold text-dark mb-2">State*</label>
@@ -191,12 +193,74 @@ export default function SignupCustomer() {
       ),
     },
     {
+      title: 'Verify Your Email',
+      description: 'Enter the code we sent to your email',
+      content: (
+        <div className="space-y-4">
+          <div className="bg-mint rounded-lg p-8 border-2 border-primary text-center">
+            <div className="text-5xl mb-4">📧</div>
+            <p className="text-lg font-semibold text-dark mb-2">Check Your Email</p>
+            <p className="text-sm text-gray mb-6">We've sent a 6-digit verification code to:</p>
+            <p className="font-mono bg-white p-3 rounded border border-primary text-primary font-semibold mb-6 text-sm">{formData.email}</p>
+            
+            {/* Verification Code Input */}
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-dark text-left">Enter Verification Code</label>
+              <input
+                type="text"
+                maxLength={6}
+                value={formData.verificationCode}
+                onChange={(e) => setFormData({ ...formData, verificationCode: e.target.value.toUpperCase() })}
+                placeholder="000000"
+                className="w-full px-4 py-3 border-2 border-primary rounded-lg text-center text-2xl font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <p className="text-xs text-gray">Code expires in 24 hours</p>
+            </div>
+
+            {/* Resend Option */}
+            <div className="mt-6 pt-6 border-t border-gray/30">
+              <p className="text-sm text-gray mb-3">Didn't receive the code?</p>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    console.log('[Resend] Requesting new verification code for:', formData.email)
+                    const response = await fetch('/api/auth/resend-verification', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email: formData.email })
+                    })
+                    if (response.ok) {
+                      setError('')
+                      alert('New verification code sent! Check your email.')
+                    } else {
+                      alert('Failed to resend code. Please try again.')
+                    }
+                  } catch (err) {
+                    console.error('[Resend Error]', err)
+                    alert('Error resending code')
+                  }
+                }}
+                className="text-primary font-semibold hover:underline text-sm"
+              >
+                Resend Code
+              </button>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
       title: 'Usage Type',
       description: 'Are you using Washlee for personal use or business?*',
       content: (
         <div className="space-y-3">
-          <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
-            onClick={() => setFormData({ ...formData, personalUse: 'personal' })}
+          <label className="flex items-center gap-3 p-4 border-2 cursor-pointer transition"
+            style={{ borderColor: formData.personalUse === 'personal' ? '#48C9B0' : '#6b7b78', backgroundColor: formData.personalUse === 'personal' ? '#E8FFFB' : 'transparent' }}
+            onClick={() => {
+              console.log('[Usage Type] Selected: personal')
+              setFormData({ ...formData, personalUse: 'personal' })
+            }}
           >
             <input
               type="radio"
@@ -208,8 +272,12 @@ export default function SignupCustomer() {
             />
             <span className="font-semibold text-dark">Personal</span>
           </label>
-          <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
-            onClick={() => setFormData({ ...formData, personalUse: 'business' })}
+          <label className="flex items-center gap-3 p-4 border-2 cursor-pointer transition"
+            style={{ borderColor: formData.personalUse === 'business' ? '#48C9B0' : '#6b7b78', backgroundColor: formData.personalUse === 'business' ? '#E8FFFB' : 'transparent' }}
+            onClick={() => {
+              console.log('[Usage Type] Selected: business')
+              setFormData({ ...formData, personalUse: 'business' })
+            }}
           >
             <input
               type="radio"
@@ -245,8 +313,11 @@ export default function SignupCustomer() {
       case 1:
         return formData.firstName.trim() && formData.lastName.trim() && formData.state
       case 2:
-        return formData.personalUse
+        // Step 2 is verification - requires 6-digit code
+        return formData.verificationCode && formData.verificationCode.length === 6
       case 3:
+        return formData.personalUse
+      case 4:
         return true
       default:
         return false
@@ -254,17 +325,101 @@ export default function SignupCustomer() {
   }
 
   const handleNext = async (planSelection?: string) => {
+    console.log('[handleNext] ==========================================')
+    console.log('[handleNext] currentStep:', currentStep)
+    console.log('[handleNext] isStepValid():', isStepValid())
+    console.log('[handleNext] personalUse:', formData.personalUse)
+    console.log('[handleNext] steps.length:', steps.length)
+    console.log('[handleNext] ==========================================')
+    
     if (isStepValid()) {
-      if (currentStep < steps.length - 1) {
-        setCurrentStep(currentStep + 1)
-      } else {
-        // Reached final step - create account
+      if (currentStep === 1) {
+        // After step 1 (Introduce yourself), create account and send email before moving to step 2 (Check Email)
+        console.log('[handleNext] Step 1 detected - creating account before moving to step 2 (Check Email)')
+        await handleCreateAccount()
+      } else if (currentStep === 2) {
+        // Step 2 is verification code - verify it before moving to step 3
+        console.log('[handleNext] Step 2 (Verification Code) detected - verifying code...')
+        await handleVerifyCode(formData.verificationCode)
+      } else if (currentStep === 4) {
+        // At final step (Subscribe to Plan) - just save plan selection and complete signup
         const finalPlanData = planSelection !== undefined ? planSelection : formData.selectedPlan
-        console.log('[Signup] About to create account with data:', { email: formData.email, firstName: formData.firstName, lastName: formData.lastName, selectedPlan: finalPlanData })
-        await handleCreateAccount(finalPlanData)
+        console.log('[handleNext] Step 4 (final) detected')
+        console.log('[handleNext] SelectedPlan:', finalPlanData)
+        // Just move to next step to complete signup
+        setCurrentStep(currentStep + 1)
+      } else if (currentStep < steps.length - 1) {
+        console.log('[handleNext] Moving from step', currentStep, 'to', currentStep + 1)
+        setCurrentStep(currentStep + 1)
       }
     } else {
+      console.log('[handleNext] Step not valid, showing error')
       setError('Please complete this step')
+    }
+  }
+
+  const handleSendVerificationEmail = async () => {
+    // Supabase will send verification email automatically during signup
+    // Just proceed to next step
+    setCurrentStep(currentStep + 1)
+  }
+
+  const handleVerifyCode = async (code: string) => {
+    console.log('[VerifyCode] Verifying code:', code)
+    setIsLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/auth/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          code: code
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('[VerifyCode] Verification failed:', data.error)
+        setError(data.error || 'Invalid verification code')
+        setIsLoading(false)
+        return
+      }
+
+      console.log('[VerifyCode] ✓ Code verified successfully!')
+      setIsLoading(false)
+      setCurrentStep(currentStep + 1)
+    } catch (error) {
+      console.error('[VerifyCode] Error:', error)
+      setError('Failed to verify code. Please try again.')
+      setIsLoading(false)
+    }
+  }
+
+  const resendVerificationEmail = async (email: string) => {
+    console.log('[Signup] Requesting to resend verification email for:', email)
+    try {
+      const response = await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+
+      const data = await response.json()
+      
+      if (!response.ok) {
+        console.error('[Signup] Resend error:', data.error)
+        alert(`Error: ${data.error}`)
+        return
+      }
+
+      console.log('[Signup] ✅ Verification email resent successfully')
+      alert('Verification email sent! Please check your inbox.')
+    } catch (err: any) {
+      console.error('[Signup] Resend exception:', err)
+      alert('Failed to resend verification email. Please try again.')
     }
   }
 
@@ -282,67 +437,128 @@ export default function SignupCustomer() {
         return
       }
 
-      // Create Firebase account
+      // Create account via our API route which saves to database
       const authStartTime = performance.now()
-      console.log('[Signup] Creating Firebase auth...')
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      )
-      const authDuration = performance.now() - authStartTime
-      const uid = userCredential.user.uid
-      console.log(`[Signup] Firebase Auth created: ${Math.round(authDuration)}ms`, uid)
-
-      // Create customer profile
-      const profileStartTime = performance.now()
-      console.log('[Signup] Creating customer profile...')
-      const finalPlanData = planSelection !== undefined ? planSelection : formData.selectedPlan
-      await createCustomerProfile(uid, {
-        email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phone || '',
-        state: formData.state,
-        personalUse: formData.personalUse as 'personal' | 'business',
-        preferenceMarketingTexts: formData.marketingTexts,
-        preferenceAccountTexts: formData.accountTexts,
-        selectedPlan: finalPlanData || 'none',
+      console.log('[Signup] Creating account via /api/auth/signup...')
+      const fullName = `${formData.firstName} ${formData.lastName}`
+      
+      const apiResponse = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          name: fullName,
+          phone: formData.phone || null,
+          state: formData.state || null,
+          personalUse: formData.personalUse || null,
+          userType: 'customer',
+        })
       })
-      const profileDuration = performance.now() - profileStartTime
-      console.log(`[Signup] Customer profile created: ${Math.round(profileDuration)}ms`)
 
-      // Send welcome email
-      try {
-        const bookingLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/booking`
-        await sendWelcomeEmail(
-          formData.email,
-          formData.firstName,
-          bookingLink
-        )
-        console.log('[Signup] ✓ Welcome email sent to:', formData.email)
-      } catch (emailError: any) {
-        console.error('[Signup] Welcome email failed (non-blocking):', emailError.message)
-        // Continue - don't fail signup if email fails
+      console.log('[Signup] API response status:', apiResponse.status)
+      console.log('[Signup] API response ok:', apiResponse.ok)
+      
+      if (!apiResponse.ok) {
+        console.log('[Signup] Attempting to parse error response as JSON...')
+        let errorData: any = {}
+        try {
+          errorData = await apiResponse.json()
+          console.log('[Signup] Parsed error data:', errorData)
+        } catch (parseError) {
+          console.error('[Signup] Failed to parse error response as JSON:', parseError)
+          const textResponse = await apiResponse.text()
+          console.log('[Signup] Response text:', textResponse.substring(0, 200))
+          errorData = { error: `Server error: ${apiResponse.statusText}` }
+        }
+        
+        console.error('[Signup] API error:', errorData)
+        
+        // Handle duplicate email error
+        if (errorData.code === 'DUPLICATE_EMAIL' || apiResponse.status === 409) {
+          setError('This email is already registered. Would you like to log in instead?')
+          setIsLoading(false)
+          
+          // Offer to resend verification email
+          const shouldResend = confirm('Your email is already registered. Would you like us to resend the verification email?')
+          if (shouldResend) {
+            await resendVerificationEmail(formData.email)
+          }
+          return
+        }
+        
+        // Handle rate limit error
+        if (errorData.code === 'RATE_LIMIT' || apiResponse.status === 429) {
+          setError('Too many signup attempts. Please wait 60 seconds and try again.')
+          setIsLoading(false)
+          return
+        }
+        
+        throw new Error(errorData.error || 'Failed to create account')
       }
 
-      const totalTime = performance.now() - signupStartTime
-      console.log(`[Signup] ✅ Complete signup in ${Math.round(totalTime)}ms (Auth: ${Math.round(authDuration)}ms, Profile: ${Math.round(profileDuration)}ms)`)
-
-      // Store user ID and show Wash Club modal
+      const apiData = await apiResponse.json()
+      console.log('[Signup] API response data:', apiData)
+      
+      const authDuration = performance.now() - authStartTime
+      const uid = apiData.user?.id
+      if (!uid) throw new Error('Failed to get user ID from API response')
+      console.log(`[Signup] Account created via API: ${Math.round(authDuration)}ms`, uid)
+      
+      // Save user ID for later profile creation
       setNewUserId(uid)
-      setShowWashClubModal(true)
+      
+      // Send verification email
+      console.log('[Signup] ==========================================')
+      console.log('[Signup] SENDING VERIFICATION EMAIL!')
+      console.log('[Signup] Email:', formData.email)
+      console.log('[Signup] FirstName:', formData.firstName)
+      console.log('[Signup] ==========================================')
+      
+      const emailStartTime = performance.now()
+      try {
+        // Generate a verification code to include in the email
+        const verificationCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+        console.log('[Signup] VerificationCode:', verificationCode)
+        
+        console.log('[Signup] Calling /api/auth/send-confirmation...')
+        const verificationResponse = await fetch('/api/auth/send-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            firstName: formData.firstName,
+            verificationCode: verificationCode
+          })
+        })
+        
+        console.log('[Signup] Response status:', verificationResponse.status)
+        console.log('[Signup] Response ok:', verificationResponse.ok)
+        
+        if (!verificationResponse.ok) {
+          const errorData = await verificationResponse.json()
+          console.warn('[Signup] ❌ FAILED to send verification email:', errorData.error)
+          console.warn('[Signup] Full error:', errorData)
+        } else {
+          const emailDuration = performance.now() - emailStartTime
+          console.log(`[Signup] ✅ Email sent successfully (${Math.round(emailDuration)}ms)`)
+          const successData = await verificationResponse.json()
+          console.log('[Signup] Email response data:', successData)
+        }
+      } catch (emailError) {
+        console.warn('[Signup] ❌ Exception calling email endpoint:', emailError)
+      }
+      
+      const totalTime = performance.now() - signupStartTime
+      console.log(`[Signup] ✓ Account created and email sent. (${Math.round(totalTime)}ms)`)
+
+      // Move to email verification step (step 2 = "Check Your Email")
+      setIsLoading(false)
+      setCurrentStep(2)
     } catch (err: any) {
       console.error('[Signup] Error:', err)
-      console.error('[Signup] Error code:', err.code)
       console.error('[Signup] Error message:', err.message)
-      if (err.code === 'auth/email-already-in-use') {
-        setError('Email already in use. Please try another.')
-      } else if (err.code === 'auth/weak-password') {
-        setError('Password is too weak.')
-      } else {
-        setError(err.message || 'Failed to create account')
-      }
+      setError(err.message || 'Failed to create account')
     } finally {
       setIsLoading(false)
     }
@@ -368,11 +584,13 @@ export default function SignupCustomer() {
   if (currentStep === steps.length) {
     const handleJoinWashClub = () => {
       setShowWashClubModal(false)
+      setIsRedirecting(true)
       router.push(`/wash-club/onboarding?email=${encodeURIComponent(formData.email)}`)
     }
 
     const handleSkipWashClub = () => {
       setShowWashClubModal(false)
+      setIsRedirecting(true)
       const finalPlanData = formData.selectedPlan === 'none' ? '/' : '/pricing'
       router.push(finalPlanData)
     }
@@ -451,8 +669,8 @@ export default function SignupCustomer() {
 
           {/* Navigation */}
           <div className="flex gap-3">
-            {currentStep === 3 ? (
-              // Custom buttons for plan step
+            {currentStep === 4 ? (
+              // Custom buttons for subscription step (final step)
               <>
                 <button
                   onClick={() => {
@@ -468,7 +686,7 @@ export default function SignupCustomer() {
                   }}
                   className="flex-1 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-mint transition"
                 >
-                  No, Go to Home
+                  No, Create Account
                 </button>
               </>
             ) : (

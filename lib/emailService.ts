@@ -1,17 +1,16 @@
 /**
  * Unified Email Service for Washlee
  * ====================================
- * Uses SendGrid for sending with your Gmail address as the sender
+ * Uses Resend (primary) or SendGrid (fallback) for email sending
  * 
  * Configuration:
- * - SENDGRID_API_KEY: Your SendGrid API key
- * - GMAIL_ADDRESS: Your Gmail address to send from (must be verified in SendGrid)
- * 
- * To use SendGrid with your Gmail address:
- * 1. Verify your Gmail address as a Sender Identity in SendGrid
- * 2. Set SENDGRID_API_KEY and GMAIL_ADDRESS in .env.local
- * 3. All emails will send from your Gmail address via SendGrid
+ * - RESEND_API_KEY: Your Resend API key (primary)
+ * - RESEND_FROM_EMAIL: Email to send from via Resend
+ * - SENDGRID_API_KEY: Your SendGrid API key (fallback)
+ * - GMAIL_ADDRESS: Your Gmail address (fallback sender)
  */
+
+import { Resend } from 'resend'
 
 interface EmailOptions {
   to: string
@@ -368,6 +367,54 @@ export const EMAIL_TEMPLATES = {
         </div>
       </div>
     `
+  },
+
+  email_confirmation: {
+    id: 'email_confirmation',
+    name: 'Confirm Your Email',
+    subject: 'Confirm Your Email - Welcome to Washlee',
+    template: (vars: Record<string, string>) => `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; max-width: 600px; margin: 0 auto; background: #f7fefe;">
+        <div style="background: linear-gradient(135deg, #48C9B0 0%, #7FE3D3 100%); color: white; padding: 40px 30px; text-align: center;">
+          <div style="font-size: 32px; margin-bottom: 15px;">🧺</div>
+          <h1 style="margin: 0; font-size: 28px; font-weight: bold;">Confirm Your Email</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">Welcome to Washlee</p>
+        </div>
+        <div style="background: white; padding: 40px 30px;">
+          <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">Hi there,</p>
+          <p style="margin: 0 0 30px 0; font-size: 16px; color: #6b7b78; line-height: 1.6;">
+            Thanks for signing up! To get started with Washlee and book your first laundry order, please confirm your email address by clicking the button below.
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${vars.confirmLink}" style="background: linear-gradient(135deg, #48C9B0 0%, #7FE3D3 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600; font-size: 16px;">
+              Confirm Email Address
+            </a>
+          </div>
+
+          <p style="margin: 20px 0 0 0; font-size: 13px; color: #999; text-align: center;">
+            Or copy and paste this link in your browser:
+          </p>
+          <p style="margin: 10px 0; padding: 15px; background: #f5f5f5; border-radius: 4px; font-size: 12px; color: #666; word-break: break-all; font-family: monospace;">
+            ${vars.confirmLink}
+          </p>
+
+          <div style="background: #E8FFFB; border-left: 4px solid #48C9B0; padding: 20px; margin: 30px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #48C9B0;">🎉 Welcome Bonus!</p>
+            <p style="margin: 0; font-size: 14px; color: #1f2d2b;">Get <strong>$10 OFF</strong> your first order with code <strong>WELCOME10</strong></p>
+          </div>
+
+          <div style="border-top: 1px solid #e0e0e0; margin-top: 30px; padding-top: 20px;">
+            <p style="margin: 0 0 15px 0; font-size: 13px; color: #999;">
+              This link expires in <strong>24 hours</strong>. If you didn't create this account, you can safely ignore this email.
+            </p>
+            <p style="margin: 0; font-size: 11px; color: #bbb;">
+              © 2026 Washlee Inc. All rights reserved. | <a href="https://washlee.com/privacy" style="color: #48C9B0; text-decoration: none;">Privacy Policy</a> | <a href="https://washlee.com/terms" style="color: #48C9B0; text-decoration: none;">Terms of Service</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    `
   }
 }
 
@@ -375,69 +422,108 @@ export const EMAIL_TEMPLATES = {
  * Main email sending function using SendGrid
  */
 export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
-  const apiKey = process.env.SENDGRID_API_KEY
-  // Accept either GMAIL_ADDRESS (legacy) or SENDGRID_FROM_EMAIL (recommended)
-  const fromEmail = process.env.GMAIL_ADDRESS || process.env.SENDGRID_FROM_EMAIL
+  const resendApiKey = process.env.RESEND_API_KEY
+  const resendFromEmail = process.env.RESEND_FROM_EMAIL
+  const sendgridApiKey = process.env.SENDGRID_API_KEY
+  const sendgridFromEmail = process.env.SENDGRID_FROM_EMAIL || 'support@washlee.com.au'
 
-  if (!apiKey || !fromEmail) {
-    console.warn('[EMAIL] SendGrid not configured. Set SENDGRID_API_KEY and SENDGRID_FROM_EMAIL (or GMAIL_ADDRESS) in .env.local')
-    console.log(`[EMAIL] Would send to: ${options.to}`)
-    console.log(`[EMAIL] Subject: ${options.subject}`)
-    return {
-      success: true,
-      messageId: `mock_${Date.now()}`,
+  console.log('[EMAIL] ========================================')
+  console.log('[EMAIL] sendEmail called')
+  console.log('[EMAIL] To:', options.to)
+  console.log('[EMAIL] Subject:', options.subject)
+  console.log('[EMAIL] ========================================')
+
+  // Try SendGrid first (more reliable for production)
+  if (sendgridApiKey) {
+    console.log('[EMAIL] Attempting to send via SendGrid...')
+    console.log('[EMAIL] SendGrid API Key present:', !!sendgridApiKey)
+    console.log('[EMAIL] SendGrid From Email:', sendgridFromEmail)
+    try {
+      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sendgridApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: options.to }] }],
+          from: { email: sendgridFromEmail },
+          subject: options.subject,
+          content: [{ type: 'text/html', value: options.html }],
+          reply_to: { email: options.replyTo || sendgridFromEmail },
+        }),
+      })
+
+      console.log('[EMAIL] SendGrid response status:', response.status)
+
+      if (response.ok) {
+        const messageId = response.headers.get('x-message-id') || `sendgrid_${Date.now()}`
+        console.log(`[EMAIL] ✅ Email sent via SendGrid to ${options.to}`)
+        console.log(`[EMAIL] Message ID:`, messageId)
+        return {
+          success: true,
+          messageId,
+        }
+      } else {
+        const errorText = await response.text()
+        console.error('[EMAIL] SendGrid failed with status', response.status)
+        console.error('[EMAIL] SendGrid error response:', errorText)
+        return {
+          success: false,
+          error: `SendGrid failed: ${response.status} - ${errorText}`,
+        }
+      }
+    } catch (error: any) {
+      console.error('[EMAIL] SendGrid exception:', error.message)
+      return {
+        success: false,
+        error: `SendGrid exception: ${error.message}`,
+      }
     }
   }
 
-  try {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        personalizations: [
-          {
-            to: [{ email: options.to }],
-            subject: options.subject,
-          },
-        ],
-        from: {
-          email: fromEmail,
-          name: 'Washlee',
-        },
-        reply_to: options.replyTo ? { email: options.replyTo } : undefined,
-        content: [
-          {
-            type: 'text/html',
-            value: options.html,
-          },
-        ],
-      }),
-    })
+  // Try Resend as fallback
+  if (resendApiKey) {
+    try {
+      const resend = new Resend(resendApiKey)
 
-    if (!response.ok) {
-      const error = await response.json()
-      console.error('[EMAIL] SendGrid error:', error)
+      console.log('[EMAIL] Sending via Resend from:', resendFromEmail)
+      const response = await resend.emails.send({
+        from: resendFromEmail,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        replyTo: options.replyTo || resendFromEmail,
+      })
+
+      if (response.error) {
+        console.error('[EMAIL] Resend error:', response.error)
+        return {
+          success: false,
+          error: `Resend failed: ${response.error.message}`,
+        }
+      } else {
+        console.log(`[EMAIL] ✅ Email sent via Resend to ${options.to}`)
+        console.log(`[EMAIL] Message ID:`, response.data?.id)
+        return {
+          success: true,
+          messageId: response.data?.id || `resend_${Date.now()}`,
+        }
+      }
+    } catch (error: any) {
+      console.error('[EMAIL] Resend exception:', error.message)
       return {
         success: false,
-        error: error.errors?.[0]?.message || 'Failed to send email',
+        error: `Resend failed: ${error.message}`,
       }
     }
+  }
 
-    const messageId = response.headers.get('x-message-id')
-    console.log(`[EMAIL] ✅ Email sent to ${options.to}`)
-    return {
-      success: true,
-      messageId: messageId || `sgm_${Date.now()}`,
-    }
-  } catch (error) {
-    console.error('[EMAIL] Error sending email:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Email send failed',
-    }
+  // No email service configured
+  console.error('[EMAIL] ❌ No email service configured!')
+  return {
+    success: false,
+    error: 'Email service not configured. Please set SENDGRID_API_KEY or RESEND_API_KEY.',
   }
 }
 
@@ -743,4 +829,25 @@ export default {
   sendWholesaleInquiryConfirmation,
   sendPaymentFailed,
   sendPasswordReset,
+}
+
+/**
+ * Send branded email confirmation
+ */
+export async function sendBrandedConfirmationEmail(
+  email: string,
+  confirmationLink: string
+): Promise<void> {
+  const template = EMAIL_TEMPLATES.email_confirmation
+  
+  const html = template.template({
+    confirmLink: confirmationLink
+  })
+
+  await sendEmail({
+    to: email,
+    subject: template.subject,
+    html: html,
+    replyTo: process.env.GMAIL_ADDRESS || process.env.SENDGRID_FROM_EMAIL
+  })
 }

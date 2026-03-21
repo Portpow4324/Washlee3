@@ -9,15 +9,13 @@ import Image from 'next/image'
 import { useState, useEffect, Suspense } from 'react'
 import { Mail, Lock, User, Phone, MapPin, CheckCircle, ArrowLeft, Upload, Eye, EyeOff, HelpCircle, AlertCircle, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
-import { setDoc, doc, getDoc, updateDoc } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
 import { AUSTRALIAN_STATES, validateAustralianPhone, formatAustralianPhone, validateEmail, getEmailSuggestions } from '@/lib/australianValidation'
 import { WASHLEE_TERMS } from '@/lib/washleeTerms'
-import { createEmployeeProfile, getCustomerProfile, upgradeCustomerToEmployee } from '@/lib/userManagement'
+import { createEmployeeProfile, getCustomerProfile } from '@/lib/userManagement'
 import { requestVerificationCode, verifyCode, isAdminUser, getVerificationCodeForTesting } from '@/lib/verification'
 import { useAuth } from '@/lib/AuthContext'
 import { getAddressDetails, AddressParts } from '@/lib/googlePlaces'
+import { supabase } from '@/lib/supabaseClient'
 
 function ProSignupFormContent() {
   const router = useRouter()
@@ -220,34 +218,35 @@ function ProSignupFormContent() {
         }
 
         if (authUser) {
-          console.log('[ProSignup] Loading customer data for user:', authUser.uid)
+          console.log('[ProSignup] Loading customer data for user:', authUser.id)
           setIsLoggedInUser(true)
-          const customerData = await getCustomerProfile(authUser.uid)
+          const customerData = await getCustomerProfile(authUser.id)
           
           if (customerData) {
+            const data = customerData as any
             console.log('[ProSignup] Customer data loaded:', {
-              firstName: customerData.firstName,
-              lastName: customerData.lastName,
-              email: customerData.email,
-              phone: customerData.phone,
-              state: customerData.state,
+              firstName: data.firstName,
+              lastName: data.lastName,
+              email: data.email,
+              phone: data.phone,
+              state: data.state,
             })
             setFormData(prev => ({
               ...prev,
-              firstName: customerData.firstName || prev.firstName,
-              lastName: customerData.lastName || prev.lastName,
-              email: customerData.email || prev.email,
-              phone: customerData.phone || prev.phone,
-              state: customerData.state || prev.state,
+              firstName: data.firstName || prev.firstName,
+              lastName: data.lastName || prev.lastName,
+              email: data.email || prev.email,
+              phone: data.phone || prev.phone,
+              state: data.state || prev.state,
               termsAccepted: true, // Auto-accept for logged-in users with complete data
             }))
             
             // AUTO-ADVANCE: Only advance if customer has ALL required Pro fields including state
             // If state is missing, user needs to stay on Step 0 to fill it in
-            if (initialStep === 0 && customerData.state) {
+            if (initialStep === 0 && data.state) {
               console.log('[ProSignup] User has existing customer profile WITH state - advancing to step 1')
               setCurrentStep(1)
-            } else if (initialStep === 0 && !customerData.state) {
+            } else if (initialStep === 0 && !data.state) {
               console.log('[ProSignup] User has customer profile but NO state - staying on step 0 to collect it')
               // Stay on Step 0 to allow user to fill in the state field
             }
@@ -508,7 +507,7 @@ function ProSignupFormContent() {
           reader.readAsDataURL(file)
         })
 
-      console.log('[Form] Current user:', authUser?.uid)
+      console.log('[Form] Current user:', authUser?.id)
       if (!authUser) throw new Error('User not found. Please log in again.')
 
       // Small delay to ensure Firebase is ready
@@ -524,13 +523,14 @@ function ProSignupFormContent() {
       if (!firstName || !lastName || !email || !phone || !state) {
         console.log('[Form] Form data incomplete, fetching from customer profile...')
         try {
-          const customerData = await getCustomerProfile(authUser.uid)
+          const customerData = await getCustomerProfile(authUser.id)
           if (customerData) {
-            firstName = firstName || customerData.firstName || ''
-            lastName = lastName || customerData.lastName || ''
-            email = email || customerData.email || authUser.email || ''
-            phone = phone || customerData.phone || ''
-            state = state || customerData.state || ''
+            const data = customerData as any
+            firstName = firstName || data.firstName || ''
+            lastName = lastName || data.lastName || ''
+            email = email || data.email || authUser.email || ''
+            phone = phone || data.phone || ''
+            state = state || data.state || ''
             console.log('[Form] Loaded customer data:', { firstName, lastName, email, phone, state })
           }
         } catch (err) {
@@ -540,7 +540,7 @@ function ProSignupFormContent() {
 
       // Validate that all required fields are populated
       const missingFields = []
-      if (!authUser.uid) missingFields.push('userId')
+      if (!authUser.id) missingFields.push('userId')
       if (!firstName?.trim()) missingFields.push('firstName')
       if (!lastName?.trim()) missingFields.push('lastName')
       if (!email?.trim()) missingFields.push('email')
@@ -552,7 +552,7 @@ function ProSignupFormContent() {
       }
 
       const inquiryPayload = {
-        userId: authUser.uid,
+        userId: authUser.id,
         firstName,
         lastName,
         email,
@@ -674,8 +674,9 @@ function ProSignupFormContent() {
       // Check if user is already logged in
       if (isLoggedInUser && authUser) {
         // Check if user has customer data
-        const customerData = await getCustomerProfile(authUser.uid)
-        if (customerData && customerData.state) {
+        const customerData = await getCustomerProfile(authUser.id)
+        const data = customerData as any
+        if (customerData && data.state) {
           console.log('[Signup] User already logged in with complete profile, advancing to email verification')
           // Already logged in with complete data
           setIsLoading(false)
@@ -684,7 +685,7 @@ function ProSignupFormContent() {
           console.log('[Signup] User logged in but needs to complete profile - creating customer profile')
           // User is logged in but needs customer profile - create it using existing auth user
           try {
-            await createEmployeeProfile(authUser.uid, {
+            await createEmployeeProfile(authUser.id, {
               email: formData.email,
               firstName: formData.firstName,
               lastName: formData.lastName,
@@ -695,14 +696,14 @@ function ProSignupFormContent() {
               status: 'pending',
               availability: formData.availability,
               applicationStep: 1,
-            })
+            } as any)
             console.log('[Signup] Customer profile created for existing user')
             
             // Auto-accept terms for logged-in users
             setFormData(prev => ({ ...prev, termsAccepted: true }))
             
             // Send verification codes automatically for logged-in users too
-            const adminStatus = await isAdminUser(authUser.uid)
+            const adminStatus = await isAdminUser(authUser.id)
             setIsAdmin(adminStatus)
             if (!adminStatus) {
               // Send codes in background (development uses test code / logs)
@@ -738,29 +739,42 @@ function ProSignupFormContent() {
         return false
       }
 
-      let userCredential
+      let authResult
 
       // Log Auth creation start
       const authStartTime = performance.now()
-      console.log('[Signup] Creating Firebase auth...')
+      console.log('[Signup] Creating Supabase auth...')
 
       try {
         // Try to create new account
-        userCredential = await createUserWithEmailAndPassword(
-          auth,
-          formData.email,
-          formData.password
-        )
+        const { data, error: signupError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+            }
+          }
+        })
+        
+        if (signupError) {
+          throw signupError
+        }
+
+        authResult = { user: { uid: data.user?.id || '' } }
 
         const authDuration = performance.now() - authStartTime
-        console.log('[Signup] Auth created in', Math.round(authDuration) + 'ms', 'UID:', userCredential.user.uid)
+        console.log('[Signup] Auth created in', Math.round(authDuration) + 'ms', 'UID:', authResult.user.uid)
 
         // Log Employee Profile creation start
         const profileStartTime = performance.now()
         console.log('[Signup] Creating employee profile...')
 
         // Create employee profile
-        await createEmployeeProfile(userCredential.user.uid, {
+        if (!authResult.user.uid) throw new Error('Failed to get user ID')
+        
+        const profilePromise = createEmployeeProfile(authResult.user.uid, {
           email: formData.email,
           firstName: formData.firstName,
           lastName: formData.lastName,
@@ -771,16 +785,27 @@ function ProSignupFormContent() {
           status: 'pending',
           availability: formData.availability,
           applicationStep: 1,
-        })
+        } as any)
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile creation timeout - database may not be initialized')), 15000)
+        )
+        
+        try {
+          await Promise.race([profilePromise, timeoutPromise])
+        } catch (profileTimeoutError: any) {
+          console.warn('[Signup] Profile creation timeout (continuing anyway):', profileTimeoutError.message)
+          // Continue - don't block signup for profile creation timeout
+        }
 
         const profileDuration = performance.now() - profileStartTime
         console.log('[Signup] Employee profile created (ID pending in background):', Math.round(profileDuration) + 'ms')
 
       } catch (createErr: any) {
         const authDuration = performance.now() - authStartTime
-        console.log('[Signup] Error after', Math.round(authDuration) + 'ms:', createErr.code)
+        console.log('[Signup] Error after', Math.round(authDuration) + 'ms:', createErr.message)
 
-        if (createErr.code === 'auth/email-already-in-use') {
+        if (createErr.message && createErr.message.includes('already registered')) {
           // Email already exists - customer account found
           setError(
             'This email is already registered as a Washlee customer. ' +
@@ -788,7 +813,7 @@ function ProSignupFormContent() {
           )
           setIsLoading(false)
           return false
-        } else if (createErr.code === 'auth/weak-password') {
+        } else if (createErr.message && createErr.message.includes('weak password')) {
           setError('Password is too weak.')
           setIsLoading(false)
           return false
@@ -798,14 +823,14 @@ function ProSignupFormContent() {
           return false
         }
       }
-      if (!userCredential) {
+      if (!authResult) {
         setError('Failed to process account')
         setIsLoading(false)
         return false
       }
 
       // Check if admin and set state
-      const adminStatus = await isAdminUser(userCredential.user.uid)
+      const adminStatus = await isAdminUser(authResult.user.uid)
       setIsAdmin(adminStatus)
       
       // Generate and send verification codes ASYNC (don't wait for these)

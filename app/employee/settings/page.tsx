@@ -8,6 +8,21 @@ import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { Settings, User, Lock, Bell, FileText, MapPin, Clock, CheckCircle, Upload } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
+
+interface AvailabilityData {
+  setAvailabilityData: any
+}
+
+const loadAvailability = async (userId: string, setAvailabilityData: any) => {
+  try {
+    const response = await fetch(`/api/availability?employeeId=${userId}`)
+    const result = await response.json()
+    setAvailabilityData(result.data || [])
+  } catch (error) {
+    console.error('Error loading availability:', error)
+  }
+}
 
 export default function EmployeeSettings() {
   const { user, userData, loading } = useAuth()
@@ -24,6 +39,7 @@ export default function EmployeeSettings() {
     state: '',
     postcode: ''
   })
+  const [availability, setAvailabilityData] = useState<any[]>([])
 
   useEffect(() => {
     if (hasCheckedAuth) return
@@ -39,15 +55,18 @@ export default function EmployeeSettings() {
     // Pre-fill form with user data
     if (userData) {
       setFormData({
-        firstName: userData.firstName || '',
-        lastName: userData.lastName || '',
+        firstName: userData.name?.split(' ')[0] || '',
+        lastName: userData.name?.split(' ')[1] || '',
         email: userData.email || '',
         phone: userData.phone || '',
-        address: userData.address || '',
-        city: userData.city || '',
-        state: userData.state || '',
-        postcode: userData.postcode || ''
+        address: '',
+        city: '',
+        state: (userData as any)?.state || '',
+        postcode: ''
       })
+
+      // Load availability
+      loadAvailability(user.id, setAvailabilityData)
     }
   }, [user, loading, userData, hasCheckedAuth, router])
 

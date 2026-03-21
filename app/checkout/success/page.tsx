@@ -1,51 +1,44 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import { CheckCircle, Clock, MapPin, Package, ChevronRight } from 'lucide-react'
 
-function CheckoutSuccessContent() {
+export default function CheckoutSuccessPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [order, setOrder] = useState<any>(null)
+  const [orderId, setOrderId] = useState('')
+  const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const sessionId = searchParams.get('session_id')
-  const orderId = searchParams.get('order_id')
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!sessionId || !orderId) {
-      setError('Invalid checkout session')
-      setLoading(false)
-      return
+    const sessionId = searchParams.get('session_id')
+    const savedOrderId = sessionStorage.getItem('lastOrderId')
+    const savedOrder = sessionStorage.getItem('lastOrder')
+
+    if (savedOrderId) {
+      setOrderId(savedOrderId)
     }
 
-    fetchOrderDetails()
-  }, [sessionId, orderId])
-
-  const fetchOrderDetails = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/orders/${orderId}`)
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch order details')
+    if (savedOrder) {
+      try {
+        setOrder(JSON.parse(savedOrder))
+      } catch (e) {
+        console.error('Failed to parse order:', e)
       }
-
-      const data = await response.json()
-      setOrder(data.order)
-      setError(null)
-    } catch (err: any) {
-      console.error('Error fetching order:', err)
-      setError(err.message)
-    } finally {
-      setLoading(false)
     }
-  }
+
+    // Clear session storage
+    sessionStorage.removeItem('lastOrderId')
+    sessionStorage.removeItem('lastOrder')
+    sessionStorage.removeItem('lastOrderTotal')
+
+    setLoading(false)
+  }, [searchParams])
 
   if (loading) {
     return (
@@ -59,7 +52,7 @@ function CheckoutSuccessContent() {
     )
   }
 
-  if (error || !order) {
+  if (error || !orderId) {
     return (
       <div className="min-h-screen bg-light flex flex-col">
         <Header />
@@ -121,69 +114,71 @@ function CheckoutSuccessContent() {
           {/* Order Total */}
           <div className="bg-mint rounded-lg p-6">
             <h2 className="text-sm font-semibold text-gray mb-4 uppercase">Total Amount</h2>
-            <p className="text-3xl font-bold text-primary">${order.totalPrice}</p>
+            <p className="text-3xl font-bold text-primary">${order?.totalPrice || '0.00'}</p>
             <p className="text-xs text-gray">(inc. GST)</p>
           </div>
         </div>
 
         {/* Order Summary */}
-        <div className="bg-white rounded-lg border border-gray/10 p-8 mb-8">
-          <h2 className="text-xl font-bold text-dark mb-6">Order Summary</h2>
+        {order && (
+          <div className="bg-white rounded-lg border border-gray/10 p-8 mb-8">
+            <h2 className="text-xl font-bold text-dark mb-6">Order Summary</h2>
 
-          <div className="space-y-4 mb-6 border-b border-gray/10 pb-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-gray">Weight</p>
-                <p className="font-semibold text-dark">{order.weight}kg</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray">Service Type</p>
-                <p className="font-semibold text-dark capitalize">{order.serviceType || 'Standard'}</p>
-              </div>
-              {order.protectionPlan && (
+            <div className="space-y-4 mb-6 border-b border-gray/10 pb-6">
+              <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm text-gray">Protection Plan</p>
-                  <p className="font-semibold text-dark capitalize">{order.protectionPlan}</p>
+                  <p className="text-sm text-gray">Weight</p>
+                  <p className="font-semibold text-dark">{order.weight}kg</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray">Service Type</p>
+                  <p className="font-semibold text-dark capitalize">{order.serviceType || 'Standard'}</p>
+                </div>
+                {order.protectionPlan && (
+                  <div>
+                    <p className="text-sm text-gray">Protection Plan</p>
+                    <p className="font-semibold text-dark capitalize">{order.protectionPlan}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Pricing Breakdown */}
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between">
+                <span className="text-gray">{order.weight}kg @ ${(order.subtotal / order.weight).toFixed(2)}/kg</span>
+                <span className="font-semibold text-dark">${order.subtotal}</span>
+              </div>
+              {order.protectionPlan && order.protectionPlan !== 'basic' && (
+                <div className="flex justify-between">
+                  <span className="text-gray">{order.protectionPlan} Protection</span>
+                  <span className="font-semibold text-dark">
+                    ${(order.totalPrice - order.subtotal).toFixed(2)}
+                  </span>
                 </div>
               )}
+              <div className="flex justify-between border-t border-gray/10 pt-3">
+                <span className="font-bold text-dark">Total</span>
+                <span className="text-lg font-bold text-primary">${order.totalPrice}</span>
+              </div>
             </div>
-          </div>
 
-          {/* Pricing Breakdown */}
-          <div className="space-y-3 mb-6">
-            <div className="flex justify-between">
-              <span className="text-gray">{order.weight}kg @ ${(order.subtotal / order.weight).toFixed(2)}/kg</span>
-              <span className="font-semibold text-dark">${order.subtotal}</span>
-            </div>
-            {order.protectionPlan && order.protectionPlan !== 'basic' && (
-              <div className="flex justify-between">
-                <span className="text-gray">{order.protectionPlan} Protection</span>
-                <span className="font-semibold text-dark">
-                  ${(order.totalPrice - order.subtotal).toFixed(2)}
-                </span>
+            {/* Delivery Address */}
+            {order.deliveryAddressLine1 && (
+              <div className="bg-mint rounded-lg p-4">
+                <p className="text-sm text-gray mb-2 flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Delivery Address
+                </p>
+                <p className="font-semibold text-dark">
+                  {order.deliveryAddressLine1}
+                  <br />
+                  {order.deliveryCity}, {order.deliveryState} {order.deliveryPostcode}
+                </p>
               </div>
             )}
-            <div className="flex justify-between border-t border-gray/10 pt-3">
-              <span className="font-bold text-dark">Total</span>
-              <span className="text-lg font-bold text-primary">${order.totalPrice}</span>
-            </div>
           </div>
-
-          {/* Delivery Address */}
-          {order.deliveryAddressLine1 && (
-            <div className="bg-mint rounded-lg p-4">
-              <p className="text-sm text-gray mb-2 flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                Delivery Address
-              </p>
-              <p className="font-semibold text-dark">
-                {order.deliveryAddressLine1}
-                <br />
-                {order.deliveryCity}, {order.deliveryState} {order.deliveryPostcode}
-              </p>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Next Steps */}
         <div className="bg-white rounded-lg border border-gray/10 p-8 mb-8">
@@ -288,13 +283,5 @@ function CheckoutSuccessContent() {
 
       <Footer />
     </div>
-  )
-}
-
-export default function CheckoutSuccessPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <CheckoutSuccessContent />
-    </Suspense>
   )
 }

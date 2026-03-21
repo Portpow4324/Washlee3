@@ -1,0 +1,13 @@
+id,email,name,phone,user_type,is_admin,is_employee,is_loyalty_member,profile_picture_url,created_at,updated_at
+550e8400-e29b-41d4-a716-446655440013,lukaverde22@gmail.com,lukaverde22,+61412458144,admin,true,false,false,,2026-03-08T10:00:34Z,2026-03-08T21:00:48Z
+550e8400-e29b-41d4-a716-446655440007,test999@gmail.com,test999,+61412459201,admin,true,false,false,,2026-03-08T01:23:00Z,2026-03-08T01:23:00Z
+550e8400-e29b-41d4-a716-446655440018,lukaverde0476653333@gmail.com,lukaverde0476653333,+61412459202,admin,true,true,false,,2026-03-11T20:06:45Z,2026-03-11T20:06:45Z
+550e8400-e29b-41d4-a716-446655440001,lukaverde02t45@gmail.com,Luka Verde,+61412459203,customer,false,false,false,,2026-03-08T12:59:19Z,2026-03-08T12:59:19Z
+550e8400-e29b-41d4-a716-446655440002,lukaverde624@gmail.com,Luka Verde,+61412459204,customer,false,false,false,,2026-03-06T15:43:06Z,2026-03-06T15:43:06Z
+550e8400-e29b-41d4-a716-446655440003,lukaverde326@gmail.com,Luka Verde,+61412459205,customer,false,false,false,,2026-03-06T15:42:32Z,2026-03-06T15:42:32Z
+550e8400-e29b-41d4-a716-446655440004,lukaverde6@gmail.com,lukaverde6,+61412459206,customer,false,false,false,,2026-03-03T07:52:45Z,2026-03-03T07:52:45Z
+550e8400-e29b-41d4-a716-446655440005,test99999@gmail.com,Luka Verde,+61412459207,customer,false,false,false,,2026-03-02T07:54:43Z,2026-03-02T07:54:43Z
+550e8400-e29b-41d4-a716-446655440006,test999923429@gmail.com,Luka Verde,+61412459208,customer,false,false,false,,2026-03-03T17:18:21Z,2026-03-03T17:18:21Z
+550e8400-e29b-41d4-a716-446655440014,lukaverde62242@gmail.com,lukaverde62242,+61412459209,pro,false,true,false,,2026-03-08T22:04:32Z,2026-03-08T22:04:32Z
+550e8400-e29b-41d4-a716-446655440015,lukaverde3@gmail.com,lukaverde3,+61412459210,pro,false,true,false,,2026-03-14T12:20:31Z,2026-03-14T12:20:31Z
+550e8400-e29b-41d4-a716-446655440016,lukaverde62322343@gmail.com,lukaverde62322343,+61412459211,pro,false,true,false,,2026-03-03T17:47:42Z,2026-03-03T17:47:42Z

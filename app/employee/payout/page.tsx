@@ -3,8 +3,6 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { db } from '@/lib/firebase'
-import { collection, query, where, getDocs } from 'firebase/firestore'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import EmployeeHeader from '@/components/EmployeeHeader'
@@ -26,6 +24,7 @@ export default function EmployeePayout() {
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
   const [availableBalance, setAvailableBalance] = useState(0)
   const [pendingPayouts, setPendingPayouts] = useState(0)
+  const [payoutId, setPayoutId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState(false)
@@ -50,31 +49,33 @@ export default function EmployeePayout() {
       router.push('/auth/employee-signin')
       return
     }
-
+    
     localStorage.setItem('employeeMode', 'true')
 
     const fetchData = async () => {
       try {
         setDataLoading(true)
 
-        // Get employee profile to access totalEarnings
-        const employeesRef = collection(db, 'employees')
-        const q = query(employeesRef, where('uid', '==', user.uid))
-        const snapshot = await getDocs(q)
+        // Get employee payout info from API
+        const response = await fetch(`/api/payouts?employeeId=${user.id}`)
+        const result = await response.json()
+        const payoutData = result.data
 
-        if (!snapshot.empty) {
-          const employeeData = snapshot.docs[0].data()
-          const totalEarnings = employeeData.totalEarnings || 0
-          setAvailableBalance(totalEarnings)
+        if (payoutData) {
+          setPayoutId(payoutData.id)
+          setAvailableBalance(payoutData.total_earned || 0)
+          setPendingPayouts(payoutData.pending_amount || 0)
+          
+          // Pre-fill form with stored bank info
+          if (payoutData.account_holder_name) {
+            setFormData(prev => ({
+              ...prev,
+              accountHolder: payoutData.account_holder_name,
+              accountNumber: payoutData.bank_account_number || '',
+              bsb: payoutData.bsb || '',
+            }))
+          }
         }
-
-        // Get pending payouts
-        const payoutsRef = collection(db, 'employee-payouts')
-        const payoutQuery = query(payoutsRef, where('uid', '==', user.uid), where('status', 'in', ['pending', 'processing']))
-        const payoutSnapshot = await getDocs(payoutQuery)
-
-        const totalPending = payoutSnapshot.docs.reduce((sum, doc) => sum + (doc.data().amount || 0), 0)
-        setPendingPayouts(totalPending)
       } catch (error) {
         console.error('Error fetching payout data:', error)
       } finally {
@@ -98,7 +99,7 @@ export default function EmployeePayout() {
     setSubmitError('')
     setSubmitSuccess(false)
 
-    if (!user) {
+    if (!user || !payoutId) {
       setSubmitError('Not authenticated')
       return
     }
@@ -127,24 +128,31 @@ export default function EmployeePayout() {
     setIsSubmitting(true)
 
     try {
-      const response = await fetch('/api/employee/payouts', {
+      // Update bank account info
+      await fetch('/api/payouts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          uid: user.uid,
-          amount: parseFloat(formData.amount),
-          accountHolder: formData.accountHolder,
-          accountNumber: formData.accountNumber,
-          bsb: formData.bsb,
-          bankName: formData.bankName,
-          accountType: formData.accountType,
+          action: 'updateBankAccount',
+          payoutId,
+          bankInfo: {
+            bank_account_number: formData.accountNumber,
+            bsb: formData.bsb,
+            account_holder_name: formData.accountHolder,
+          },
         }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to submit payout request')
-      }
+      // Request payout
+      await fetch('/api/payouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'requestPayout',
+          payoutId,
+          amount: parseFloat(formData.amount),
+        }),
+      })
 
       setSubmitSuccess(true)
       setFormData({

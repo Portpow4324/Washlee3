@@ -10,8 +10,7 @@ import {
   Home, Package, Settings, Lock, CreditCard, MapPin, LifeBuoy, 
   Smartphone, Menu, X, LogOut, ChevronRight
 } from 'lucide-react'
-import { signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { createClient } from '@supabase/supabase-js'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, userData, loading } = useAuth()
@@ -27,12 +26,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return
     }
 
-    // Still loading auth state OR user not set
-    if (loading || !user) {
+    // Still loading auth state OR user not set - redirect to login
+    if (loading) {
       return
     }
 
-    // User exists and loading is done - now check if we have user data
+    if (!user) {
+      console.log('[DashboardLayout] Auth check complete - no user, redirecting to login')
+      hasCheckedAuthRef.current = true
+      router.push('/auth/login')
+      return
+    }
+
+    // User exists but we don't have user data yet - wait
     if (!userData) {
       return
     }
@@ -41,13 +47,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     hasCheckedAuthRef.current = true
     console.log('[DashboardLayout] Auth check starting...')
     console.log('[DashboardLayout] Current pathname:', pathname)
-    console.log('[DashboardLayout] User type:', userData.userType)
+    console.log('[DashboardLayout] User type:', userData.user_type)
 
     // Don't redirect if on settings page (customer settings)
     const isSettingsPage = pathname?.includes('/dashboard/settings')
     
     // If user is pro/employee, redirect them to employee dashboard (but not from settings)
-    if (userData.userType === 'pro' && !isSettingsPage) {
+    if (userData.user_type === 'pro' && !isSettingsPage) {
       console.log('[DashboardLayout] User is pro, redirecting to employee dashboard')
       router.push('/employee/dashboard')
       return
@@ -55,7 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     // User is authenticated customer with data loaded - proceed
     console.log('[DashboardLayout] User authenticated as customer, rendering dashboard')
-  }, [loading, user, userData, router])
+  }, [loading, user, userData, router, pathname])
 
   // Show loading state while auth checks happen
   if (loading) {
@@ -69,10 +75,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )
   }
 
-  // If loading is done but user is not set, redirect to login
-  if (!loading && !user) {
-    console.log('[DashboardLayout] Auth check complete - no user, redirecting to login')
-    router.push('/auth/login')
+  // Return null while checking auth (prevents rendering before redirect)
+  if (!user) {
     return null
   }
 
@@ -90,7 +94,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleLogout = async () => {
     try {
-      await signOut(auth)
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      await supabase.auth.signOut()
       router.push('/')
     } catch (error) {
       console.error('Logout error:', error)

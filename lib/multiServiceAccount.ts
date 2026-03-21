@@ -1,46 +1,47 @@
-import { adminAuth, adminDb, secondaryAuth, secondaryDb } from '@/lib/firebaseAdmin';
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 /**
- * Multi-Service Account Manager
- * Provides utilities to work with both primary (fbsvc) and secondary (lukaverde) service accounts
+ * Admin Service Account Manager
+ * Unified service for admin operations using Supabase
  */
 
-export type ServiceAccountType = 'primary' | 'secondary';
+// Create service role client for admin operations
+export const adminClient = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+)
 
 /**
- * Get auth instance for the specified service account
- */
-export function getAuth(accountType: ServiceAccountType = 'primary') {
-  return accountType === 'secondary' ? secondaryAuth() : adminAuth;
-}
-
-/**
- * Get Firestore instance for the specified service account
- */
-export function getDatabase(accountType: ServiceAccountType = 'primary') {
-  return accountType === 'secondary' ? secondaryDb() : adminDb;
-}
-
-/**
- * Set admin privileges via the specified service account
+ * Set admin privileges for a user
  */
 export async function setAdminClaims(
-  uid: string,
-  accountType: ServiceAccountType = 'primary'
+  uid: string
 ) {
   try {
-    const auth = getAuth(accountType);
-    await auth.setCustomUserClaims(uid, { admin: true });
-    console.log(
-      `✅ Admin claims set for ${uid} via ${accountType} service account`
-    );
-    return true;
+    // Update user's is_admin field in users table
+    const { error } = await adminClient
+      .from('users')
+      .update({ is_admin: true })
+      .eq('id', uid)
+
+    if (error) {
+      throw error
+    }
+
+    console.log(`✅ Admin status set for ${uid}`)
+    return true
   } catch (error) {
-    console.error(
-      `❌ Failed to set admin claims via ${accountType} account:`,
-      error
-    );
-    throw error;
+    console.error(`❌ Failed to set admin claims:`, error)
+    throw error
   }
 }
 
@@ -50,44 +51,40 @@ export async function setAdminClaims(
 export async function createAdminUser(
   uid: string,
   email: string,
-  name: string,
-  accountType: ServiceAccountType = 'primary'
+  name: string
 ) {
   try {
-    const db = getDatabase(accountType);
-    await db.collection('users').doc(uid).set(
-      {
-        isAdmin: true,
-        email,
-        name,
-        adminRole: 'super_admin',
-        userType: 'admin',
-        adminSince: new Date(),
+    const { error } = await adminClient
+      .from('users')
+      .update({
+        is_admin: true,
+        admin_role: 'super_admin',
+        user_type: 'admin',
+        admin_since: new Date().toISOString(),
         subscription: {
           plan: 'washly',
-          status: 'active',
+          status: 'active'
         },
         permissions: {
-          canViewAnalytics: true,
-          canManageUsers: true,
-          canManageOrders: true,
-          canViewPayments: true,
-          canManagePlans: true,
-          canViewLogs: true,
-        },
-      },
-      { merge: true }
-    );
-    console.log(
-      `✅ Admin user document created for ${email} via ${accountType} account`
-    );
-    return true;
+          can_view_analytics: true,
+          can_manage_users: true,
+          can_manage_orders: true,
+          can_view_payments: true,
+          can_manage_plans: true,
+          can_view_logs: true
+        }
+      })
+      .eq('id', uid)
+
+    if (error) {
+      throw error
+    }
+
+    console.log(`✅ Admin user document created for ${email}`)
+    return true
   } catch (error) {
-    console.error(
-      `❌ Failed to create admin user via ${accountType} account:`,
-      error
-    );
-    throw error;
+    console.error(`❌ Failed to create admin user:`, error)
+    throw error
   }
 }
 
@@ -96,70 +93,67 @@ export async function createAdminUser(
  */
 export async function promoteToAdmin(
   uid: string,
-  email: string,
-  accountType: ServiceAccountType = 'primary'
+  email: string
 ) {
   try {
     // Set custom claims
-    await setAdminClaims(uid, accountType);
+    await setAdminClaims(uid)
 
     // Create admin document
-    await createAdminUser(uid, email, email.split('@')[0], accountType);
+    await createAdminUser(uid, email, email.split('@')[0])
 
-    console.log(
-      `✅ User ${email} promoted to admin via ${accountType} account`
-    );
-    return true;
+    console.log(`✅ User ${email} promoted to admin`)
+    return true
   } catch (error) {
-    console.error(
-      `❌ Failed to promote user via ${accountType} account:`,
-      error
-    );
-    throw error;
+    console.error(`❌ Failed to promote user:`, error)
+    throw error
   }
 }
 
 /**
- * Check if user is admin (using Firestore document)
+ * Check if user is admin
  */
 export async function isUserAdmin(
-  uid: string,
-  accountType: ServiceAccountType = 'primary'
+  uid: string
 ): Promise<boolean> {
   try {
-    const db = getDatabase(accountType);
-    const userDoc = await db.collection('users').doc(uid).get();
-    return userDoc.exists && userDoc.data()?.isAdmin === true;
+    const { data, error } = await adminClient
+      .from('users')
+      .select('is_admin')
+      .eq('id', uid)
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    return data?.is_admin === true
   } catch (error) {
-    console.error(`❌ Failed to check admin status via ${accountType}:`, error);
-    return false;
+    console.error(`❌ Failed to check admin status:`, error)
+    return false
   }
 }
 
 /**
  * List all admins in the system
  */
-export async function listAllAdmins(accountType: ServiceAccountType = 'primary') {
+export async function listAllAdmins() {
   try {
-    const db = getDatabase(accountType);
-    const snapshot = await db
-      .collection('users')
-      .where('isAdmin', '==', true)
-      .get();
+    const { data, error } = await adminClient
+      .from('users')
+      .select('id, email, name, is_admin, admin_role, admin_since')
+      .eq('is_admin', true)
 
-    const admins = snapshot.docs.map((doc) => ({
-      uid: doc.id,
-      ...doc.data(),
-    }));
+    if (error) {
+      throw error
+    }
 
-    console.log(`📋 Found ${admins.length} admins via ${accountType} account`);
-    return admins;
+    const admins = data || []
+    console.log(`📋 Found ${admins.length} admins`)
+    return admins
   } catch (error) {
-    console.error(
-      `❌ Failed to list admins via ${accountType} account:`,
-      error
-    );
-    throw error;
+    console.error(`❌ Failed to list admins:`, error)
+    throw error
   }
 }
 
@@ -167,59 +161,51 @@ export async function listAllAdmins(accountType: ServiceAccountType = 'primary')
  * Remove admin privileges
  */
 export async function removeAdminAccess(
-  uid: string,
-  accountType: ServiceAccountType = 'primary'
+  uid: string
 ) {
   try {
-    const auth = getAuth(accountType);
-    const db = getDatabase(accountType);
+    const { error } = await adminClient
+      .from('users')
+      .update({
+        is_admin: false,
+        admin_role: null,
+        user_type: 'customer'
+      })
+      .eq('id', uid)
 
-    // Remove custom claims
-    await auth.setCustomUserClaims(uid, { admin: false });
+    if (error) {
+      throw error
+    }
 
-    // Update Firestore document
-    await db.collection('users').doc(uid).update({
-      isAdmin: false,
-      adminRole: 'none',
-      userType: 'customer',
-    });
-
-    console.log(
-      `✅ Admin access removed for ${uid} via ${accountType} account`
-    );
-    return true;
+    console.log(`✅ Admin access removed for ${uid}`)
+    return true
   } catch (error) {
-    console.error(
-      `❌ Failed to remove admin access via ${accountType}:`,
-      error
-    );
-    throw error;
+    console.error(`❌ Failed to remove admin access:`, error)
+    throw error
   }
 }
 
 /**
- * Test connection to both service accounts
+ * Test connection to Supabase admin client
  */
 export async function testServiceAccountConnections() {
-  console.log('🧪 Testing service account connections...\n');
+  console.log('🧪 Testing Supabase admin connection...\n')
 
   try {
-    // Test primary
-    console.log('Testing Primary Account (fbsvc):');
-    await adminAuth.listUsers(1);
-    console.log('✅ Primary account authentication working\n');
-  } catch (error) {
-    console.error('❌ Primary account failed:', error, '\n');
-  }
+    // Test admin client by fetching users
+    const { data, error } = await adminClient
+      .from('users')
+      .select('id')
+      .limit(1)
 
-  try {
-    // Test secondary
-    console.log('Testing Secondary Account (lukaverde):');
-    await secondaryAuth().listUsers(1);
-    console.log('✅ Secondary account authentication working\n');
-  } catch (error) {
-    console.error('❌ Secondary account failed:', error, '\n');
-  }
+    if (error) {
+      throw error
+    }
 
-  console.log('✨ Service account test complete');
+    console.log('✅ Supabase admin connection working\n')
+    return true
+  } catch (error) {
+    console.error('❌ Supabase admin connection failed:', error, '\n')
+    return false
+  }
 }

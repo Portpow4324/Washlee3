@@ -1,0 +1,78 @@
+# ⚡ FRESH START - QUICK CARD (Print This)
+
+## The Goal
+✅ Delete all old test data  
+✅ Start with clean database  
+✅ Test fresh signup works  
+
+---
+
+## DO THIS NOW (5 min)
+
+### 1️⃣ Clean Database (2 min)
+```
+1. Go: https://app.supabase.com
+2. Select: Washlee project
+3. Click: SQL Editor → New Query
+4. Copy: CLEAN_START_FRESH.sql (entire file)
+5. Paste: Into SQL editor
+6. Click: Run
+7. Check: All counts = 0 ✅
+```
+
+### 2️⃣ Restart Server (1 min)
+```bash
+npm run dev
+# Wait for: "ready - started server on localhost:3001"
+```
+
+### 3️⃣ Test Signup (2 min)
+```
+1. Go: http://localhost:3001/auth/signup
+2. Select: Customer
+3. Email: testcust@gmail.com
+4. Pass: TestPass123!
+5. Name: Test Customer
+6. Click: Sign Up
+7. Check: "Check your email" ✅
+```
+
+---
+
+## Error? Check This
+
+| Error | Fix |
+|-------|-----|
+| `API error: {}` | Restart server (npm run dev) |
+| `email already registered` | Run CLEAN_START_FRESH.sql again |
+| `no response` | Check Console (F12) for logs |
+| Nothing happens | Try different email |
+
+---
+
+## Success = See This
+
+✅ Signup form loads  
+✅ Can type email/password  
+✅ Click Sign Up works  
+✅ Page shows "Check your email"  
+✅ No red error message  
+✅ Console shows `[SIGNUP] ✓`  
+
+---
+
+## Next Test
+```
+1. Check email (verify account)
+2. Login with same email
+3. See dashboard
+```
+
+---
+
+**All 3 files ready in workspace:**
+- `CLEAN_START_FRESH.sql` ← Run this
+- `START_FRESH_NOW.md` ← Detailed steps
+- `FRESH_START_SIGNUP_FIX.md` ← Troubleshooting
+
+**🚀 Start with Step 1 above!**

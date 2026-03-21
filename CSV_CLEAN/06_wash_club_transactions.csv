@@ -1,0 +1,2 @@
+id,user_id,transaction_type,amount,previous_balance,new_balance,order_id,notes,created_at
+880e8400-e29b-41d4-a716-446655440001,550e8400-e29b-41d4-a716-446655440015,credit_earned,25,0,25,,Welcome bonus - Wash Club signup,2026-03-16T21:18:03Z

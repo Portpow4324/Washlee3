@@ -1,0 +1,3 @@
+id,name,email,phone,inquiry_type,message,status,created_at,updated_at
+880e8400-e29b-41d4-a716-446655440001,Luka Verde,lukaverde0476653333@gmail.com,+61412459202,Employee Application,"I have experience with general laundry tasks including washing, drying, folding, and organizing clothing. I understand the importance of sorting garments by color and fabric type to prevent damage or color transfer.",approved,2026-03-11T20:07:41Z,2026-03-11T20:07:41Z
+880e8400-e29b-41d4-a716-446655440002,Luka Verde,lukaverde3@gmail.com,+61412459212,Employee Application,"I have experience with general laundry tasks including washing, drying, folding, and organizing clothing. I'm detail-oriented and efficient.",pending,2026-03-15T21:15:48Z,2026-03-15T21:15:48Z

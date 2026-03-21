@@ -69,7 +69,7 @@ export default function FAQ() {
         },
         {
           q: 'Can I get a refund?',
-          a: 'Yes. Full refunds issued within 48 hours of request if laundry is not picked up yet. If laundry has been delivered, refund covers processing fees only. We offer 100% satisfaction guarantee - if you\'re not happy with our service, we\'ll make it right.',
+          a: 'Yes. Refunds issued within 48 hours of request if laundry is not picked up yet.',
         },
       ],
     },

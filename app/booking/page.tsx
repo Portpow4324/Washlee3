@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/AuthContext'
-import { authenticatedFetch } from '@/lib/firebaseAuthClient'
+import { supabase } from '@/lib/supabaseClient'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
@@ -313,6 +313,12 @@ export default function BookingHybrid() {
     setIsLoading(true)
     setError('')
 
+    // Add a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false)
+      setError('Request timed out. Please check your internet connection and try again.')
+    }, 30000) // 30 seconds
+
     try {
       if (!user) throw new Error('User not found')
 
@@ -327,7 +333,7 @@ export default function BookingHybrid() {
       const deliveryCountry = bookingData.deliveryAddressDetails?.country || 'Australia'
 
       const orderPayload = {
-        uid: user.uid,
+        uid: user.id,
         customerName: userData?.name || 'Customer',
         customerEmail: user.email,
         customerPhone: userData?.phone || '',
@@ -344,19 +350,22 @@ export default function BookingHybrid() {
         orderTotal,
       }
 
-      console.log('[BOOKING] Submitting order payload:', {
+      console.log('[BOOKING] Step 1: Submitting order payload:', {
         uid: orderPayload.uid,
         customerEmail: orderPayload.customerEmail,
         customerName: orderPayload.customerName,
-        bookingDataKeys: Object.keys(orderPayload.bookingData),
-        deliveryAddress: `${deliveryAddressLine1}, ${deliveryCity}, ${deliveryState} ${deliveryPostcode}`,
         orderTotal,
       })
 
-      const orderResponse = await authenticatedFetch('/api/orders', {
+      console.log('[BOOKING] Step 2: Calling /api/orders-simple (no auth)...')
+      const orderResponse = await fetch('/api/orders-simple', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(orderPayload),
       })
+      console.log('[BOOKING] Step 3: Got response from /api/orders-simple:', orderResponse.status)
 
       if (!orderResponse.ok) {
         const errorData = await orderResponse.json()
@@ -416,12 +425,16 @@ export default function BookingHybrid() {
         hasBookingDetails: !!checkoutPayload.bookingDetails,
       })
 
-      const checkoutResponse = await authenticatedFetch('/api/checkout', {
+      console.log('[BOOKING] Step 4: Calling /api/checkout-simple (no auth)...')
+      const checkoutResponse = await fetch('/api/checkout-simple', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(checkoutPayload),
       })
 
-      console.log('[BOOKING] Checkout Response Status:', checkoutResponse.status)
+      console.log('[BOOKING] Step 5: Got response from /api/checkout-simple:', checkoutResponse.status)
       console.log('[BOOKING] Checkout Response OK:', checkoutResponse.ok)
 
       if (!checkoutResponse.ok) {
@@ -486,9 +499,12 @@ export default function BookingHybrid() {
         setOrderConfirmed(true)
       }
     } catch (err: any) {
+      clearTimeout(timeoutId)
       console.error('[BOOKING] Order error:', err)
       setError(err.message || 'Failed to create order')
       setIsLoading(false)
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 

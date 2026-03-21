@@ -1,45 +1,25 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
-import { auth, db } from '@/lib/firebase'
-import { onAuthStateChanged, User } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { supabase } from '@/lib/supabaseClient'
+import type { User } from '@supabase/supabase-js'
 
 interface UserData {
-  uid: string
+  id: string
   email: string
-  name: string
-  firstName?: string
-  lastName?: string
+  name?: string
+  first_name?: string
+  last_name?: string
   phone?: string
   address?: string
-  city?: string
-  state?: string
-  postcode?: string
-  createdAt: string
-  userType: 'customer' | 'pro' | 'employee'
-  isAdmin?: boolean
-  isEmployee?: boolean
-  employeeId?: string
-  employeeStatus?: 'active' | 'inactive' | 'suspended'
-  approvalDate?: string
-  personalUse?: string
-  marketingTexts?: boolean
-  accountTexts?: boolean
-  hasMultipleRoles?: boolean
-  linkedEmployeeId?: string
-  linkedCustomerId?: string
-  currentPlan?: 'none' | 'starter' | 'professional' | 'washly'
-  businessAccountType?: string
-  stripeCustomerId?: string
-  stripeSubscriptionId?: string
-  subscriptionStatus?: string
   subscription?: {
-    plan: 'free' | 'pro' | 'washly'
-    status: 'active' | 'paused' | 'cancelled'
-    startDate: string
-    renewalDate?: string
+    plan?: string
   }
+  user_type: 'customer' | 'pro' | 'admin'
+  is_admin?: boolean
+  is_employee?: boolean
+  created_at: string
+  updated_at: string
 }
 
 interface AuthContextType {
@@ -47,6 +27,9 @@ interface AuthContextType {
   userData: UserData | null
   loading: boolean
   isAuthenticated: boolean
+  signup: (email: string, password: string, name: string, phone: string, userType: 'customer' | 'pro') => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -63,195 +46,146 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // Check if we're in a new tab that opened from admin
-    if (typeof window !== 'undefined') {
-      const previousAuthUserId = sessionStorage.getItem('authUserId')
-      if (previousAuthUserId) {
-        console.log('[Auth] Auth session found in sessionStorage, user was authenticated in another tab')
-      }
-    }
-
-    // Set up Firebase auth state listener
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Only log significant state changes
-      const currentUserIdentifier = firebaseUser?.email || 'logged out'
+    // Set up Supabase auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUserIdentifier = session?.user?.email || 'logged out'
+      
       if (previousUserRef.current !== currentUserIdentifier) {
-        if (firebaseUser) {
-          console.log('[Auth] State changed: authenticated as', firebaseUser.email)
+        if (session?.user?.email) {
+          console.log('[Auth] State changed: authenticated as', session.user.email)
         }
         previousUserRef.current = currentUserIdentifier
       }
-      
-      // Add small delay to ensure auth persistence is loaded from storage
-      // This is especially important when opening new tabs
-      if (!firebaseUser && typeof window !== 'undefined') {
-        const storedUserId = sessionStorage.getItem('authUserId')
-        if (storedUserId) {
-          console.log('[Auth] Waiting for auth persistence to load from storage...')
-          // Wait a moment for Firebase to load persisted auth state
-          await new Promise(resolve => setTimeout(resolve, 500))
-        }
-      }
 
       try {
-        if (firebaseUser) {
-          // Store user UID in sessionStorage for cross-tab persistence
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('authUserId', firebaseUser.uid)
-            sessionStorage.setItem('authUserEmail', firebaseUser.email || '')
+        if (session?.user) {
+          setUser(session.user)
+          console.log('[Auth] Looking up customer record for user ID:', session.user.id)
+
+          // Get user data from Supabase (try customers table first, then employees)
+          const { data: customerData, error: customerError } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', session.user.id)
+            .limit(1)
+
+          if (customerError) {
+            console.error('[Auth] Customer query error:', customerError.message)
+          } else {
+            console.log('[Auth] Customer query result:', customerData)
           }
-          
-          // Force token refresh to get latest custom claims
-          let idTokenResult;
-          try {
-            idTokenResult = await firebaseUser.getIdTokenResult(true)
-          } catch (error) {
-            idTokenResult = await firebaseUser.getIdTokenResult(false)
-          }
-          
-          setUser(firebaseUser)
 
-          // Get admin status from custom claims (from ID token)
-          const isAdminFromClaims = idTokenResult?.claims?.admin === true
-
-          // Get fresh user data from Firestore - prioritize speed
-          try {
-            const userRef = doc(db, 'users', firebaseUser.uid)
-            let userSnap
-            let retries = 0
-            const maxRetries = 3
-            
-            try {
-              userSnap = await getDoc(userRef)
-              
-              // If document doesn't exist yet (race condition from signup), retry a few times
-              if (!userSnap.exists() && retries < maxRetries) {
-                while (!userSnap.exists() && retries < maxRetries) {
-                  await new Promise(resolve => setTimeout(resolve, 300)) // Wait 300ms before retry
-                  userSnap = await getDoc(userRef)
-                  retries++
-                }
-              }
-            } catch (offlineError: any) {
-              if (offlineError?.code === 'failed-precondition' || offlineError?.message?.includes('offline')) {
-                console.log('[Auth] Firestore offline, using basic user data')
-                // Offline - create minimal user data
-                const minimalUserData: UserData = {
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email || '',
-                  name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Customer',
-                  phone: firebaseUser.phoneNumber || '',
-                  createdAt: new Date().toISOString(),
-                  userType: 'customer',
-                  isAdmin: isAdminFromClaims,
-                }
-                setUserData(minimalUserData)
-                setLoading(false)
-                return
-              }
-              throw offlineError
-            }
-
-            if (userSnap.exists()) {
-              const userData = userSnap.data() as UserData
-              
-              // Use custom claims if available, fallback to Firestore
-              const finalUserData = {
-                ...userData,
-                isAdmin: isAdminFromClaims || userData.isAdmin,
-              }
-              
-              setUserData(finalUserData)
-              setLoading(false) // Only set loading=false when userData is ready
-            } else {
-              
-              // AUTO-CREATE user document for new users
-              const newUserData: UserData = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Customer',
-                phone: firebaseUser.phoneNumber || '',
-                createdAt: new Date().toISOString(),
-                userType: 'customer',
-                isAdmin: isAdminFromClaims,
-                marketingTexts: true,
-                accountTexts: true,
-              }
-
-              try {
-                // Create the user document in Firestore
-                const userRef = doc(db, 'users', firebaseUser.uid)
-                await setDoc(userRef, newUserData)
-                
-                setUserData(newUserData)
-              } catch (createError: any) {
-                console.error('[Auth] Failed to create user document:', createError)
-                // If offline, still proceed with basic user data
-                if (createError?.code === 'failed-precondition' || createError?.message?.includes('offline')) {
-                  setUserData(newUserData)
-                } else if (isAdminFromClaims) {
-                  setUserData(newUserData)
-                } else {
-                  setUserData(null)
-                }
-              }
-              setLoading(false)
-            }
-          } catch (error: any) {
-            // Handle offline state gracefully
-            if (error?.code === 'failed-precondition' || error?.message?.includes('offline')) {
-              setUserData({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-                createdAt: new Date().toISOString(),
-                userType: 'customer',
-                isAdmin: isAdminFromClaims,
-              })
-            } else if (isAdminFromClaims) {
-              // If Firestore fails but user has admin claims, still allow access
-              setUserData({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Admin',
-                createdAt: new Date().toISOString(),
-                userType: 'customer',
-                isAdmin: true,
-              })
-            } else {
-              setUserData(null)
-            }
+          if (!customerError && customerData && customerData.length > 0) {
+            const customer = customerData[0]
+            console.log('[Auth] Found customer profile:', customer.email)
+            setUserData({
+              ...customer,
+              user_type: 'customer'
+            } as UserData)
             setLoading(false)
+            return
           }
+
+          // If not a customer, try employees table
+          console.log('[Auth] Not a customer, trying employees table...')
+          const { data: employeeData, error: employeeError } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('id', session.user.id)
+            .limit(1)
+
+          if (employeeError) {
+            console.error('[Auth] Employee query error:', employeeError.message)
+          } else {
+            console.log('[Auth] Employee query result:', employeeData)
+          }
+
+          if (!employeeError && employeeData && employeeData.length > 0) {
+            const employee = employeeData[0]
+            console.log('[Auth] Found employee profile:', employee.email)
+            setUserData({
+              ...employee,
+              user_type: 'pro'
+            } as UserData)
+            setLoading(false)
+            return
+          }
+
+          // If neither table has data, just continue with auth user
+          console.log('[Auth] User profile not found in customers or employees table - continuing with auth user')
+          setLoading(false)
         } else {
-          // Clear sessionStorage when user logs out
-          if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('authUserId')
-            sessionStorage.removeItem('authUserEmail')
-          }
+          // User logged out
           setUser(null)
           setUserData(null)
           setLoading(false)
         }
       } catch (error) {
-        console.error('[Auth] Unexpected error:', error)
+        console.error('[Auth] Error in auth state change:', error)
         setLoading(false)
       }
     })
 
-    unsubscribeRef.current = unsubscribe
+    unsubscribeRef.current = () => {
+      subscription?.unsubscribe()
+    }
 
     return () => {
-      unsubscribe()
-      unsubscribeRef.current = null
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current()
+      }
     }
   }, [])
+
+  const signup = async (
+    email: string,
+    password: string,
+    name: string,
+    phone: string,
+    userType: 'customer' | 'pro'
+  ) => {
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name, phone, userType }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        return { success: false, error: errorData.error }
+      }
+
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  const login = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        return { success: false, error: error.message }
+      }
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  const logout = async () => {
+    await supabase.auth.signOut()
+  }
 
   const value: AuthContextType = {
     user,
     userData,
     loading,
     isAuthenticated: !!user,
+    signup,
+    login,
+    logout,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -264,4 +198,3 @@ export function useAuth() {
   }
   return context
 }
-

@@ -7,6 +7,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import { AlertCircle, ArrowLeft, CheckCircle, Loader } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function CancelSubscription() {
   const router = useRouter()
@@ -40,26 +41,34 @@ export default function CancelSubscription() {
     setError('')
 
     try {
-      // Get ID token from Firebase
-      const token = await user.getIdToken()
+      // Update customer subscription status in Supabase
+      const { error: updateError } = await supabase
+        .from('customers')
+        .update({
+          selected_plan: 'none',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
 
-      // Call API to cancel subscription
-      const response = await fetch('/api/subscriptions/cancel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          reason: selectedReason,
-          feedback: feedback,
-        }),
-      })
+      if (updateError) throw updateError
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to cancel subscription')
-      }
+      // Log cancellation reason
+      const { error: logError } = await supabase
+        .from('email_logs')
+        .insert({
+          recipient: user.email,
+          subject: 'Subscription Cancellation',
+          template: 'subscription_cancelled',
+          status: 'logged',
+          metadata: {
+            reason: selectedReason,
+            feedback: feedback,
+            cancelled_at: new Date().toISOString(),
+          },
+          created_at: new Date().toISOString(),
+        })
+
+      if (logError) console.warn('Failed to log cancellation:', logError)
 
       // Success - show confirmation
       setSuccess(true)
@@ -120,9 +129,10 @@ export default function CancelSubscription() {
                 <div className="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200">
                   <p className="text-sm text-gray mb-1">Current Plan:</p>
                   <p className="text-lg font-bold text-dark capitalize">
-                    {userData.currentPlan === 'starter' && 'Starter Plan'}
-                    {userData.currentPlan === 'professional' && 'Professional Plan'}
-                    {userData.currentPlan === 'washly' && 'Washly Premium Plan'}
+                    {(userData as any)?.selected_plan === 'starter' && 'Starter Plan'}
+                    {(userData as any)?.selected_plan === 'professional' && 'Professional Plan'}
+                    {(userData as any)?.selected_plan === 'premium' && 'Premium Plan'}
+                    {!(userData as any)?.selected_plan && 'No active plan'}
                   </p>
                 </div>
 

@@ -133,7 +133,7 @@ export default function PricingRulesPage() {
     )
   }
 
-  if (!userData?.isAdmin) {
+  if (!userData?.is_admin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray">You don't have access to this page</p>

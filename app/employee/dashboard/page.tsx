@@ -3,8 +3,7 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { db } from '@/lib/firebase'
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore'
+import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import EmployeeHeader from '@/components/EmployeeHeader'
@@ -62,29 +61,23 @@ export default function EmployeeDashboard() {
       sessionStorage.setItem('employeeMode', 'true')
     }
 
-    // Fetch real data from Firestore
+    // Fetch real data from Supabase
     const fetchData = async () => {
       try {
-        const ordersRef = collection(db, 'orders')
-        const q = query(
-          ordersRef,
-          where('assignedTo', '==', user.uid),
-          orderBy('createdAt', 'desc'),
-          limit(3)
-        )
-        const snapshot = await getDocs(q)
+        const response = await fetch('/api/orders')
+        const result = await response.json()
+        const orders = result.data || []
         
-        const fetchedOrders: Order[] = snapshot.docs.map(doc => {
-          const data = doc.data()
-          const pickupDate = data.pickupTime?.seconds ? new Date(data.pickupTime.seconds * 1000) : new Date()
+        const fetchedOrders: Order[] = orders.slice(0, 3).map((order: any) => {
+          const pickupDate = order.pickup_time ? new Date(order.pickup_time) : new Date()
           return {
-            id: data.orderId || doc.id,
-            customer: data.customerName || 'Unknown',
-            status: data.status || 'pending-pickup',
-            weight: `${data.estimatedWeight || 0} kg`,
+            id: order.id,
+            customer: order.customer_id || 'Unknown',
+            status: order.status || 'pending-pickup',
+            weight: `${order.weight || 0} kg`,
             pickup: pickupDate.toLocaleDateString() === new Date().toLocaleDateString() ? 'Today ' + pickupDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : pickupDate.toLocaleDateString(),
-            earnings: `$${((data.estimatedWeight || 0) * 3).toFixed(2)}`,
-            address: data.deliveryAddress?.street || 'N/A'
+            earnings: `$${((order.weight || 0) * 3).toFixed(2)}`,
+            address: order.delivery_address || 'N/A'
           }
         })
         
@@ -223,7 +216,7 @@ export default function EmployeeDashboard() {
         {/* Welcome Section */}
         <div className="space-y-2">
           <h1 className="text-4xl font-bold text-dark">
-            Welcome back, {userData?.firstName || user?.email?.split('@')[0]}! 👋
+            Welcome back, {userData?.name || user?.email?.split('@')[0]}! 👋
           </h1>
           <p className="text-gray text-lg">Here's your performance summary for today</p>
         </div>

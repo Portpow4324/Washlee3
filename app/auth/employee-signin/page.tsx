@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import Button from '@/components/Button'
 import Link from 'next/link'
 import { Mail, Lock, Briefcase, AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react'
-import { signInWithEmailAndPassword } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function EmployeeSignIn() {
   const router = useRouter()
@@ -125,21 +124,28 @@ export default function EmployeeSignIn() {
       localStorage.setItem('employeeMode', 'true')
       sessionStorage.setItem('employeeMode', 'true')
 
-      // Sign into Firebase on the client side using the email and password
-      // This triggers onAuthStateChanged in AuthContext, which then recognizes the user
+      // Sign into Supabase on the client side using the email and password
+      // This maintains the user session for authenticated operations
       try {
-        await signInWithEmailAndPassword(auth, email.trim(), password)
-        console.log('[Employee Login] Successfully signed into Firebase')
+        const { error: supabaseError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password
+        })
         
-        // Wait a moment for Firestore to be consistent with the update from the API
-        // This ensures AuthContext reads the updated isEmployee flag
+        if (supabaseError) {
+          throw supabaseError
+        }
+        
+        console.log('[Employee Login] Successfully signed into Supabase')
+        
+        // Wait a moment for Supabase session to be ready
         await new Promise(resolve => setTimeout(resolve, 1000))
         
         // Redirect to employee dashboard
         router.push('/employee/dashboard')
-      } catch (firebaseError: any) {
-        console.error('[Employee Login] Firebase sign-in error:', firebaseError)
-        setError('Firebase authentication failed: ' + firebaseError.message)
+      } catch (authError: any) {
+        console.error('[Employee Login] Auth sign-in error:', authError)
+        setError('Authentication failed: ' + authError.message)
         setIsLoading(false)
       }
     } catch (err: any) {

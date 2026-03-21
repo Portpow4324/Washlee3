@@ -10,6 +10,7 @@ import Card from '@/components/Card'
 import { Clock, MapPin, Droplet, Wind, Truck, CheckCircle, ChevronRight, AlertCircle, Mail, Phone, X } from 'lucide-react'
 import Spinner from '@/components/Spinner'
 import { AddressParts } from '@/lib/googlePlaces'
+import { supabase } from '@/lib/supabaseClient'
 
 const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -32,7 +33,7 @@ export default function BookingHybrid() {
   const [showPickupInstructionsInfo, setShowPickupInstructionsInfo] = useState(false)
   
   // Address autocomplete states
-  const [addressInput, setAddressInput] = useState(userData?.address || '')
+  const [addressInput, setAddressInput] = useState('')
   const [addressPredictions, setAddressPredictions] = useState<any[]>([])
   const [isValidatingAddress, setIsValidatingAddress] = useState(false)
   const [showAddressPredictions, setShowAddressPredictions] = useState(false)
@@ -43,7 +44,7 @@ export default function BookingHybrid() {
     selectedService: 'standard',
 
     // Step 2: Pickup Location
-    pickupAddress: userData?.address || '',
+    pickupAddress: '',
     pickupAddressDetails: null as AddressParts | null,
     pickupSpot: 'front-door',
     pickupInstructions: '',
@@ -72,7 +73,7 @@ export default function BookingHybrid() {
     protectionPlan: 'basic',
 
     // Step 7: Delivery Address
-    deliveryAddress: userData?.address || '',
+    deliveryAddress: '',
     deliveryAddressDetails: null as AddressParts | null,
   })
 
@@ -291,25 +292,38 @@ export default function BookingHybrid() {
 
       const orderTotal = calculateTotal()
 
-      const orderResponse = await fetch('/api/orders', {
+      // Create order via API
+      const estimatedWeight = bookingData.bagCount * 2.5 // ~2.5kg per bag
+      
+      const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          uid: user.uid,
-          customerName: userData?.name || 'Customer',
-          customerEmail: user.email,
-          customerPhone: userData?.phone || '',
-          bookingData,
-          orderTotal,
+          customer_id: user.id,
+          delivery_address: bookingData.pickupAddress,
+          weight: estimatedWeight,
+          status: 'pending-pickup',
+          pickup_spot: bookingData.pickupSpot,
+          pickup_instructions: bookingData.pickupInstructions,
+          service_type: bookingData.selectedService,
+          detergent_type: bookingData.detergent,
+          protection_plan: bookingData.protectionPlan,
+          add_ons: JSON.stringify({
+            delicatesCare: bookingData.delicatesCare,
+            hangDry: bookingData.hangDry,
+            comforterService: bookingData.comforterService,
+            stainTreatment: bookingData.stainTreatment,
+            ironing: bookingData.ironing,
+          }),
+          total_price: orderTotal,
+          created_at: new Date().toISOString(),
         }),
       })
 
-      if (!orderResponse.ok) {
-        throw new Error('Failed to create order')
-      }
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Failed to create order')
 
-      const orderResult = await orderResponse.json()
-      setOrderId(orderResult.orderId || '')
+      setOrderId(result.data?.id || '')
       setOrderConfirmed(true)
     } catch (err: any) {
       console.error('Order error:', err)

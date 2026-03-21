@@ -7,9 +7,7 @@ import Link from 'next/link'
 import { useState, Suspense } from 'react'
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { signInWithEmailAndPassword, sendPasswordResetEmail, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
-import { auth, db } from '@/lib/firebase'
-import { doc, getDoc } from 'firebase/firestore'
+import { supabase } from '@/lib/supabaseClient'
 
 function LoginContent() {
   const router = useRouter()
@@ -26,20 +24,21 @@ function LoginContent() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [resetSuccessMessage, setResetSuccessMessage] = useState('')
+  const [emailNotConfirmedError, setEmailNotConfirmedError] = useState('')
 
   const handleGoogleSignIn = async () => {
     setError('')
     setIsLoading(true)
 
     try {
-      const provider = new GoogleAuthProvider()
-      const result = await signInWithPopup(auth, provider)
-      const user = result.user
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+      })
 
-      // Show success message
+      if (error) throw error
+
       setSuccessMessage(`✅ Welcome! Signing you in with Google...`)
 
-      // Redirect to specified location or home
       setTimeout(() => {
         if (redirectTo) {
           router.push(redirectTo)
@@ -49,13 +48,7 @@ function LoginContent() {
       }, 1500)
     } catch (err: any) {
       console.error('Google sign in error:', err)
-      if (err.code === 'auth/popup-closed-by-user') {
-        setError('Sign in was cancelled')
-      } else if (err.code === 'auth/popup-blocked') {
-        setError('Pop-up was blocked. Please allow pop-ups for this site.')
-      } else {
-        setError(err.message || 'Failed to sign in with Google')
-      }
+      setError(err.message || 'Failed to sign in with Google')
     } finally {
       setIsLoading(false)
     }
@@ -64,17 +57,29 @@ function LoginContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setEmailNotConfirmedError('')
     setIsLoading(true)
 
     try {
-      // Sign in with Firebase
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      const user = userCredential.user
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      // Show success message
+      if (error) {
+        throw error
+      }
+
+      // Check if email is confirmed
+      if (data.user && !data.user.email_confirmed_at) {
+        console.log('[Login] Email not confirmed:', email)
+        setEmailNotConfirmedError(email)
+        setIsLoading(false)
+        return
+      }
+
       setSuccessMessage(`✅ Welcome back! Logging you in...`)
 
-      // Redirect to specified location or home
       setTimeout(() => {
         if (redirectTo) {
           router.push(redirectTo)
@@ -84,18 +89,39 @@ function LoginContent() {
       }, 1500)
     } catch (err: any) {
       console.error('Login error:', err)
-      if (err.code === 'auth/user-not-found') {
-        setError('Incorrect email or password. Please try again or sign up for a new account.')
-      } else if (err.code === 'auth/wrong-password') {
+      if (err.message.includes('Invalid login credentials')) {
         setError('Incorrect email or password. Please try again or use Forgot Password.')
-      } else if (err.code === 'auth/invalid-credential') {
-        setError('Incorrect email or password. Please try again or use Forgot Password.')
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many failed attempts. Please try again later or use Forgot Password.')
       } else {
         setError(err.message || 'Failed to sign in')
       }
       setIsLoading(false)
+    }
+  }
+
+  const handleResendConfirmationEmail = async () => {
+    try {
+      setError('')
+      const response = await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailNotConfirmedError })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(`Error: ${data.error}`)
+        return
+      }
+
+      setSuccessMessage('✅ Confirmation email sent! Check your inbox.')
+      setEmailNotConfirmedError('')
+      setTimeout(() => {
+        setSuccessMessage('')
+      }, 4000)
+    } catch (err: any) {
+      setError('Failed to resend confirmation email. Please try again.')
+      console.error('Resend error:', err)
     }
   }
 
@@ -112,39 +138,31 @@ function LoginContent() {
         return
       }
 
-      await sendPasswordResetEmail(auth, resetEmail)
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail)
+
+      if (error) throw error
+
       setResetSuccessMessage(`✅ Password reset link sent to ${resetEmail}. Check your email!`)
       setResetEmail('')
       
-      // Close forgot password section after 3 seconds
       setTimeout(() => {
         setShowForgotPassword(false)
         setResetSuccessMessage('')
       }, 3000)
     } catch (err: any) {
       console.error('Password reset error:', err)
-      if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email. Please sign up first.')
-      } else if (err.code === 'auth/invalid-email') {
-        setError('Please enter a valid email address.')
-      } else {
-        setError('Failed to send reset link. Please try again.')
-      }
+      setError('Failed to send reset link. Please try again.')
     } finally {
       setIsResetLoading(false)
     }
   }
 
-  const handleBackClick = () => {
-    router.push('/auth/signin')
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
       <button
-        onClick={handleBackClick}
+        onClick={() => router.back()}
         className="absolute top-6 left-6 p-2 hover:bg-white rounded-full transition"
-        title="Go back to sign in"
+        title="Go back"
       >
         <ArrowLeft size={24} className="text-primary" />
       </button>
@@ -177,6 +195,32 @@ function LoginContent() {
             </div>
           )}
 
+          {/* Email Not Confirmed Message */}
+          {emailNotConfirmedError && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 px-4 py-4 rounded-lg mb-6">
+              <p className="font-semibold mb-3">📧 Email Not Confirmed</p>
+              <p className="text-sm mb-4">Your email address hasn't been verified yet. We've sent you a confirmation email at <span className="font-semibold">{emailNotConfirmedError}</span></p>
+              <p className="text-sm mb-4">Check your inbox for the confirmation link, or <button
+                type="button"
+                onClick={handleResendConfirmationEmail}
+                className="text-primary font-semibold underline hover:opacity-75 transition"
+              >
+                click here to resend the email
+              </button>.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailNotConfirmedError('')
+                  setEmail('')
+                  setPassword('')
+                }}
+                className="px-4 py-2 border border-yellow-200 text-yellow-900 rounded-lg font-semibold hover:bg-yellow-100 transition text-sm"
+              >
+                Back
+              </button>
+            </div>
+          )}
+
           {/* Success Message */}
           {successMessage && (
             <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-4 rounded-lg mb-6 text-center">
@@ -191,6 +235,9 @@ function LoginContent() {
                 <Spinner />
               </div>
             </div>
+          ) : emailNotConfirmedError ? (
+            // Don't show login form when email is not confirmed
+            null
           ) : showForgotPassword ? (
             <form onSubmit={handlePasswordReset} className="space-y-4">
               {/* Reset Success Message */}
@@ -373,7 +420,7 @@ function LoginContent() {
 
 export default function Login() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Spinner /></div>}>
       <LoginContent />
     </Suspense>
   )

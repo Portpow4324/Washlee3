@@ -1,486 +1,253 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useAuth } from '@/lib/AuthContext';
-import { ChevronLeft, Search, Shield, Trash2, Eye } from 'lucide-react';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useEffect, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { CheckCircle, XCircle, Clock, Mail, User, Trash2, Check } from 'lucide-react'
 
-interface User {
-  id: string;
-  email: string;
-  displayName: string;
-  userType: 'customer' | 'pro';
-  createdAt: string;
-  lastLogin: string;
-  isAdmin: boolean;
-  status: 'active' | 'inactive' | 'suspended';
-  totalOrders?: number;
-  totalSpent?: number;
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+)
+
+interface EmailConfirmation {
+  id: string
+  user_id: string
+  email: string
+  user_type: 'customer' | 'pro'
+  is_confirmed: boolean
+  confirmation_method: string
+  confirmed_at: string | null
+  email_sent_at: string | null
+  created_at: string
+  updated_at: string
 }
 
-export default function AdminUsersPage() {
-  const { user, userData, loading } = useAuth();
-  const isAdmin = userData?.isAdmin;
-  const isLoading = loading;
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'customer' | 'pro'>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'suspended'>('all');
-  const [sortBy, setSortBy] = useState<'created' | 'name' | 'orders'>('created');
-  const [pageLoading, setPageLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+export default function UsersPage() {
+  const [confirmations, setConfirmations] = useState<EmailConfirmation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
-  // Redirect if not admin
-  useEffect(() => {
-    if (!isLoading && !isAdmin) {
-      // Check if user is logged in as a different account
-      if (user) {
-        console.error('[AdminUsers] User is not admin. Current user:', user.email);
-      }
-      window.location.href = '/';
-    }
-  }, [user, isAdmin, isLoading]);
-
-  // Fetch users from Firestore
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setPageLoading(true);
-        setError(null);
-
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, orderBy('createdAt', 'desc'), limit(100));
-        const querySnapshot = await getDocs(q);
-        
-        const fetchedUsers: User[] = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          email: doc.data().email || '',
-          displayName: doc.data().name || doc.data().firstName || 'Unknown',
-          userType: doc.data().userType || 'customer',
-          createdAt: doc.data().createdAt || new Date().toISOString(),
-          lastLogin: doc.data().lastLogin || doc.data().createdAt || new Date().toISOString(),
-          isAdmin: doc.data().isAdmin || false,
-          status: 'active',
-          totalOrders: 0,
-          totalSpent: 0
-        } as User));
-
-        console.log('Fetched users from Firestore:', fetchedUsers);
-        setUsers(fetchedUsers);
-        setFilteredUsers(fetchedUsers);
-      } catch (error) {
-        console.error('Error fetching users from Firestore:', error);
-        setError('Failed to fetch users from Firestore');
-        setUsers([]);
-        setFilteredUsers([]);
-      } finally {
-        setPageLoading(false);
-      }
-    };
-
-    if (isAdmin) {
-      fetchUsers();
-    }
-  }, [isAdmin]);
-
-  // Filter and sort users
-  useEffect(() => {
-    let filtered = users;
-
-    // Search
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        u =>
-          u.email.toLowerCase().includes(query) ||
-          u.displayName.toLowerCase().includes(query)
-      );
-    }
-
-    // Filter by type
-    if (filterType !== 'all') {
-      filtered = filtered.filter(u => u.userType === filterType);
-    }
-
-    // Filter by status
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(u => u.status === filterStatus);
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name':
-          return a.displayName.localeCompare(b.displayName);
-        case 'orders':
-          return (b.totalOrders || 0) - (a.totalOrders || 0);
-        case 'created':
-        default:
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-    });
-
-    setFilteredUsers(filtered);
-  }, [users, searchQuery, filterType, filterStatus, sortBy]);
-
-  const handleToggleSelect = (userId: string) => {
-    setSelectedUsers(prev =>
-      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedUsers.length === filteredUsers.length) {
-      setSelectedUsers([]);
-    } else {
-      setSelectedUsers(filteredUsers.map(u => u.id));
-    }
-  };
-
-  const handlePromoteAdmin = async (userId: string) => {
+  const fetchConfirmations = async () => {
     try {
-      const response = await fetch('/api/admin/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'set_admin_claims',
-          userId: userId,
-          isAdmin: true
-        })
-      });
+      setLoading(true)
+      setError(null)
+      
+      const { data, error: fetchError } = await supabase
+        .from('email_confirmations')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-      if (!response.ok) throw new Error('Failed to promote user');
+      if (fetchError) {
+        setError(`Failed to load users: ${fetchError.message}`)
+        console.error('Fetch error:', fetchError)
+        return
+      }
 
-      // Update local state
-      setUsers(prev =>
-        prev.map(u => (u.id === userId ? { ...u, isAdmin: true } : u))
-      );
-
-      console.log('User promoted to admin');
-    } catch (err) {
-      console.error('Error promoting user:', err);
-      alert('Failed to promote user to admin');
+      setConfirmations(data || [])
+    } catch (err: any) {
+      setError(`Error: ${err.message}`)
+      console.error('Error fetching confirmations:', err)
+    } finally {
+      setLoading(false)
     }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) throw new Error('Failed to delete user');
-
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      console.log('User deleted');
-    } catch (err) {
-      console.error('Error deleting user:', err);
-      alert('Failed to delete user');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'suspended':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getUserTypeColor = (type: string) => {
-    return type === 'pro'
-      ? 'bg-blue-100 text-blue-800'
-      : 'bg-purple-100 text-purple-800';
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-teal-500 border-r-transparent"></div>
-          <p className="mt-4 text-gray-600">Loading admin panel...</p>
-        </div>
-      </div>
-    );
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-2xl font-bold text-red-600">Access Denied</p>
-          <p className="text-gray-600 mt-2">You don't have permission to access this page.</p>
-          <Link href="/" className="text-teal-600 hover:underline mt-4 inline-block">
-            Return to Home
-          </Link>
-        </div>
-      </div>
-    );
+  useEffect(() => {
+    fetchConfirmations()
+  }, [])
+
+  const handleManualConfirm = async (id: string) => {
+    try {
+      setRefreshing(true)
+      const { error: updateError } = await supabase
+        .from('email_confirmations')
+        .update({
+          is_confirmed: true,
+          confirmation_method: 'manual_admin',
+          confirmed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+
+      if (updateError) {
+        alert(`Error: ${updateError.message}`)
+        return
+      }
+
+      setConfirmations(prev =>
+        prev.map(c =>
+          c.id === id
+            ? {
+                ...c,
+                is_confirmed: true,
+                confirmation_method: 'manual_admin',
+                confirmed_at: new Date().toISOString()
+              }
+            : c
+        )
+      )
+    } catch (err: any) {
+      alert(`Error: ${err.message}`)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this record?')) return
+
+    try {
+      setRefreshing(true)
+      const { error: deleteError } = await supabase
+        .from('email_confirmations')
+        .delete()
+        .eq('id', id)
+
+      if (deleteError) {
+        alert(`Error: ${deleteError.message}`)
+        return
+      }
+
+      setConfirmations(prev => prev.filter(c => c.id !== id))
+    } catch (err: any) {
+      alert(`Error: ${err.message}`)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A'
+    const date = new Date(dateString)
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+    <div className="min-h-screen bg-light p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-dark">Users & Email Confirmations</h1>
           <button
-            onClick={() => window.history.back()}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            onClick={fetchConfirmations}
+            disabled={refreshing}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 disabled:opacity-50"
           >
-            <ChevronLeft className="w-5 h-5" />
-            Back to Dashboard
+            {refreshing ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600 mt-2">Manage all users, roles, and permissions</p>
-        </div>
-
         {error && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-yellow-800">⚠️ {error} - Showing mock data for demonstration</p>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
           </div>
         )}
 
-        {/* Filters and Search */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            {/* Search */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Users
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by email or name..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* User Type Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                User Type
-              </label>
-              <select
-                value={filterType}
-                onChange={e => setFilterType(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              >
-                <option value="all">All Types</option>
-                <option value="customer">Customers</option>
-                <option value="pro">Pros</option>
-              </select>
-            </div>
-
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="suspended">Suspended</option>
-              </select>
-            </div>
-
-            {/* Sort */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sort By
-              </label>
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              >
-                <option value="created">Recently Created</option>
-                <option value="name">Name (A-Z)</option>
-                <option value="orders">Most Orders</option>
-              </select>
-            </div>
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-gray text-lg">Loading users...</p>
           </div>
-
-          {/* Results info */}
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <span>
-              Showing {filteredUsers.length} of {users.length} users
-            </span>
-            <span>
-              {selectedUsers.length > 0 && `${selectedUsers.length} selected`}
-            </span>
+        ) : confirmations.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray text-lg">No users found</p>
           </div>
-        </div>
-
-        {/* Users Table */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {pageLoading ? (
-            <div className="p-8 text-center">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-teal-500 border-r-transparent"></div>
-              <p className="mt-4 text-gray-600">Loading users...</p>
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-600">No users found matching your filters</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
-                        onChange={handleSelectAll}
-                        className="rounded border-gray-300"
-                      />
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Joined
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Orders
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredUsers.map(user => (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedUsers.includes(user.id)}
-                          onChange={() => handleToggleSelect(user.id)}
-                          className="rounded border-gray-300"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {user.isAdmin && (
-                          <Shield className="inline w-4 h-4 text-yellow-500 mr-2" />
+        ) : (
+          <div className="overflow-x-auto bg-white rounded-lg shadow">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left font-semibold text-dark">Email</th>
+                  <th className="px-6 py-3 text-left font-semibold text-dark">Type</th>
+                  <th className="px-6 py-3 text-left font-semibold text-dark">Status</th>
+                  <th className="px-6 py-3 text-left font-semibold text-dark">Confirmed At</th>
+                  <th className="px-6 py-3 text-left font-semibold text-dark">Email Sent</th>
+                  <th className="px-6 py-3 text-left font-semibold text-dark">Method</th>
+                  <th className="px-6 py-3 text-left font-semibold text-dark">Created</th>
+                  <th className="px-6 py-3 text-center font-semibold text-dark">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {confirmations.map(confirmation => (
+                  <tr key={confirmation.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-gray" />
+                        <span className="font-medium text-dark">{confirmation.email}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+                        {confirmation.user_type === 'customer' ? 'Customer' : 'Pro'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {confirmation.is_confirmed ? (
+                          <>
+                            <CheckCircle className="w-5 h-5 text-green-600" />
+                            <span className="text-green-600 font-semibold">Confirmed</span>
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="w-5 h-5 text-yellow-600" />
+                            <span className="text-yellow-600 font-semibold">Pending</span>
+                          </>
                         )}
-                        {user.email}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{user.displayName}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${getUserTypeColor(
-                            user.userType
-                          )}`}
-                        >
-                          {user.userType === 'pro' ? 'Pro' : 'Customer'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                            user.status
-                          )}`}
-                        >
-                          {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {user.totalOrders || 0}
-                      </td>
-                      <td className="px-6 py-4 text-sm space-x-2 flex">
-                        <button
-                          onClick={() => {
-                            const details = `
-User ID: ${user.id}
-Email: ${user.email}
-Name: ${user.displayName}
-Type: ${user.userType}
-Status: ${user.status}
-Admin: ${user.isAdmin}
-Created: ${user.createdAt}
-Last Login: ${user.lastLogin}
-Total Orders: ${user.totalOrders || 0}
-Total Spent: $${user.totalSpent || 0}
-                            `;
-                            alert(details);
-                          }}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {!user.isAdmin && (
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-gray text-xs">
+                      {formatDate(confirmation.confirmed_at)}
+                    </td>
+                    <td className="px-6 py-4 text-gray text-xs">
+                      {formatDate(confirmation.email_sent_at)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-block px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
+                        {confirmation.confirmation_method || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray text-xs">
+                      {formatDate(confirmation.created_at)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2 justify-center">
+                        {!confirmation.is_confirmed && (
                           <button
-                            onClick={() => handlePromoteAdmin(user.id)}
-                            className="text-yellow-600 hover:text-yellow-900"
-                            title="Promote to admin"
+                            onClick={() => handleManualConfirm(confirmation.id)}
+                            disabled={refreshing}
+                            className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded text-xs font-semibold disabled:opacity-50"
+                            title="Manually confirm this email"
                           >
-                            <Shield className="w-4 h-4" />
+                            <Check className="w-4 h-4" />
+                            Confirm
                           </button>
                         )}
                         <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete user"
+                          onClick={() => handleDelete(confirmation.id)}
+                          disabled={refreshing}
+                          className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-semibold disabled:opacity-50"
+                          title="Delete this record"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-        {/* Footer */}
-        <div className="mt-8 flex items-center justify-between text-sm text-gray-600">
-          <p>Manage users and their permissions from this dashboard</p>
-          <Link href="/admin" className="text-teal-600 hover:underline">
-            Back to Admin Dashboard
-          </Link>
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-blue-900 text-sm">
+            <span className="font-semibold">Total Users:</span> {confirmations.length} | 
+            <span className="font-semibold ml-3">Confirmed:</span> {confirmations.filter(c => c.is_confirmed).length} | 
+            <span className="font-semibold ml-3">Pending:</span> {confirmations.filter(c => !c.is_confirmed).length}
+          </p>
         </div>
       </div>
     </div>
-  );
+  )
 }
+

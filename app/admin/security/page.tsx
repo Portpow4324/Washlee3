@@ -64,7 +64,7 @@ export default function AdminSecurityDashboard() {
       return
     }
 
-    if (!userData?.isAdmin) {
+    if (!userData?.is_admin) {
       console.error('[AdminSecurity] User is not admin. Current user:', user.email)
       router.push('/')
       return

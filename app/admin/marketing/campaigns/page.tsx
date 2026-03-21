@@ -8,7 +8,7 @@ import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import { Mail, Send, Calendar, Users, BarChart3, Plus, Edit2, Trash2 } from 'lucide-react'
-import { getEmailTemplates } from '@/lib/sendgrid-email'
+import { getEmailTemplates } from '@/lib/resend-email'
 
 interface Campaign {
   id: string
@@ -47,14 +47,14 @@ export default function EmailCampaignsPage() {
       router.push('/auth/login')
       return
     }
-    if (!authLoading && user && !userData?.isAdmin) {
+    if (!authLoading && user && !userData?.is_admin) {
       console.error('[Marketing] User is not admin. Current user:', user.email)
       router.push('/')
     }
   }, [user, authLoading, userData, router])
 
   useEffect(() => {
-    if (user && userData?.isAdmin) {
+    if (user && userData?.is_admin) {
       fetchCampaigns()
     }
   }, [user, userData])
@@ -127,7 +127,7 @@ export default function EmailCampaignsPage() {
     )
   }
 
-  if (!userData?.isAdmin) {
+  if (!userData?.is_admin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray">You don't have access to this page</p>

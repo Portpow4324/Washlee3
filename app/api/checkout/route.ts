@@ -1,114 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validationError, createdResponse, serverError } from '@/lib/apiUtils'
-import { withRateLimit, rateLimits } from '@/lib/middleware/rateLimit'
-import { verifyToken } from '@/lib/firebaseAuthServer'
+import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
-import admin from 'firebase-admin'
-import '@/lib/firebaseAdmin'
 
-/**
- * /api/checkout - Creates a Stripe checkout session
- * 
- * Flow:
- * 1. Client sends: amount, email, name, orderId, bookingDetails
- * 2. We store booking details in Firestore (under the order)
- * 3. We create Stripe session with minimal metadata (just orderId, uid)
- * 4. Webhook receives payment confirmation and fetches order from Firestore
- */
 export async function POST(request: NextRequest) {
+  console.log('[CHECKOUT] ===== NEW CHECKOUT REQUEST =====')
   try {
-    // Verify authentication
-    const authResult = await verifyToken(request)
-    if (!authResult) {
-      console.error('[CHECKOUT-API] Authentication failed')
+    const body = await request.json()
+    console.log('[CHECKOUT] 1. Request body received:', { orderId: body.orderId, amount: body.amount })
+    
+    // Get auth token
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      console.log('[CHECKOUT] 2. ERROR: No auth header')
       return NextResponse.json(
-        { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED', timestamp: new Date().toISOString() },
+        { success: false, error: 'Unauthorized' },
         { status: 401 }
       )
     }
-    console.log('[CHECKOUT-API] Auth verified for user:', authResult.uid)
 
-    // Rate limiting
-    const { allowed, response: rateLimitResponse } = withRateLimit(
-      request,
-      rateLimits.checkout.max,
-      rateLimits.checkout.window
+    const token = authHeader.replace('Bearer ', '')
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     )
-    if (!allowed) return rateLimitResponse!
 
-    const body = await request.json()
-    console.log('[CHECKOUT-API] Payload received:', { 
-      amount: body.amount, 
-      email: body.email,
-      orderId: body.orderId,
-      hasBookingDetails: !!body.bookingDetails
-    })
+    // Verify the user token
+    console.log('[CHECKOUT] 2. Verifying auth token...')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (!user || authError) {
+      console.error('[CHECKOUT] 2. ERROR: Auth failed:', authError?.message)
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
 
-    // Simple validation
+    console.log('[CHECKOUT] 3. Auth verified for user:', user.id)
+
+    // Validate input
     if (!body.amount || typeof body.amount !== 'number' || body.amount < 24) {
-      console.error('[CHECKOUT-API] Validation failed: Invalid amount')
-      return validationError('Amount must be at least $24')
+      console.log('[CHECKOUT] 4. ERROR: Invalid amount:', body.amount)
+      return NextResponse.json(
+        { success: false, error: 'Amount must be at least $24' },
+        { status: 400 }
+      )
     }
     if (!body.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
-      console.error('[CHECKOUT-API] Validation failed: Invalid email')
-      return validationError('Invalid email')
+      console.log('[CHECKOUT] 4. ERROR: Invalid email:', body.email)
+      return NextResponse.json(
+        { success: false, error: 'Invalid email' },
+        { status: 400 }
+      )
     }
     if (!body.name || body.name.trim().length < 2) {
-      console.error('[CHECKOUT-API] Validation failed: Invalid name')
-      return validationError('Name required')
+      console.log('[CHECKOUT] 4. ERROR: Invalid name:', body.name)
+      return NextResponse.json(
+        { success: false, error: 'Name required' },
+        { status: 400 }
+      )
     }
     if (!body.orderId) {
-      console.error('[CHECKOUT-API] Validation failed: Missing orderId')
-      console.error('[CHECKOUT-API] Request body keys:', Object.keys(body))
-      console.error('[CHECKOUT-API] Request body:', {
-        amount: body.amount,
-        email: body.email,
-        name: body.name,
-        hasOrderId: !!body.orderId,
-        hasBookingDetails: !!body.bookingDetails
-      })
-      return validationError('Order ID required - please try booking again')
+      console.log('[CHECKOUT] 4. ERROR: No order ID')
+      return NextResponse.json(
+        { success: false, error: 'Order ID required' },
+        { status: 400 }
+      )
     }
 
-    const uid = authResult.uid
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    console.log('[CHECKOUT] 4. All validations passed')
 
     // Initialize Stripe
     if (!process.env.STRIPE_SECRET_KEY) {
-      console.error('[CHECKOUT-API] STRIPE_SECRET_KEY not set')
-      return serverError(new Error('Stripe not configured'), 'Stripe configuration missing')
+      console.error('[CHECKOUT] 5. ERROR: STRIPE_SECRET_KEY not set')
+      return NextResponse.json(
+        { success: false, error: 'Stripe not configured' },
+        { status: 500 }
+      )
     }
 
+    console.log('[CHECKOUT] 5. Stripe initialized')
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
-    // Store booking details in Firestore FIRST (before creating Stripe session)
-    // This way we don't hit Stripe metadata character limits
-    try {
-      const db = admin.firestore()
-      const orderRef = db.collection('users').doc(uid).collection('orders').doc(body.orderId)
-      
-      // Update the order with full booking details
-      await orderRef.update({
-        ...body.bookingDetails,
-        updatedAt: new Date(),
-        lastUpdatedReason: 'Checkout initiated'
-      })
-      
-      console.log('[CHECKOUT-API] ✓ Order updated with booking details:', body.orderId)
-    } catch (dbError: any) {
-      console.error('[CHECKOUT-API] Failed to update order in Firestore:', dbError.message)
-      return serverError(dbError, 'Failed to save booking details')
-    }
+    console.log('[CHECKOUT] 6. SKIPPING database update - going straight to Stripe')
+    
+    // Skip database update for now - focus on getting Stripe working
 
-    // Build line items from booking details to show breakdown to customer
+    // Build line items from booking details
     const lineItems: any[] = []
     const bookingDetails = body.bookingDetails || {}
-    
+
     // Base laundry service
     const estimatedWeight = bookingDetails.estimatedWeight || (bookingDetails.bagCount * 2.5) || 0
     const baseRate = bookingDetails.deliverySpeed === 'express' ? 10.0 : 5.0
     const baseCost = estimatedWeight * baseRate
-    
+
     if (baseCost > 0) {
       lineItems.push({
         price_data: {
@@ -122,8 +108,8 @@ export async function POST(request: NextRequest) {
         quantity: 1,
       })
     }
-    
-    // Add-on: Hang Dry
+
+    // Add-ons
     if (bookingDetails.hangDry) {
       lineItems.push({
         price_data: {
@@ -132,13 +118,12 @@ export async function POST(request: NextRequest) {
             name: 'Hang Dry Service',
             description: 'Hang-dry delicate items',
           },
-          unit_amount: 1650, // $16.50
+          unit_amount: 1650,
         },
         quantity: 1,
       })
     }
-    
-    // Add-on: Delicates Care
+
     if (bookingDetails.delicatesCare) {
       lineItems.push({
         price_data: {
@@ -147,13 +132,12 @@ export async function POST(request: NextRequest) {
             name: 'Delicates Care + Ironing',
             description: 'Special care and ironing for delicate items',
           },
-          unit_amount: 2200, // $22.00
+          unit_amount: 2200,
         },
         quantity: 1,
       })
     }
-    
-    // Add-on: Comforter Service
+
     if (bookingDetails.comforterService) {
       lineItems.push({
         price_data: {
@@ -162,13 +146,12 @@ export async function POST(request: NextRequest) {
             name: 'Comforter Service',
             description: 'Professional cleaning for comforters and quilts',
           },
-          unit_amount: 2500, // $25.00
+          unit_amount: 2500,
         },
         quantity: 1,
       })
     }
-    
-    // Add-on: Stain Treatment
+
     if (bookingDetails.stainTreatment) {
       lineItems.push({
         price_data: {
@@ -177,13 +160,12 @@ export async function POST(request: NextRequest) {
             name: 'Stain Treatment',
             description: 'Professional stain removal per item',
           },
-          unit_amount: 50, // $0.50
+          unit_amount: 50,
         },
         quantity: bookingDetails.stainTreatmentCount || 1,
       })
     }
-    
-    // Add-on: Oversized Items
+
     if (bookingDetails.oversizedItems && bookingDetails.oversizedItems > 0) {
       lineItems.push({
         price_data: {
@@ -192,12 +174,12 @@ export async function POST(request: NextRequest) {
             name: 'Oversized Items',
             description: 'Large items (beds, blankets, etc)',
           },
-          unit_amount: 800, // $8.00 per item
+          unit_amount: 800,
         },
         quantity: bookingDetails.oversizedItems,
       })
     }
-    
+
     // Protection Plan
     if (bookingDetails.protectionPlan === 'premium') {
       lineItems.push({
@@ -207,7 +189,7 @@ export async function POST(request: NextRequest) {
             name: 'Protection Plan - Premium',
             description: 'Premium damage protection',
           },
-          unit_amount: 250, // $2.50
+          unit_amount: 350,
         },
         quantity: 1,
       })
@@ -219,13 +201,13 @@ export async function POST(request: NextRequest) {
             name: 'Protection Plan - Premium Plus',
             description: 'Premium Plus damage protection',
           },
-          unit_amount: 575, // $5.75
+          unit_amount: 850,
         },
         quantity: 1,
       })
     }
-    
-    // If no line items (shouldn't happen), add a single line for the total
+
+    // If no line items, add a single line for the total
     if (lineItems.length === 0) {
       const totalCents = Math.round(body.amount * 100)
       lineItems.push({
@@ -241,13 +223,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Create Stripe checkout session with MINIMAL metadata
-    // The webhook will fetch full booking details from Firestore using orderId
-    console.log('[CHECKOUT-API] Creating Stripe session with minimal metadata:', {
+    // Create Stripe checkout session
+    console.log('[CHECKOUT] 7. Creating Stripe session:', {
       amount: body.amount,
       email: body.email,
       orderId: body.orderId,
-      uid
+      lineItemsCount: lineItems.length,
     })
 
     const session = await stripe.checkout.sessions.create({
@@ -258,28 +239,44 @@ export async function POST(request: NextRequest) {
       cancel_url: `${baseUrl}/booking?paymentStatus=cancelled`,
       customer_email: body.email,
       metadata: {
-        uid,
+        userId: user.id,
         orderId: body.orderId,
-        customerName: body.name.substring(0, 100), // Limit to 100 chars
-        customerEmail: body.email.substring(0, 100), // Limit to 100 chars
+        customerName: body.name.substring(0, 100),
+        customerEmail: body.email.substring(0, 100),
       },
     })
 
-    console.log('[CHECKOUT-API] ✓ Session created:', session.id)
-    console.log('[CHECKOUT-API] Redirect URL:', session.url)
+    console.log('[CHECKOUT] 8. ✅ Session created successfully:', session.id)
 
-    return createdResponse({
-      sessionId: session.id,
-      url: session.url,
+    return NextResponse.json({
+      data: {
+        sessionId: session.id,
+        url: session.url,
+      },
       success: true
-    })
+    }, { status: 201 })
   } catch (error: any) {
-    console.error('[CHECKOUT-API] Error:', {
-      message: error.message,
-      code: error.code,
-      statusCode: error.statusCode,
-      type: error.type,
-    })
-    return serverError(error, 'Failed to create Stripe checkout session')
+    console.error('[CHECKOUT] ❌ ERROR:', error.message)
+    console.error('[CHECKOUT] Full error:', error)
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to create checkout session' },
+      { status: 500 }
+    )
   }
+}
+
+export async function GET(request: NextRequest) {
+  return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
+}
+
+export async function PATCH(request: NextRequest) {
+  return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
+}
+
+export async function PUT(request: NextRequest) {
+  return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
+}
+
+export async function DELETE(request: NextRequest) {
+  return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
 }

@@ -1,362 +1,219 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useAuth } from '@/lib/AuthContext'
 import Link from 'next/link'
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { planDetails } from '@/lib/subscriptionLogic'
-import { Check, ChevronLeft, CreditCard, ArrowUp } from 'lucide-react'
-import { useAuth } from '@/lib/AuthContext'
-import { db } from '@/lib/firebase'
-import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore'
+import { Check, Zap, Crown } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 
-interface Subscription {
-  id: string
-  planId: string
-  planName: string
-  price: number
-  status: 'active' | 'cancelled' | 'paused'
-  nextBillingDate: Timestamp
-}
+export default function SubscriptionsPage() {
+  const { user } = useAuth()
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
-interface BillingEntry {
-  id: string
-  date: Timestamp
-  amount: number
-  plan: string
-  status: 'paid' | 'pending' | 'failed'
-}
-
-export default function Subscriptions() {
-  const { user, userData, loading } = useAuth()
-  const [subscription, setSubscription] = useState<Subscription | null>(null)
-  const [billingHistory, setBillingHistory] = useState<BillingEntry[]>([])
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
-  const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false)
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
-
-  // Fetch subscription from Firebase
   useEffect(() => {
-    if (!user || loading) return
+    const fetchSubscription = async () => {
+      if (!user) return
 
-    setSubscriptionLoading(true)
-    const subscriptionsRef = collection(db, 'subscriptions')
-    const q = query(subscriptionsRef, where('userId', '==', user.uid))
+      try {
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('customer_id', user.id)
+          .maybeSingle()
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data() as Subscription
-        setSubscription({ ...data, id: snapshot.docs[0].id })
+        if (data && !error) {
+          setCurrentPlan(data.plan_type)
+        }
+      } catch (err) {
+        console.error('Error fetching subscription:', err)
+      } finally {
+        setLoading(false)
       }
-      setSubscriptionLoading(false)
-    })
-
-    return () => unsubscribe()
-  }, [user, loading])
-
-  // Fetch billing history from Firebase
-  useEffect(() => {
-    if (!user || loading) return
-
-    const billingRef = collection(db, 'billingHistory')
-    const q = query(billingRef, where('userId', '==', user.uid))
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      } as BillingEntry))
-      // Sort by date, most recent first
-      setBillingHistory(data.sort((a, b) => b.date?.toMillis() - a.date?.toMillis()))
-    })
-
-    return () => unsubscribe()
-  }, [user, loading])
-
-  const handleUpgrade = (planKey: string) => {
-    setSelectedPlan(planKey)
-    setShowUpgradeConfirm(true)
-  }
-
-  const handleConfirmUpgrade = () => {
-    if (selectedPlan) {
-      // TODO: Call /api/subscriptions/update with action: 'upgrade', newPlan: selectedPlan
-      alert(`Upgrading to ${selectedPlan} plan...`)
-      setShowUpgradeConfirm(false)
     }
-  }
 
-  const handlePause = () => {
-    if (confirm('Are you sure you want to pause your subscription? You can resume it anytime.')) {
-      // TODO: Call /api/subscriptions/update with action: 'pause'
-      alert('Subscription paused')
-    }
-  }
+    fetchSubscription()
+  }, [user])
 
-  const handleCancel = () => {
-    if (confirm('Are you sure you want to cancel? Your access will end at the end of your billing period.')) {
-      // TODO: Call /api/subscriptions/update with action: 'cancel'
-      alert('Subscription cancelled')
-    }
-  }
+  const plans = [
+    {
+      id: 'monthly',
+      name: 'Monthly Pass',
+      price: '$29',
+      period: '/month',
+      description: 'Perfect for regular laundry',
+      features: [
+        'Unlimited pickups & deliveries',
+        '15% discount on all services',
+        'Priority customer support',
+        'Free protection plan',
+        'Monthly loyalty points bonus',
+      ],
+      icon: Zap,
+    },
+    {
+      id: 'quarterly',
+      name: 'Quarterly Bundle',
+      price: '$79',
+      period: '/quarter',
+      description: 'Best value for monthly users',
+      features: [
+        'Unlimited pickups & deliveries',
+        '20% discount on all services',
+        'Priority support + Express support',
+        'Free premium protection plan',
+        'Double loyalty points',
+        'Exclusive member perks',
+      ],
+      icon: Crown,
+      popular: true,
+    },
+    {
+      id: 'yearly',
+      name: 'Annual Plan',
+      price: '$199',
+      period: '/year',
+      description: 'Maximum savings',
+      features: [
+        'Unlimited pickups & deliveries',
+        '25% discount on all services',
+        'VIP customer support',
+        'Free premium+ protection plan',
+        'Triple loyalty points',
+        'Exclusive member events',
+        'Free service month (April)',
+      ],
+      icon: Crown,
+    },
+  ]
 
-  const getPlanPrice = (key: string, cycle: 'monthly' | 'yearly') => {
-    const plan = planDetails[key as keyof typeof planDetails]
-    if (!plan) return 0
-    if (cycle === 'yearly') {
-      return plan.yearlyPrice || Math.round(plan.monthlyPrice * 12 * 0.8 * 100) / 100 // Use yearlyPrice or calculate with 20% discount
-    }
-    return plan.monthlyPrice
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#48C9B0] mx-auto mb-4"></div>
+            <p className="text-[#6b7b78]">Loading subscriptions...</p>
+          </div>
+        </div>
+        <Footer />
+      </>
+    )
   }
 
   return (
-    <div className="space-y-8">
-      {/* Current Subscription Status */}
-      {subscription && subscription.status === 'active' ? (
-        <div>
-          <h2 className="text-2xl font-bold text-dark mb-6">Your Subscription</h2>
-          <Card className="p-6 bg-gradient-to-r from-mint to-transparent">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-gray mb-1">Current Plan</p>
-                <h3 className="text-3xl font-bold text-dark capitalize">{subscription.planName}</h3>
-                <p className="text-sm text-gray mt-2">${subscription.price}/month</p>
-              </div>
-
-              <div>
-                <p className="text-sm text-gray mb-2">Next Billing Date</p>
-                <p className="font-medium text-dark text-lg">
-                  {new Date(subscription.nextBillingDate?.toMillis()).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </p>
-                <p className="text-xs text-gray mt-2">Auto-renews unless cancelled</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <Button variant="outline" size="sm" onClick={handlePause}>
-                Pause
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleCancel} className="text-red-600 border-red-200">
-                Cancel
-              </Button>
-            </div>
-          </Card>
-        </div>
-      ) : (
-        <Card className="bg-gradient-to-r from-primary/5 to-mint/5 border-2 border-primary p-6">
-          <p className="text-gray">No active subscription. Choose a plan below to get started.</p>
-        </Card>
-      )}
-
-      {/* Upgrade Section */}
-      <div>
-        <h2 className="text-2xl font-bold text-dark mb-4">
-          {subscription ? 'Upgrade Your Plan' : 'Choose a Plan'}
-        </h2>
-
-        {/* Billing Cycle Toggle */}
-        <div className="mb-6 flex items-center gap-4">
-          <span className="text-sm font-medium text-dark">Billing Cycle:</span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setBillingCycle('monthly')}
-              className={`px-4 py-2 rounded-lg font-medium transition ${
-                billingCycle === 'monthly'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-dark hover:bg-gray-200'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingCycle('yearly')}
-              className={`px-4 py-2 rounded-lg font-medium transition relative ${
-                billingCycle === 'yearly'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-dark hover:bg-gray-200'
-              }`}
-            >
-              Yearly
-              <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
-                Save 20%
-              </span>
-            </button>
+    <>
+      <Header />
+      <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white py-12 px-4">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-[#1f2d2b] mb-4">Subscription Plans</h1>
+            <p className="text-lg text-[#6b7b78]">Choose the perfect plan for your laundry needs</p>
           </div>
-        </div>
 
-        {/* Plan Comparison */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {Object.entries(planDetails)
-            .filter(([key]) => key !== 'basic') // Remove Basic plan from display
-            .map(([key, plan]) => (
-            <Card
-              key={key}
-              className={`p-6 transition ${
-                subscription?.planName.toLowerCase() === key
-                  ? 'ring-2 ring-primary bg-mint'
-                  : 'hoverable'
-              }`}
-            >
-              <div className="mb-4">
-                <h3 className="font-bold text-dark text-lg">{plan.name}</h3>
-                {subscription?.planName.toLowerCase() === key && (
-                  <span className="text-xs font-medium text-primary">Current Plan</span>
-                )}
-              </div>
+          {/* Current Plan */}
+          {currentPlan && (
+            <div className="mb-12 p-6 bg-[#E8FFFB] rounded-lg border-2 border-[#48C9B0]">
+              <p className="text-[#6b7b78] mb-2">Current Plan</p>
+              <p className="text-2xl font-bold text-[#1f2d2b] capitalize">{currentPlan} Plan</p>
+            </div>
+          )}
 
-              <div className="mb-4">
-                <span className="text-3xl font-bold text-dark">
-                  ${getPlanPrice(key, billingCycle)}
-                </span>
-                <span className="text-xs text-gray">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
-              </div>
-
-              <div className="mb-6 pb-6 border-b border-gray-200">
-                <p className="text-sm font-medium text-dark mb-1">
-                  {plan.monthlyOrders >= 999999 ? 'Unlimited orders' : `Up to ${plan.monthlyOrders} orders`}/month
-                </p>
-                <p className="text-xs text-gray">
-                  Max {plan.features.maxWeightPerLoad}kg per load
-                </p>
-              </div>
-
-              <ul className="space-y-2 mb-6 flex-1">
-                <li className="flex items-start gap-2 text-xs text-dark">
-                  <Check size={14} className="text-primary flex-shrink-0 mt-0.5" />
-                  <span>Max {plan.features.maxWeightPerLoad}kg per load</span>
-                </li>
-                <li className="flex items-start gap-2 text-xs text-dark">
-                  <Check size={14} className={`flex-shrink-0 mt-0.5 ${plan.features.expressDelivery ? 'text-primary' : 'text-gray-300'}`} />
-                  <span className={plan.features.expressDelivery ? 'text-dark' : 'text-gray-400'}>
-                    {plan.features.expressDelivery ? 'Express delivery' : 'Standard delivery only'}
-                  </span>
-                </li>
-                <li className="flex items-start gap-2 text-xs text-dark">
-                  <Check size={14} className={`flex-shrink-0 mt-0.5 ${plan.features.addOnDiscounts ? 'text-primary' : 'text-gray-300'}`} />
-                  <span className={plan.features.addOnDiscounts ? 'text-dark' : 'text-gray-400'}>
-                    {plan.features.addOnDiscounts ? 'Add-on discounts' : 'Standard pricing'}
-                  </span>
-                </li>
-              </ul>
-
-              {subscription?.planName.toLowerCase() === key ? (
-                <Button variant="outline" className="w-full" disabled>
-                  Current Plan
-                </Button>
-              ) : (
-                <Button
-                  variant="primary"
-                  className="w-full text-sm"
-                  onClick={() => handleUpgrade(key)}
+          {/* Plans Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            {plans.map((plan) => {
+              const IconComponent = plan.icon
+              const isCurrentPlan = currentPlan === plan.id
+              
+              return (
+                <Card
+                  key={plan.id}
+                  hoverable
+                  className={`flex flex-col p-8 ${isCurrentPlan ? 'ring-2 ring-[#48C9B0]' : ''} ${
+                    plan.popular ? 'md:scale-105' : ''
+                  }`}
                 >
-                  <ArrowUp size={14} className="mr-1" />
-                  {subscription ? 'Upgrade' : 'Choose'}
-                </Button>
-              )}
-            </Card>
-          ))}
-        </div>
-      </div>
+                  {plan.popular && (
+                    <div className="mb-4 inline-block px-3 py-1 bg-[#48C9B0] text-white text-sm font-bold rounded">
+                      MOST POPULAR
+                    </div>
+                  )}
 
-      {/* Invoice History */}
-      <div>
-        <h2 className="text-2xl font-bold text-dark mb-6">Billing History</h2>
+                  <IconComponent className="w-10 h-10 text-[#48C9B0] mb-4" />
+                  <h3 className="text-2xl font-bold text-[#1f2d2b] mb-2">{plan.name}</h3>
+                  <p className="text-[#6b7b78] mb-4 text-sm">{plan.description}</p>
 
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-dark">Invoice</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-dark">Date</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-dark">Plan</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-dark">Amount</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-dark">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {billingHistory.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-gray">
-                      No billing history yet
-                    </td>
-                  </tr>
-                ) : (
-                  billingHistory.map((invoice) => (
-                    <tr key={invoice.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 text-sm text-dark">INV-{invoice.id.slice(0, 8).toUpperCase()}</td>
-                      <td className="px-6 py-4 text-sm text-gray">
-                        {new Date(invoice.date?.toMillis()).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-dark capitalize">{invoice.plan}</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-dark">
-                        ${invoice.amount.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            invoice.status === 'paid'
-                              ? 'bg-green-50 text-green-700'
-                              : invoice.status === 'pending'
-                                ? 'bg-yellow-50 text-yellow-700'
-                                : 'bg-red-50 text-red-700'
-                          }`}
-                        >
-                          {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  <div className="mb-6">
+                    <span className="text-4xl font-bold text-[#1f2d2b]">{plan.price}</span>
+                    <span className="text-[#6b7b78]">{plan.period}</span>
+                  </div>
+
+                  {isCurrentPlan ? (
+                    <Button disabled className="w-full mb-6">
+                      Current Plan
+                    </Button>
+                  ) : (
+                    <Button className="w-full mb-6">Subscribe Now</Button>
+                  )}
+
+                  <div className="space-y-3">
+                    {plan.features.map((feature, idx) => (
+                      <div key={idx} className="flex items-start gap-3">
+                        <Check size={20} className="text-[#48C9B0] flex-shrink-0 mt-0.5" />
+                        <span className="text-[#1f2d2b] text-sm">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )
+            })}
           </div>
-        </Card>
-      </div>
 
-      {/* Upgrade Confirmation Modal */}
-      {showUpgradeConfirm && selectedPlan && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="p-8 max-w-md">
-            <h2 className="text-2xl font-bold text-dark mb-4">Confirm Upgrade</h2>
-            <p className="text-gray mb-6">
-              You're about to upgrade{subscription ? ` from ${subscription.planName} ` : ' '}to
-              <strong> {selectedPlan}</strong>.
-            </p>
-
-            <div className="bg-mint p-4 rounded-lg mb-6">
-              <p className="text-sm text-gray mb-2">New {billingCycle} cost</p>
-              <p className="text-2xl font-bold text-dark">
-                ${getPlanPrice(selectedPlan, billingCycle)}
-                <span className="text-sm text-gray">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
-              </p>
-              <p className="text-xs text-gray mt-2">Changes take effect immediately</p>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setShowUpgradeConfirm(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                className="flex-1"
-                onClick={handleConfirmUpgrade}
-              >
-                Confirm Upgrade
-              </Button>
+          {/* FAQ Section */}
+          <Card className="p-8">
+            <h2 className="text-2xl font-bold text-[#1f2d2b] mb-6">Subscription FAQs</h2>
+            <div className="space-y-6">
+              {[
+                {
+                  q: 'Can I change my plan anytime?',
+                  a: 'Yes, you can upgrade or downgrade your subscription at any time. Changes take effect at your next billing cycle.',
+                },
+                {
+                  q: 'Is there a cancellation fee?',
+                  a: 'No! You can cancel your subscription anytime without any penalties.',
+                },
+                {
+                  q: 'Do I get a refund?',
+                  a: 'We offer a 30-day money-back guarantee if you\'re not satisfied with your subscription.',
+                },
+                {
+                  q: 'Can I pause my subscription?',
+                  a: 'Yes, you can pause your subscription for up to 3 months without losing your benefits.',
+                },
+              ].map((faq, idx) => (
+                <div key={idx}>
+                  <h3 className="font-bold text-[#1f2d2b] mb-2">{faq.q}</h3>
+                  <p className="text-[#6b7b78]">{faq.a}</p>
+                </div>
+              ))}
             </div>
           </Card>
+
+          {/* Back Link */}
+          <div className="mt-12 text-center">
+            <Link href="/dashboard" className="text-[#48C9B0] hover:text-[#7FE3D3] font-medium">
+              ← Back to Dashboard
+            </Link>
+          </div>
         </div>
-      )}
-    </div>
+      </div>
+      <Footer />
+    </>
   )
 }

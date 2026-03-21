@@ -38,8 +38,9 @@ export default function Pricing() {
 
   // Check if user has a specific plan
   const isCurrentPlan = (planId: string): boolean => {
-    const userPlan = userData?.currentPlan || 'none'
-    return userPlan === planId
+    // userData currentPlan check - set default to none if not available
+    const userCurrentPlan = (userData as any)?.currentPlan || 'none'
+    return userCurrentPlan === planId
   }
 
   // Get button text based on plan
@@ -199,7 +200,7 @@ export default function Pricing() {
                     <div className="flex-1">
                       <p className="font-semibold text-dark">Express</p>
                       <p className="text-xs text-gray">
-                        {weight > 25 ? '✕ Not available (max 25kg)' : isPastCutoff ? `✕ Unavailable (cutoff 12pm) - ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'Same-day by 7pm'}
+                        {weight > 25 ? '✕ Not available (max 25kg)' : isPastCutoff ? `✕ Unavailable (cutoff 12pm) - ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}` : 'Same-day by 7pm'}
                       </p>
                     </div>
                     <span className="text-sm font-bold text-primary">$7.50/kg</span>

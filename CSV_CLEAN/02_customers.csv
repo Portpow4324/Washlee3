@@ -1,0 +1,7 @@
+id,subscription_active,subscription_plan,subscription_status,payment_status,delivery_address,preferences,created_at,updated_at
+550e8400-e29b-41d4-a716-446655440001,false,none,inactive,pending,,{},2026-03-08T12:59:19Z,2026-03-08T12:59:19Z
+550e8400-e29b-41d4-a716-446655440002,false,none,inactive,pending,,{},2026-03-06T15:43:06Z,2026-03-06T15:43:06Z
+550e8400-e29b-41d4-a716-446655440003,false,none,inactive,pending,,{},2026-03-06T15:42:32Z,2026-03-06T15:42:32Z
+550e8400-e29b-41d4-a716-446655440004,false,none,inactive,pending,,{},2026-03-03T07:52:45Z,2026-03-03T07:52:45Z
+550e8400-e29b-41d4-a716-446655440005,false,none,inactive,pending,,{},2026-03-02T07:54:43Z,2026-03-02T07:54:43Z
+550e8400-e29b-41d4-a716-446655440006,false,none,inactive,pending,,{},2026-03-03T17:18:21Z,2026-03-03T17:18:21Z

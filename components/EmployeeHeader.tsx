@@ -4,8 +4,7 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { Menu, X, LogOut, Home, Package, Briefcase, DollarSign, Settings, Zap, ChevronDown } from 'lucide-react'
-import { signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { createClient } from '@supabase/supabase-js'
 import { useAuth } from '@/lib/AuthContext'
 
 export default function EmployeeHeader() {
@@ -18,11 +17,16 @@ export default function EmployeeHeader() {
 
   const handleLogout = async () => {
     try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      
       // Clear employee mode
       localStorage.removeItem('employeeMode')
       sessionStorage.removeItem('employeeMode')
       
-      await signOut(auth)
+      await supabase.auth.signOut()
       router.push('/')
     } catch (error) {
       console.error('Logout error:', error)
@@ -114,7 +118,7 @@ export default function EmployeeHeader() {
             
             {showRoleSwitch && (
               <div className="absolute right-0 mt-2 w-56 bg-white text-dark rounded-lg shadow-xl overflow-hidden">
-                {userData?.userType === 'pro' && (
+                {userData?.user_type === 'pro' && (
                   <button
                     onClick={switchToProMode}
                     className="w-full px-4 py-3 text-left hover:bg-mint transition font-semibold flex items-center gap-2 border-b border-gray/20"
@@ -161,13 +165,13 @@ export default function EmployeeHeader() {
               className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center font-bold text-dark hover:shadow-lg transition"
               title={user?.email || 'User'}
             >
-              {userData?.firstName?.charAt(0) || user?.email?.charAt(0) || 'U'}
+              {userData?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
             </button>
             
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white text-dark rounded-lg shadow-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray/20">
-                  <p className="font-semibold text-dark">{userData?.firstName} {userData?.lastName}</p>
+                  <p className="font-semibold text-dark">{userData?.name}</p>
                   <p className="text-xs text-gray">{user?.email}</p>
                 </div>
                 <Link
@@ -218,7 +222,7 @@ export default function EmployeeHeader() {
                 {item.label}
               </Link>
             ))}
-            {userData?.userType === 'pro' && (
+            {userData?.user_type === 'pro' && (
               <button
                 onClick={() => {
                   switchToProMode()

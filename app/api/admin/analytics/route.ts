@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/firebase'
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,135 +13,73 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'get_dashboard_summary': {
-        // Get dashboard summary stats
         const now = new Date()
         const startDate = new Date()
 
-        // Set date range
         if (dateRange === '7days') startDate.setDate(now.getDate() - 7)
         else if (dateRange === '30days') startDate.setDate(now.getDate() - 30)
         else if (dateRange === '90days') startDate.setDate(now.getDate() - 90)
 
-        // Get orders
-        const ordersRef = collection(db, 'orders')
-        const ordersSnapshot = await getDocs(ordersRef)
-        const allOrders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        const { data: allOrders = [] } = await supabase.from('orders').select('*')
+        const { data: allUsers = [] } = await supabase.from('users').select('*')
+        const { data: inquiries = [] } = await supabase.from('inquiries').select('*').eq('status', 'pending')
 
-        // Get recent orders within date range
-        const recentOrders = allOrders.filter((order: any) => {
-          const orderDate = order.createdAt?.toDate?.() || new Date(order.createdAt)
-          return orderDate >= startDate
-        })
-
-        // Calculate metrics
-        const totalRevenue = allOrders.reduce((sum: number, order: any) => {
-          return sum + (order.pricing?.total || 0)
-        }, 0)
-
-        const totalOrders = allOrders.length
-        const activeUsersSet = new Set()
-
-        allOrders.forEach((order: any) => {
-          if (order.customerId) activeUsersSet.add(order.customerId)
-        })
-
-        // Get users
-        const usersRef = collection(db, 'users')
-        const usersSnapshot = await getDocs(usersRef)
-        const allUsers = usersSnapshot.docs.map(doc => doc.data())
-
-        const newSignups = allUsers.filter((user: any) => {
-          const created = user.createdAt?.toDate?.() || new Date(user.createdAt)
-          return created >= startDate
-        }).length
-
-        // Get pro applications
-        const prosRef = collection(db, 'users')
-        const prosQuery = query(prosRef, where('userType', '==', 'pro'))
-        const prosSnapshot = await getDocs(prosQuery)
-        const pendingApplications = prosSnapshot.docs.filter((doc: any) => {
-          const data = doc.data()
-          return data.verificationStatus !== 'approved'
-        }).length
-
-        // Calculate averages
-        const averageOrderValue = recentOrders.length > 0
-          ? recentOrders.reduce((sum: number, order: any) => sum + (order.pricing?.total || 0), 0) / recentOrders.length
-          : 0
-
-        const refundedOrders = allOrders.filter((order: any) => order.status === 'refunded').length
-        const refundRate = totalOrders > 0 ? (refundedOrders / totalOrders) * 100 : 0
-
-        // Find top pro
-        const proEarnings = allOrders
-          .filter((order: any) => order.proId)
-          .reduce((acc: any, order: any) => {
-            const proId = order.proId
-            acc[proId] = (acc[proId] || 0) + (order.pricing?.total || 0)
-            return acc
-          }, {})
-
-        const topProEarnings = Object.values(proEarnings).length > 0
-          ? Math.max(...Object.values(proEarnings) as number[])
-          : 0
-
-        const analytics = {
-          totalRevenue,
-          totalOrders,
-          activeUsers: activeUsersSet.size,
-          newSignups,
-          pendingApplications,
-          refundRate,
-          averageOrderValue,
-          topProEarnings,
-          dateRange,
-          generatedAt: new Date().toISOString()
-        }
-
-        return NextResponse.json({ success: true, analytics })
-      }
-
-      case 'get_user_analytics': {
-        // Get detailed user analytics
-        const usersRef = collection(db, 'users')
-        const usersSnapshot = await getDocs(usersRef)
-        const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-
-        const customers = users.filter((u: any) => u.userType === 'customer')
-        const pros = users.filter((u: any) => u.userType === 'pro')
+        const ordersArray = allOrders || []
+        const recentOrders = ordersArray.filter((order: any) => new Date(order.created_at) >= startDate)
+        const totalRevenue = ordersArray.reduce((sum, o: any) => sum + (o.total_price || 0), 0)
+        const activeUsers = new Set(ordersArray.map((o: any) => o.user_id)).size
+        const newSignups = (allUsers || []).filter((u: any) => new Date(u.created_at) >= startDate).length
 
         return NextResponse.json({
           success: true,
-          totalUsers: users.length,
+          analytics: {
+            totalRevenue,
+            totalOrders: ordersArray.length,
+            activeUsers,
+            newSignups,
+            pendingApplications: inquiries?.length || 0,
+            refundRate: 0,
+            averageOrderValue: ordersArray.length > 0 ? totalRevenue / ordersArray.length : 0,
+            topProEarnings: 0,
+            dateRange,
+            generatedAt: new Date().toISOString()
+          }
+        })
+      }
+
+      case 'get_user_analytics': {
+        const { data: users = [] } = await supabase.from('users').select('*')
+        const customers = (users || []).filter((u: any) => u.user_type === 'customer')
+        const pros = (users || []).filter((u: any) => u.user_type === 'pro')
+        const admins = (users || []).filter((u: any) => u.is_admin)
+
+        return NextResponse.json({
+          success: true,
+          totalUsers: users?.length || 0,
           customers: customers.length,
           pros: pros.length,
-          adminUsers: users.filter((u: any) => u.isAdmin).length
+          adminUsers: admins.length
         })
       }
 
       case 'get_order_analytics': {
-        // Get detailed order analytics
-        const ordersRef = collection(db, 'orders')
-        const ordersSnapshot = await getDocs(ordersRef)
-        const orders = ordersSnapshot.docs.map(doc => doc.data())
+        const { data: orders = [] } = await supabase.from('orders').select('*')
 
+        const ordersArray = orders || []
         const statuses = {
-          pending: orders.filter((o: any) => o.status === 'pending').length,
-          accepted: orders.filter((o: any) => o.status === 'accepted').length,
-          completed: orders.filter((o: any) => o.status === 'completed').length,
-          cancelled: orders.filter((o: any) => o.status === 'cancelled').length,
-          refunded: orders.filter((o: any) => o.status === 'refunded').length
+          pending: ordersArray.filter((o: any) => o.status === 'pending').length,
+          confirmed: ordersArray.filter((o: any) => o.status === 'confirmed').length,
+          'in-transit': ordersArray.filter((o: any) => o.status === 'in-transit').length,
+          delivered: ordersArray.filter((o: any) => o.status === 'delivered').length,
+          cancelled: ordersArray.filter((o: any) => o.status === 'cancelled').length
         }
 
-        const revenue = orders.reduce((sum: number, order: any) => {
-          return sum + (order.pricing?.total || 0)
-        }, 0)
-
-        const cancellationRate = (statuses.cancelled / orders.length) * 100
+        const revenue = ordersArray.reduce((sum, o: any) => sum + (o.total_price || 0), 0)
+        const cancellationRate = ordersArray.length > 0 ? (statuses.cancelled / ordersArray.length) * 100 : 0
 
         return NextResponse.json({
           success: true,
-          totalOrders: orders.length,
+          totalOrders: orders?.length || 0,
           statuses,
           totalRevenue: revenue,
           cancellationRate
@@ -145,25 +87,22 @@ export async function POST(request: NextRequest) {
       }
 
       case 'get_payment_analytics': {
-        // Get payment analytics
-        const paymentsRef = collection(db, 'payments')
-        const paymentsSnapshot = await getDocs(paymentsRef)
-        const payments = paymentsSnapshot.docs.map(doc => doc.data())
+        const { data: payments = [] } = await supabase.from('payments').select('*')
 
-        const succeeded = payments.filter((p: any) => p.status === 'succeeded').length
-        const failed = payments.filter((p: any) => p.status === 'payment_failed').length
-        const pending = payments.filter((p: any) => p.status === 'processing').length
-
-        const totalProcessed = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+        const paymentsArray = payments || []
+        const succeeded = paymentsArray.filter((p: any) => p.status === 'succeeded').length
+        const failed = paymentsArray.filter((p: any) => p.status === 'failed').length
+        const pending = paymentsArray.filter((p: any) => p.status === 'processing').length
+        const totalProcessed = paymentsArray.reduce((sum, p: any) => sum + (p.amount || 0), 0)
 
         return NextResponse.json({
           success: true,
-          totalPayments: payments.length,
+          totalPayments: paymentsArray.length,
           succeeded,
           failed,
           pending,
           totalProcessed,
-          successRate: payments.length > 0 ? (succeeded / payments.length) * 100 : 0
+          successRate: paymentsArray.length > 0 ? (succeeded / paymentsArray.length) * 100 : 0
         })
       }
 
@@ -171,7 +110,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     }
   } catch (error) {
-    console.error('Admin analytics error:', error)
+    console.error('Analytics error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }

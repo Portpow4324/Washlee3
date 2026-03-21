@@ -1,40 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/firebase'
-import { collection, query, orderBy, getDocs } from 'firebase/firestore'
-
 export async function GET(request: NextRequest) {
-  try {
-    
-    // Get all email campaigns, sorted by creation date (newest first)
-    const campaignsRef = collection(db, 'email_campaigns')
-    const q = query(campaignsRef, orderBy('createdAt', 'desc'))
-    const campaignsSnapshot = await getDocs(q)
-
-    const campaigns = campaignsSnapshot.docs.map(doc => {
-      const data = doc.data()
-      return {
-        id: doc.id,
-        campaignName: data.campaignName || '',
-        campaignType: data.campaignType || 'promotional',
-        segments: data.segments || [],
-        status: data.status || 'draft',
-        sentCount: data.sentCount || 0,
-        openCount: data.openCount || 0,
-        clickCount: data.clickCount || 0,
-        createdAt: data.createdAt ? new Date(data.createdAt.toDate?.() || data.createdAt).toISOString() : new Date().toISOString(),
-        scheduledFor: data.scheduledFor ? new Date(data.scheduledFor.toDate?.() || data.scheduledFor).toISOString() : undefined,
-      }
-    })
-
-    return NextResponse.json({
-      campaigns,
-      total: campaigns.length,
-    })
-  } catch (error) {
-    console.error('Error listing campaigns:', error)
-    return NextResponse.json(
-      { error: 'Failed to list campaigns', message: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    )
-  }
+  return NextResponse.json({ success: false, message: 'MVP disabled' }, { status: 503 })
+}
+export async function POST(request: NextRequest) {
+  return NextResponse.json({ success: false, message: 'MVP disabled' }, { status: 503 })
+}
+export async function PATCH(request: NextRequest) {
+  return NextResponse.json({ success: false, message: 'MVP disabled' }, { status: 503 })
+}
+export async function PUT(request: NextRequest) {
+  return NextResponse.json({ success: false, message: 'MVP disabled' }, { status: 503 })
+}
+export async function DELETE(request: NextRequest) {
+  return NextResponse.json({ success: false, message: 'MVP disabled' }, { status: 503 })
 }

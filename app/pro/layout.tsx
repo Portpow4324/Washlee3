@@ -31,7 +31,7 @@ export default function ProLayout({
       }
 
       // If logged in but NOT a Pro user, redirect to customer dashboard
-      if (userData?.userType !== 'pro') {
+      if (userData?.user_type !== 'pro') {
         router.push('/dashboard')
         return
       }
@@ -49,7 +49,7 @@ export default function ProLayout({
     )
   }
 
-  if (!isPublicProPage && (!user || userData?.userType !== 'pro')) {
+  if (!isPublicProPage && (!user || userData?.user_type !== 'pro')) {
     return null
   }
 

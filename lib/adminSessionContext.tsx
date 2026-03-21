@@ -23,7 +23,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
 
   // Initialize admin session on mount
   useEffect(() => {
-    if (user && userData?.isAdmin && user.email) {
+    if (user && userData?.is_admin && user.email) {
       const storedEmail = sessionStorage.getItem(ADMIN_SESSION_KEY)
       
       // If no admin session yet, or user switched accounts, set new admin session
@@ -48,7 +48,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
           clearAdminSession()
         }
       }
-    } else if (user && !userData?.isAdmin) {
+    } else if (user && !userData?.is_admin) {
       // User is logged in but NOT an admin - clear any admin session
       const storedEmail = sessionStorage.getItem(ADMIN_SESSION_KEY)
       if (storedEmail && user.email && storedEmail !== user.email) {
@@ -76,7 +76,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
 
   const verifyAdminAccess = (): boolean => {
     // Check if current user is admin AND has valid admin session
-    if (!user || !userData?.isAdmin) {
+    if (!user || !userData?.is_admin) {
       console.log('[AdminSession] Access denied: User is not admin')
       return false
     }

@@ -1,6 +1,5 @@
 import Stripe from 'stripe'
-import { db } from '@/lib/firebase'
-import { doc, updateDoc, getDoc, Timestamp, addDoc, collection } from 'firebase/firestore'
+import { supabase } from '@/lib/supabaseClient'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-12-15.clover'
@@ -13,8 +12,8 @@ export interface PaymentIntent {
   currency: string
   orderId: string
   customerId: string
-  createdAt: Timestamp
-  updatedAt: Timestamp
+  createdAt: string
+  updatedAt: string
 }
 
 export interface PaymentMethod {
@@ -44,19 +43,24 @@ export async function createStripeCustomer(
       email,
       name,
       metadata: {
-        firebaseUid: customerId
+        supabaseUid: customerId
       }
     })
 
     console.log('[PaymentService] Stripe customer created successfully:', customer.id)
 
-    // Save Stripe customer ID to Firestore
-    const userRef = doc(db, 'users', customerId)
-    await updateDoc(userRef, {
-      stripeCustomerId: customer.id
-    })
+    // Save Stripe customer ID to Supabase
+    const { error } = await supabase
+      .from('users')
+      .update({ stripe_customer_id: customer.id })
+      .eq('id', customerId)
 
-    console.log('[PaymentService] Stripe customer ID saved to Firestore')
+    if (error) {
+      console.error('[PaymentService] Error saving Stripe customer ID to Supabase:', error)
+      throw error
+    }
+
+    console.log('[PaymentService] Stripe customer ID saved to Supabase')
     return customer.id
   } catch (error: any) {
     // Handle rate limiting (429 error) with exponential backoff
@@ -82,20 +86,23 @@ export async function createPaymentIntent(
   try {
     console.log('[Payment] Creating payment intent for:', { customerId, amount, orderId })
     
-    // Get Stripe customer ID
-    const userRef = doc(db, 'users', customerId)
-    const userSnap = await getDoc(userRef)
+    // Get Stripe customer ID from Supabase
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('stripe_customer_id')
+      .eq('id', customerId)
+      .single()
     
-    if (!userSnap.exists()) {
-      console.error('[Payment] User not found in Firestore:', customerId)
-      throw new Error('User not found in Firestore')
+    if (userError || !userData) {
+      console.error('[Payment] User not found in Supabase:', customerId)
+      throw new Error('User not found in Supabase')
     }
 
-    const stripeCustomerId = userSnap.data().stripeCustomerId
+    const stripeCustomerId = userData.stripe_customer_id
     console.log('[Payment] Retrieved stripeCustomerId:', stripeCustomerId)
     
     if (!stripeCustomerId) {
-      console.error('[Payment] Stripe customer not set up. User data:', userSnap.data())
+      console.error('[Payment] Stripe customer not set up. User data:', userData)
       throw new Error('Stripe customer not set up - run createStripeCustomer() first')
     }
 
@@ -108,7 +115,7 @@ export async function createPaymentIntent(
       description: description || `Order ${orderId}`,
       metadata: {
         orderId,
-        firebaseUid: customerId
+        supabaseUid: customerId
       }
     })
 
@@ -118,17 +125,23 @@ export async function createPaymentIntent(
       clientSecret: paymentIntent.client_secret ? 'present' : 'missing'
     })
 
-    // Save to Firestore
-    await addDoc(collection(db, 'payments'), {
-      stripePaymentIntentId: paymentIntent.id,
-      orderId,
-      customerId,
-      amount,
-      currency: 'aud',
-      status: paymentIntent.status,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
-    })
+    // Save to Supabase
+    const { error: insertError } = await supabase
+      .from('transactions')
+      .insert([{
+        stripe_payment_intent_id: paymentIntent.id,
+        order_id: orderId,
+        user_id: customerId,
+        amount,
+        currency: 'aud',
+        status: paymentIntent.status,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+
+    if (insertError) {
+      console.error('[Payment] Error saving payment intent to Supabase:', insertError)
+    }
 
     return {
       clientSecret: paymentIntent.client_secret || '',
@@ -148,14 +161,17 @@ export async function savePaymentMethod(
   isDefault: boolean = false
 ): Promise<PaymentMethod | null> {
   try {
-    const userRef = doc(db, 'users', customerId)
-    const userSnap = await getDoc(userRef)
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('stripe_customer_id')
+      .eq('id', customerId)
+      .single()
     
-    if (!userSnap.exists()) {
+    if (userError || !userData) {
       throw new Error('User not found')
     }
 
-    const stripeCustomerId = userSnap.data().stripeCustomerId
+    const stripeCustomerId = userData.stripe_customer_id
     if (!stripeCustomerId) {
       throw new Error('Stripe customer not set up')
     }
@@ -176,15 +192,8 @@ export async function savePaymentMethod(
       })
     }
 
-    // Save to Firestore
-    const paymentMethodsRef = collection(db, 'users', customerId, 'payment_methods')
-    await addDoc(paymentMethodsRef, {
-      stripePaymentMethodId,
-      type: paymentMethod.type,
-      card: paymentMethod.card,
-      isDefault,
-      createdAt: Timestamp.now()
-    })
+    // For now, payment methods are managed through Stripe
+    // In future, could store reference in Supabase if needed
 
     return {
       id: stripePaymentMethodId,
@@ -207,14 +216,17 @@ export async function savePaymentMethod(
 // Get saved payment methods
 export async function getPaymentMethods(customerId: string): Promise<PaymentMethod[]> {
   try {
-    const userRef = doc(db, 'users', customerId)
-    const userSnap = await getDoc(userRef)
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('stripe_customer_id')
+      .eq('id', customerId)
+      .single()
     
-    if (!userSnap.exists()) {
+    if (userError || !userData) {
       return []
     }
 
-    const stripeCustomerId = userSnap.data().stripeCustomerId
+    const stripeCustomerId = userData.stripe_customer_id
     if (!stripeCustomerId) {
       return []
     }
@@ -252,9 +264,6 @@ export async function confirmPayment(
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
 
     if (paymentIntent.status === 'succeeded') {
-      // Find and update order
-      const paymentsRef = collection(db, 'payments')
-      // Query by payment intent ID and update
       console.log('Payment confirmed:', paymentIntentId)
       return true
     }
@@ -272,14 +281,17 @@ export async function createSubscription(
   priceId: string
 ): Promise<string | null> {
   try {
-    const userRef = doc(db, 'users', customerId)
-    const userSnap = await getDoc(userRef)
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('stripe_customer_id')
+      .eq('id', customerId)
+      .single()
     
-    if (!userSnap.exists()) {
+    if (userError || !userData) {
       throw new Error('User not found')
     }
 
-    const stripeCustomerId = userSnap.data().stripeCustomerId
+    const stripeCustomerId = userData.stripe_customer_id
     if (!stripeCustomerId) {
       throw new Error('Stripe customer not set up')
     }
@@ -291,14 +303,23 @@ export async function createSubscription(
       expand: ['latest_invoice.payment_intent']
     })
 
-    // Save to Firestore
-    await updateDoc(userRef, {
-      stripeSubscriptionId: subscription.id,
-      subscriptionStatus: subscription.status,
-      subscriptionPriceId: priceId,
-      subscriptionStartDate: Timestamp.fromDate(new Date((subscription as any).current_period_start * 1000)),
-      subscriptionEndDate: Timestamp.fromDate(new Date((subscription as any).current_period_end * 1000))
-    })
+    // Save to Supabase
+    const { error: updateError } = await supabase
+      .from('subscriptions')
+      .insert([{
+        user_id: customerId,
+        stripe_subscription_id: subscription.id,
+        plan_type: priceId,
+        status: subscription.status,
+        current_period_start: new Date((subscription as any).current_period_start * 1000).toISOString(),
+        current_period_end: new Date((subscription as any).current_period_end * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+
+    if (updateError) {
+      console.error('[Payment] Error saving subscription to Supabase:', updateError)
+    }
 
     return subscription.id
   } catch (error) {
@@ -343,14 +364,17 @@ export async function getPaymentHistory(
   limit: number = 20
 ): Promise<PaymentIntent[]> {
   try {
-    const userRef = doc(db, 'users', customerId)
-    const userSnap = await getDoc(userRef)
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('stripe_customer_id')
+      .eq('id', customerId)
+      .single()
     
-    if (!userSnap.exists()) {
+    if (userError || !userData) {
       return []
     }
 
-    const stripeCustomerId = userSnap.data().stripeCustomerId
+    const stripeCustomerId = userData.stripe_customer_id
     if (!stripeCustomerId) {
       return []
     }
@@ -368,8 +392,8 @@ export async function getPaymentHistory(
       currency: charge.currency,
       orderId: charge.metadata?.orderId || '',
       customerId,
-      createdAt: Timestamp.fromDate(new Date(charge.created * 1000)),
-      updatedAt: Timestamp.fromDate(new Date(charge.created * 1000))
+      createdAt: new Date(charge.created * 1000).toISOString(),
+      updatedAt: new Date(charge.created * 1000).toISOString()
     }))
   } catch (error) {
     console.error('Error fetching payment history:', error)

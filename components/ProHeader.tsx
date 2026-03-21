@@ -4,8 +4,7 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { Menu, X, LogOut, Home, Package, Briefcase, DollarSign, Settings, Zap, ChevronDown, ArrowLeft } from 'lucide-react'
-import { signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { createClient } from '@supabase/supabase-js'
 import { useAuth } from '@/lib/AuthContext'
 
 export default function ProHeader() {
@@ -18,11 +17,16 @@ export default function ProHeader() {
 
   const handleLogout = async () => {
     try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      
       // Clear pro mode
       localStorage.removeItem('proMode')
       sessionStorage.removeItem('proMode')
       
-      await signOut(auth)
+      await supabase.auth.signOut()
       router.push('/')
     } catch (error) {
       console.error('Logout error:', error)
@@ -153,13 +157,13 @@ export default function ProHeader() {
               className="w-10 h-10 bg-white rounded-full flex items-center justify-center font-bold text-primary hover:shadow-lg transition"
               title={user?.email || 'User'}
             >
-              {userData?.firstName?.charAt(0) || user?.email?.charAt(0) || 'P'}
+              {userData?.name?.charAt(0) || user?.email?.charAt(0) || 'P'}
             </button>
             
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white text-dark rounded-lg shadow-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-200">
-                  <p className="font-semibold text-dark">{userData?.firstName} {userData?.lastName}</p>
+                  <p className="font-semibold text-dark">{userData?.name}</p>
                   <p className="text-xs text-gray">{user?.email}</p>
                 </div>
                 <Link

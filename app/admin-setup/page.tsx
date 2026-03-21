@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
+import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/Button'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 
 export default function AdminSetupPage() {
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -21,20 +22,24 @@ export default function AdminSetupPage() {
     setMessage(null)
 
     try {
-      // Get the user's ID token
-      const idToken = await user.getIdToken(true)
+      // Get session token from Supabase
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('No active session found')
+      }
 
       // Call the setup API to grant admin claims
       const response = await fetch('/api/admin/setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          uid: user.uid,
+          user_id: user.id,
           email: user.email,
-          name: user.displayName || user.email?.split('@')[0],
+          name: userData?.name || user.email?.split('@')[0],
         }),
       })
 

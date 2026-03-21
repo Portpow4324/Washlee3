@@ -60,22 +60,22 @@ function SignupChoiceContent() {
           </div>
 
           {/* Two Choice Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
             {/* Customer Signup */}
             <Link href="/auth/signup-customer">
-              <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 h-full flex flex-col items-center justify-center cursor-pointer hover:scale-105">
-                <div className="bg-mint rounded-full p-6 mb-6">
+              <div className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 h-full flex flex-col items-center justify-center cursor-pointer hover:-translate-y-2">
+                <div className="bg-mint rounded-2xl p-6 mb-6 group-hover:bg-accent transition-colors duration-300">
                   <Users size={48} className="text-primary" />
                 </div>
                 <h2 className="text-2xl font-bold text-dark mb-3 text-center">
-                  Customer Sign Up
+                  I'm a Customer
                 </h2>
-                <p className="text-gray text-center mb-6">
-                  Schedule convenient laundry pickups and deliveries. Save time doing what matters most.
+                <p className="text-gray text-center mb-8 flex-1">
+                  Get your laundry picked up, washed, and delivered fresh to your door
                 </p>
-                <div className="mt-auto">
-                  <Button variant="primary" size="lg">
-                    Sign Up
+                <div className="w-full">
+                  <Button variant="primary" size="lg" className="w-full">
+                    Sign Up Now
                   </Button>
                 </div>
               </div>
@@ -83,18 +83,18 @@ function SignupChoiceContent() {
 
             {/* Washlee Pro Signup */}
             <Link href="/auth/pro-signup">
-              <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 h-full flex flex-col items-center justify-center cursor-pointer hover:scale-105">
-                <div className="bg-accent rounded-full p-6 mb-6">
+              <div className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 h-full flex flex-col items-center justify-center cursor-pointer hover:-translate-y-2">
+                <div className="bg-accent rounded-2xl p-6 mb-6 group-hover:bg-mint transition-colors duration-300">
                   <Briefcase size={48} className="text-primary" />
                 </div>
                 <h2 className="text-2xl font-bold text-dark mb-3 text-center">
-                  Become a Washlee Pro
+                  I'm a Washlee Pro
                 </h2>
-                <p className="text-gray text-center mb-6">
-                  Earn flexible income providing professional laundry services in your community.
+                <p className="text-gray text-center mb-8 flex-1">
+                  Earn money by offering professional laundry services in your area
                 </p>
-                <div className="mt-auto">
-                  <Button variant="primary" size="lg">
+                <div className="w-full">
+                  <Button variant="primary" size="lg" className="w-full">
                     Apply Now
                   </Button>
                 </div>

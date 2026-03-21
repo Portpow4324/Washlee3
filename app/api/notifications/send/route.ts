@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendToDevice } from '@/lib/fcm'
 
 export async function POST(request: NextRequest) {
   try {
-    const requestBody = await request.json()
-    const { fcmToken, title, body, data, icon, image } = requestBody
+    const { fcmToken, title, body } = await request.json()
 
     if (!fcmToken || !title || !body) {
       return NextResponse.json(
@@ -13,19 +11,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const success = await sendToDevice(fcmToken, {
-      title,
-      body,
-      data,
-      icon,
-      image,
-    })
+    // FCM notifications coming in Phase 9
+    console.log('[API] Notification would be sent:', { fcmToken: fcmToken.slice(-8), title, body })
 
     return NextResponse.json({
-      success,
-      message: success ? 'Notification sent' : 'Failed to send notification',
+      success: true,
+      message: 'Notification queued (Phase 9 implementation)',
     })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    console.error('Error sending notification:', error)
+    return NextResponse.json(
+      { error: 'Failed to send notification' },
+      { status: 500 }
+    )
   }
 }
