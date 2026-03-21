@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdminClient } from '@/lib/supabaseFactory'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16' as any,
 })
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
 
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseAdminClient()
   return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdminClient()
   try {
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
@@ -102,13 +100,16 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const supabase = getSupabaseAdminClient()
   return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
 }
 
 export async function PUT(request: NextRequest) {
+  const supabase = getSupabaseAdminClient()
   return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
 }
 
 export async function DELETE(request: NextRequest) {
+  const supabase = getSupabaseAdminClient()
   return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
 }

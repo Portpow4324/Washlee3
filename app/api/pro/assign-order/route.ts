@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendProOrderAssignment } from '@/lib/emailService'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdminClient } from '@/lib/supabaseFactory'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 /**
  * POST /api/pro/assign-order
@@ -22,6 +18,7 @@ const supabase = createClient(
  * - earnings: string (optional)
  */
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdminClient()
   try {
     const { 
       orderId, 
