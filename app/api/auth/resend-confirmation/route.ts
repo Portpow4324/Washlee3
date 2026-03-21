@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServiceRoleClient } from '@/lib/supabaseClientFactory'
 import { sendEmail } from '@/lib/emailService'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
 
 /**
  * POST /api/auth/resend-confirmation
  * Resend verification email for an existing user
  */
 export async function POST(request: NextRequest) {
+  const supabase = getServiceRoleClient()
   console.log('[RESEND-CONFIRMATION] ==========================================')
   console.log('[RESEND-CONFIRMATION] POST /api/auth/resend-confirmation called')
 
