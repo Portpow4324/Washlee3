@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       authUsersCount: users?.length || 0,
       customersCount: customers?.length || 0,
-      authUsers: users?.map(u => ({
+      authUsers: users?.map((u: any) => ({
         id: u.id,
         email: u.email,
         created_at: u.created_at,
@@ -72,7 +72,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const user = users?.find(u => u.email === email)
+    const user = users?.find((u: any) => u.email === email)
     if (!user) {
       return NextResponse.json(
         { error: 'User not found', email },

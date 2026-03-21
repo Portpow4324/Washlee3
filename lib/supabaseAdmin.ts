@@ -5,30 +5,49 @@
  * Never expose to client/browser
  * 
  * Usage:
- *   import { supabaseAdmin } from '@/lib/supabaseAdmin'
- *   const { data, error } = await supabaseAdmin.from('customers').select('*')
+ *   import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
+ *   const { data, error } = await getSupabaseAdmin().from('customers').select('*')
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Lazy initialization to avoid build-time credential requirements
+let supabaseAdminClient: SupabaseClient | null = null
 
-if (!supabaseUrl || !serviceRoleKey) {
-  console.error(
-    '❌ Missing Supabase credentials for admin client:',
-    !supabaseUrl ? 'NEXT_PUBLIC_SUPABASE_URL' : '',
-    !serviceRoleKey ? 'SUPABASE_SERVICE_ROLE_KEY' : ''
-  )
+function getSupabaseAdmin(): SupabaseClient {
+  if (!supabaseAdminClient) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error(
+        '❌ Missing Supabase credentials for admin client:',
+        !supabaseUrl ? 'NEXT_PUBLIC_SUPABASE_URL' : '',
+        !serviceRoleKey ? 'SUPABASE_SERVICE_ROLE_KEY' : ''
+      )
+      throw new Error('Missing Supabase credentials')
+    }
+
+    // Create admin client with service role (full database access)
+    supabaseAdminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  }
+
+  return supabaseAdminClient
 }
 
-// Create admin client with service role (full database access)
-export const supabaseAdmin = createClient(supabaseUrl || '', serviceRoleKey || '', {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
+// Export both for backwards compatibility
+export const supabaseAdmin = {
+  from: (table: string) => getSupabaseAdmin().from(table),
+  auth: getSupabaseAdmin().auth,
+  rpc: (name: string, params?: any) => getSupabaseAdmin().rpc(name, params),
+} as any
+
+export { getSupabaseAdmin }
 
 /**
  * Verify user is admin by checking custom claim or admin column
