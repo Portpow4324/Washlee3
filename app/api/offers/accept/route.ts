@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find employee by ID
-    const { data: employee, error: employeeError } = await supabase
+    const { data: employee, error: employeeError } = await supabaseAdmin
       .from('employees')
       .select('user_id, offer_accepted_at')
       .eq('id', employeeId)
@@ -43,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update employee record
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('employees')
       .update({
         offer_accepted_at: new Date().toISOString(),
