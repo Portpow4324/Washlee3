@@ -7,11 +7,18 @@ import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import { CheckCircle, Clock, MapPin, Package, ChevronRight } from 'lucide-react'
 
+interface OrderData {
+  totalPrice?: number | string
+  weight?: number
+  service?: string
+  [key: string]: any
+}
+
 export default function CheckoutSuccessPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [orderId, setOrderId] = useState('')
-  const [order, setOrder] = useState(null)
+  const [order, setOrder] = useState<OrderData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
