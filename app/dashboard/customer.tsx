@@ -67,8 +67,16 @@ export default function CustomerDashboard() {
           return
         }
 
-        setOrders(data || [])
-        console.log('[Dashboard] Loaded orders:', data)
+        // Transform data to match Order interface
+        const transformedOrders = (data || []).map((order: any) => ({
+          ...order,
+          employees: Array.isArray(order.employees) && order.employees.length > 0 
+            ? order.employees[0] 
+            : null
+        }))
+
+        setOrders(transformedOrders as Order[])
+        console.log('[Dashboard] Loaded orders:', transformedOrders)
         setOrdersLoading(false)
       } catch (err) {
         console.error('[Dashboard] Error:', err)

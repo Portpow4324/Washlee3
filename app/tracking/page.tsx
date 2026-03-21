@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Head from 'next/head'
 import Header from '@/components/Header'
@@ -24,7 +24,7 @@ interface Order {
   pro_lng?: number
 }
 
-export default function TrackingPage() {
+function TrackingPageContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('id') || searchParams.get('orderId')
   const [order, setOrder] = useState<Order | null>(null)
@@ -68,13 +68,17 @@ export default function TrackingPage() {
           return
         }
 
+        // Transform Supabase array responses to single objects
+        const userData = Array.isArray(data.users) && data.users.length > 0 ? data.users[0] : null
+        const employeeData = Array.isArray(data.employees) && data.employees.length > 0 ? data.employees[0] : null
+
         const transformedOrder: Order = {
           id: data.id,
           status: data.status,
-          customer_name: data.users?.name || 'Unknown',
-          pro_name: data.employees?.name,
-          pro_phone: data.employees?.phone,
-          pro_rating: data.employees?.rating,
+          customer_name: userData?.name || 'Unknown',
+          pro_name: employeeData?.name,
+          pro_phone: employeeData?.phone,
+          pro_rating: employeeData?.rating,
           pickup_address: data.pickup_address,
           delivery_address: data.delivery_address,
           weight: data.weight,
@@ -280,5 +284,17 @@ export default function TrackingPage() {
         <Footer />
       </div>
     </>
+  )
+}
+
+export default function TrackingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-light">
+        <Spinner />
+      </div>
+    }>
+      <TrackingPageContent />
+    </Suspense>
   )
 }

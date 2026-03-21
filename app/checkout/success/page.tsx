@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -9,12 +9,17 @@ import { CheckCircle, Clock, MapPin, Package, ChevronRight } from 'lucide-react'
 
 interface OrderData {
   totalPrice?: number | string
+  subtotal?: number | string
   weight?: number
   service?: string
+  serviceType?: string
+  protectionPlan?: string
+  deliveryAddressLine1?: string
+  deliveryAddressLine2?: string
   [key: string]: any
 }
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [orderId, setOrderId] = useState('')
@@ -153,20 +158,22 @@ export default function CheckoutSuccessPage() {
             {/* Pricing Breakdown */}
             <div className="space-y-3 mb-6">
               <div className="flex justify-between">
-                <span className="text-gray">{order.weight}kg @ ${(order.subtotal / order.weight).toFixed(2)}/kg</span>
-                <span className="font-semibold text-dark">${order.subtotal}</span>
+                <span className="text-gray">
+                  {order.weight && order.subtotal ? `${order.weight}kg @ $${((Number(order.subtotal) / order.weight).toFixed(2))}/kg` : 'N/A'}
+                </span>
+                <span className="font-semibold text-dark">${order.subtotal || '0.00'}</span>
               </div>
               {order.protectionPlan && order.protectionPlan !== 'basic' && (
                 <div className="flex justify-between">
                   <span className="text-gray">{order.protectionPlan} Protection</span>
                   <span className="font-semibold text-dark">
-                    ${(order.totalPrice - order.subtotal).toFixed(2)}
+                    ${order.weight && order.subtotal ? (Number(order.totalPrice) - Number(order.subtotal)).toFixed(2) : '0.00'}
                   </span>
                 </div>
               )}
               <div className="flex justify-between border-t border-gray/10 pt-3">
                 <span className="font-bold text-dark">Total</span>
-                <span className="text-lg font-bold text-primary">${order.totalPrice}</span>
+                <span className="text-lg font-bold text-primary">${order.totalPrice || '0.00'}</span>
               </div>
             </div>
 
@@ -290,5 +297,17 @@ export default function CheckoutSuccessPage() {
 
       <Footer />
     </div>
+  )
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-light">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary"></div>
+      </div>
+    }>
+      <CheckoutSuccessContent />
+    </Suspense>
   )
 }

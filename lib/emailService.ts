@@ -489,11 +489,11 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
 
       console.log('[EMAIL] Sending via Resend from:', resendFromEmail)
       const response = await resend.emails.send({
-        from: resendFromEmail,
+        from: resendFromEmail || 'noreply@washlee.com',
         to: options.to,
         subject: options.subject,
         html: options.html,
-        replyTo: options.replyTo || resendFromEmail,
+        replyTo: options.replyTo || resendFromEmail || 'noreply@washlee.com',
       })
 
       if (response.error) {
