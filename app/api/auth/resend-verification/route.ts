@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdminClient } from '@/lib/supabaseFactory'
 import { sendEmail } from '@/lib/emailService'
 import { getVerificationEmailHtml } from '@/lib/resend-email'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
-
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseAdminClient()
     console.log('[ResendVerification] POST endpoint called!')
     const body = await request.json()
     const { email } = body

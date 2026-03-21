@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdminClient } from '@/lib/supabaseFactory'
 import { sendProApplicationRejected } from '@/lib/emailService'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseAdminClient()
     const { inquiryId, adminId, adminName, rejectionReason } = await request.json()
 
     if (!inquiryId || !adminId || !rejectionReason) {

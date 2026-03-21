@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { getSupabaseAdminClient } from '@/lib/supabaseFactory'
 
 /**
  * Generates unique employee/payslip codes
@@ -13,6 +8,7 @@ const supabase = createClient(
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseAdminClient()
     const { count = 1, format = 'standard' } = await request.json()
 
     if (count < 1 || count > 100) {
@@ -77,6 +73,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabaseAdminClient()
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '10')
 
