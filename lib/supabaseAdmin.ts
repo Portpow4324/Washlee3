@@ -40,12 +40,13 @@ function getSupabaseAdmin(): SupabaseClient {
   return supabaseAdminClient
 }
 
-// Export both for backwards compatibility
-export const supabaseAdmin = {
-  from: (table: string) => getSupabaseAdmin().from(table),
-  auth: getSupabaseAdmin().auth,
-  rpc: (name: string, params?: any) => getSupabaseAdmin().rpc(name, params),
-} as any
+// Create a Proxy that lazily initializes on first access
+export const supabaseAdmin = new Proxy({} as any, {
+  get: (_target, prop) => {
+    const client = getSupabaseAdmin()
+    return (client as any)[prop]
+  },
+})
 
 export { getSupabaseAdmin }
 
