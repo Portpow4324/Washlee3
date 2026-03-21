@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy initialization to avoid build-time issues
+let supabase: SupabaseClient | null = null
+
+function getSupabaseClient() {
+  if (!supabase) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+    }
+    
+    supabase = createClient(url, key)
+  }
+  return supabase
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,9 +32,9 @@ export async function POST(request: NextRequest) {
         else if (dateRange === '30days') startDate.setDate(now.getDate() - 30)
         else if (dateRange === '90days') startDate.setDate(now.getDate() - 90)
 
-        const { data: allOrders = [] } = await supabase.from('orders').select('*')
-        const { data: allUsers = [] } = await supabase.from('users').select('*')
-        const { data: inquiries = [] } = await supabase.from('inquiries').select('*').eq('status', 'pending')
+        const { data: allOrders = [] } = await getSupabaseClient().from('orders').select('*')
+        const { data: allUsers = [] } = await getSupabaseClient().from('users').select('*')
+        const { data: inquiries = [] } = await getSupabaseClient().from('inquiries').select('*').eq('status', 'pending')
 
         const ordersArray = allOrders || []
         const recentOrders = ordersArray.filter((order: any) => new Date(order.created_at) >= startDate)
@@ -48,7 +60,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'get_user_analytics': {
-        const { data: users = [] } = await supabase.from('users').select('*')
+        const { data: users = [] } = await getSupabaseClient().from('users').select('*')
         const customers = (users || []).filter((u: any) => u.user_type === 'customer')
         const pros = (users || []).filter((u: any) => u.user_type === 'pro')
         const admins = (users || []).filter((u: any) => u.is_admin)
@@ -63,7 +75,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'get_order_analytics': {
-        const { data: orders = [] } = await supabase.from('orders').select('*')
+        const { data: orders = [] } = await getSupabaseClient().from('orders').select('*')
 
         const ordersArray = orders || []
         const statuses = {
@@ -87,7 +99,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'get_payment_analytics': {
-        const { data: payments = [] } = await supabase.from('payments').select('*')
+        const { data: payments = [] } = await getSupabaseClient().from('payments').select('*')
 
         const paymentsArray = payments || []
         const succeeded = paymentsArray.filter((p: any) => p.status === 'succeeded').length

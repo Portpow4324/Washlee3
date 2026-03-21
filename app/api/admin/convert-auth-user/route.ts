@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy initialization to avoid build-time issues
+let supabase: SupabaseClient | null = null
+
+function getSupabaseClient() {
+  if (!supabase) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+    }
+    
+    supabase = createClient(url, key)
+  }
+  return supabase
+}
 
 /**
  * POST /api/admin/convert-auth-user
@@ -42,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     // Create profile in appropriate table
     if (type === 'employee') {
-      const { error: employeeError } = await supabase
+      const { error: employeeError } = await getSupabaseClient()
         .from('employees')
         .insert({
           user_id: userId,
@@ -74,7 +86,7 @@ export async function POST(request: NextRequest) {
         userId
       })
     } else if (type === 'customer') {
-      const { error: customerError } = await supabase
+      const { error: customerError } = await getSupabaseClient()
         .from('users')
         .insert({
           id: userId,
