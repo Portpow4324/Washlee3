@@ -5,7 +5,22 @@ export async function POST(request: NextRequest) {
   console.log('[SIGNUP] ==========================================')
   console.log('[SIGNUP] POST /api/auth/signup called')
   
-  const supabase = getServiceRoleClient()
+  let supabase
+  
+  try {
+    supabase = getServiceRoleClient()
+  } catch (initError: any) {
+    console.error('[SIGNUP] ❌ CRITICAL: Failed to initialize Supabase client')
+    console.error('[SIGNUP] Init error message:', initError?.message)
+    console.error('[SIGNUP] Init error:', initError)
+    return NextResponse.json(
+      { 
+        error: 'Server configuration error: ' + (initError?.message || 'Cannot initialize Supabase'),
+        code: 'INIT_ERROR'
+      },
+      { status: 500 }
+    )
+  }
   
   try {
     const body = await request.json()
@@ -216,13 +231,15 @@ export async function POST(request: NextRequest) {
         })
       
       if (codeError) {
-        console.warn('[SIGNUP] Failed to store verification code:', codeError.message)
-        // Continue anyway - code is generated, just not stored
+        console.warn('[SIGNUP] Warning: Failed to store verification code:', codeError.message)
+        console.warn('[SIGNUP] Code error details:', codeError.details)
+        // Continue anyway - code is generated, just not stored in this table
       } else {
         console.log('[SIGNUP] ✓ Verification code stored')
       }
       
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      console.log('[SIGNUP] Calling /api/auth/send-confirmation at:', baseUrl)
       const emailResponse = await fetch(`${baseUrl}/api/auth/send-confirmation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -233,16 +250,24 @@ export async function POST(request: NextRequest) {
         })
       })
       
+      console.log('[SIGNUP] Email response status:', emailResponse.status)
+      
       if (!emailResponse.ok) {
-        const emailError = await emailResponse.json().catch(() => ({}))
-        console.warn('[SIGNUP] Failed to send verification email:', emailError)
+        let emailError = {}
+        try {
+          emailError = await emailResponse.json()
+        } catch {
+          const text = await emailResponse.text()
+          console.warn('[SIGNUP] Email error response body:', text)
+        }
+        console.warn('[SIGNUP] Warning: Failed to send verification email:', emailError)
         // Don't fail signup if email fails - user can request resend
       } else {
         console.log('[SIGNUP] ✓ Verification email sent successfully')
         emailSent = true
       }
     } catch (emailError) {
-      console.error('[SIGNUP] Error sending email:', emailError)
+      console.error('[SIGNUP] Error in email section:', emailError instanceof Error ? emailError.message : String(emailError))
       // Don't fail signup if email fails
     }
     
@@ -264,13 +289,14 @@ export async function POST(request: NextRequest) {
         })
       
       if (confirmError) {
-        console.warn('[SIGNUP] Failed to log email confirmation:', confirmError.message)
+        console.warn('[SIGNUP] Warning: Failed to log email confirmation:', confirmError.message)
+        console.warn('[SIGNUP] Confirmation error details:', confirmError.details)
         // Don't fail signup - this is just tracking for admins
       } else {
         console.log('[SIGNUP] ✓ Email confirmation logged for admin panel')
       }
     } catch (logError) {
-      console.error('[SIGNUP] Error logging email confirmation:', logError)
+      console.warn('[SIGNUP] Warning: Error logging email confirmation:', logError instanceof Error ? logError.message : String(logError))
       // Don't fail signup
     }
 
@@ -289,18 +315,27 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error: any) {
-    console.error('[SIGNUP] Unexpected error:', error)
-    console.error('[SIGNUP] Error stack:', error.stack)
+    console.error('[SIGNUP] ==========================================')
+    console.error('[SIGNUP] ❌ UNEXPECTED ERROR IN SIGNUP')
+    console.error('[SIGNUP] ==========================================')
+    console.error('[SIGNUP] Error name:', error?.name)
+    console.error('[SIGNUP] Error message:', error?.message)
+    console.error('[SIGNUP] Error status:', error?.status)
+    console.error('[SIGNUP] Error code:', error?.code)
+    console.error('[SIGNUP] Full error object:', JSON.stringify(error, null, 2))
+    console.error('[SIGNUP] Error stack:', error?.stack)
     console.error('[SIGNUP] Error type:', typeof error)
     console.error('[SIGNUP] Error keys:', Object.keys(error || {}))
+    console.error('[SIGNUP] ==========================================')
     
     const errorMessage = error?.message || error?.toString?.() || 'Signup failed'
     console.error('[SIGNUP] Returning error response:', { error: errorMessage })
     
     return NextResponse.json(
       { 
-        error: errorMessage,
-        code: 'SIGNUP_ERROR'
+        error: errorMessage || 'An unexpected error occurred during signup',
+        code: 'SIGNUP_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error?.toString?.() : undefined
       },
       { status: 500 }
     )
@@ -312,7 +347,17 @@ export async function POST(request: NextRequest) {
  * Check if email exists
  */
 export async function GET(request: NextRequest) {
-  const supabase = getServiceRoleClient()
+  let supabase
+  
+  try {
+    supabase = getServiceRoleClient()
+  } catch (initError: any) {
+    console.error('[SIGNUP-GET] Failed to initialize Supabase:', initError?.message)
+    return NextResponse.json(
+      { error: 'Server configuration error' },
+      { status: 500 }
+    )
+  }
   
   try {
     const { searchParams } = new URL(request.url)
