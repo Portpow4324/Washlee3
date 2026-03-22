@@ -4,17 +4,37 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // Lazy initialization to avoid build-time issues
 let supabaseClientInstance: SupabaseClient | null = null
+let initializationAttempted = false
+let initializationError: Error | null = null
 
 function getSupabaseClient(): SupabaseClient {
+  // If we already tried and failed, throw the same error
+  if (initializationAttempted && initializationError) {
+    throw initializationError
+  }
+
   if (!supabaseClientInstance) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Missing Supabase credentials: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required')
+      if (!supabaseUrl || !supabaseAnonKey) {
+        const error = new Error(
+          `Missing Supabase credentials. Check that NEXT_PUBLIC_SUPABASE_URL="${supabaseUrl}" and NEXT_PUBLIC_SUPABASE_ANON_KEY="${supabaseAnonKey ? '***' : 'undefined'}" are set in environment variables.`
+        )
+        initializationError = error
+        initializationAttempted = true
+        throw error
+      }
+
+      supabaseClientInstance = createClient(supabaseUrl, supabaseAnonKey)
+      initializationAttempted = true
+    } catch (error) {
+      if (error instanceof Error) {
+        initializationError = error
+      }
+      throw error
     }
-
-    supabaseClientInstance = createClient(supabaseUrl, supabaseAnonKey)
   }
 
   return supabaseClientInstance
