@@ -49,7 +49,7 @@ export default function ManageAddresses() {
         if (queryError) throw queryError
 
         // Transform business accounts to addresses format
-        const formattedAddresses = (data || []).map(acc => ({
+        const formattedAddresses = (data || []).map((acc: any) => ({
           id: acc.id,
           label: acc.business_name,
           address: acc.address,
@@ -95,9 +95,9 @@ export default function ManageAddresses() {
       const { data } = await supabase
         .from('business_accounts')
         .select('*')
-        .eq('owner_id', user.id)
+        .order('created_at', { ascending: false })
 
-      const formattedAddresses = (data || []).map(acc => ({
+      const formattedAddresses = (data || []).map((acc: any) => ({
         id: acc.id,
         label: acc.business_name,
         address: acc.address,
@@ -156,7 +156,7 @@ export default function ManageAddresses() {
         .select('*')
         .eq('owner_id', user.id)
 
-      const formattedAddresses = (data || []).map(acc => ({
+      const formattedAddresses = (data || []).map((acc: any) => ({
         id: acc.id,
         label: acc.business_name,
         address: acc.address,

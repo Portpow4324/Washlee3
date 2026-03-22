@@ -124,10 +124,10 @@ function TrackingPageContent() {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
-        (payload) => {
+        (payload: any) => {
           console.log('[Tracking] Real-time update:', payload)
           if (payload.new) {
-            setOrder((prev) =>
+            setOrder((prev: any) =>
               prev
                 ? { ...prev, status: payload.new.status }
                 : null

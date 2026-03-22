@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Set up Supabase auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       const currentUserIdentifier = session?.user?.email || 'logged out'
       
       if (previousUserRef.current !== currentUserIdentifier) {

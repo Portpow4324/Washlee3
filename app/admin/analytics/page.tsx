@@ -88,9 +88,9 @@ export default function AnalyticsDashboard() {
         .from('users')
         .select('*', { count: 'exact', head: true })
 
-      const totalRevenue = (orders || []).reduce((sum, order) => sum + (order.total_price || 0), 0)
+      const totalRevenue = (orders || []).reduce((sum: number, order: any) => sum + (order.total_price || 0), 0)
       const totalOrdersCount = orders?.length || 0
-      const completedOrdersCount = (orders || []).filter((o) => o.status === 'delivered').length
+      const completedOrdersCount = (orders || []).filter((o: any) => o.status === 'delivered').length
       const averageOrderValue = totalOrdersCount > 0 ? totalRevenue / totalOrdersCount : 0
 
       const dailyRevenue: Record<string, number> = {}
@@ -101,14 +101,14 @@ export default function AnalyticsDashboard() {
         dailyRevenue[dateStr] = 0
       }
 
-      ;(orders || []).forEach((order) => {
+      ;(orders || []).forEach((order: any) => {
         const orderDate = new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
         if (orderDate in dailyRevenue) {
           dailyRevenue[orderDate] += order.total_price || 0
         }
       })
 
-      const revenueChartData = Object.entries(dailyRevenue).map(([date, revenue]) => ({
+      const revenueChartData = Object.entries(dailyRevenue).map(([date, revenue]: [string, number]) => ({
         date,
         revenue: Math.round(revenue * 100) / 100,
       }))
@@ -120,14 +120,14 @@ export default function AnalyticsDashboard() {
         delivered: 0,
         cancelled: 0,
       }
-      ;(orders || []).forEach((order) => {
+      ;(orders || []).forEach((order: any) => {
         const status = order.status || 'pending'
         if (status in statusCount) {
           statusCount[status]++
         }
       })
 
-      const orderStatusChartData = Object.entries(statusCount).map(([status, count]) => ({
+      const orderStatusChartData = Object.entries(statusCount).map(([status, count]: [string, number]) => ({
         status: status.charAt(0).toUpperCase() + status.slice(1),
         count,
       }))
@@ -162,11 +162,11 @@ export default function AnalyticsDashboard() {
       const midDate = new Date()
       midDate.setDate(midDate.getDate() - Math.floor(days / 2))
       const firstHalf = (orders || [])
-        .filter(o => new Date(o.created_at) < midDate)
-        .reduce((sum, o) => sum + (o.total_price || 0), 0)
+        .filter((o: any) => new Date(o.created_at) < midDate)
+        .reduce((sum: number, o: any) => sum + (o.total_price || 0), 0)
       const secondHalf = (orders || [])
-        .filter(o => new Date(o.created_at) >= midDate)
-        .reduce((sum, o) => sum + (o.total_price || 0), 0)
+        .filter((o: any) => new Date(o.created_at) >= midDate)
+        .reduce((sum: number, o: any) => sum + (o.total_price || 0), 0)
       const revenueGrowth = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf * 100) : 0
 
       setAnalytics({

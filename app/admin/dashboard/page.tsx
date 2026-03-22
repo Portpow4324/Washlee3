@@ -90,14 +90,14 @@ export default function AdminDashboard() {
 
         // Calculate total revenue
         let totalRevenue = 0
-        const activeOrders = (ordersData || []).filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length
+        const activeOrders = (ordersData || []).filter((o: any) => o.status !== 'delivered' && o.status !== 'cancelled').length
         
         ;(ordersData || []).forEach((order: any) => {
           totalRevenue += order.total_price || 0
         })
 
         // Calculate completion rate
-        const deliveredCount = (ordersData || []).filter(o => o.status === 'delivered').length
+        const deliveredCount = (ordersData || []).filter((o: any) => o.status === 'delivered').length
         const completionRate = orderCount ? Math.round((deliveredCount / orderCount) * 100) : 0
 
         // Transform recent orders

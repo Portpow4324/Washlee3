@@ -32,17 +32,17 @@ export default function ProEarningsPage() {
           setEarnings(data)
 
           // Calculate stats
-          const total = data.reduce((sum, e) => sum + (e.amount || 0), 0)
+          const total = data.reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
           const thisMonth = data
-            .filter((e) => {
+            .filter((e: any) => {
               const date = new Date(e.created_at)
               const now = new Date()
               return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
             })
-            .reduce((sum, e) => sum + (e.amount || 0), 0)
+            .reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
           const pending = data
-            .filter((e) => e.status === 'pending')
-            .reduce((sum, e) => sum + (e.amount || 0), 0)
+            .filter((e: any) => e.status === 'pending')
+            .reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
 
           setStats({
             totalEarnings: total,
