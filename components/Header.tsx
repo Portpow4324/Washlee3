@@ -111,7 +111,7 @@ export default function Header() {
             <Link href="/faq" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
               FAQ
             </Link>
-            <Link href="/loyalty" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
+            <Link href="/wash-club" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
               WASH Club
             </Link>
             <Link href="/pro" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
@@ -259,7 +259,7 @@ export default function Header() {
             <Link href="/faq" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
               FAQ
             </Link>
-            <Link href="/loyalty" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
+            <Link href="/wash-club" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
               WASH Club
             </Link>
             <Link href="/pro" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">

@@ -50,11 +50,17 @@ export async function POST(request: NextRequest) {
     console.log('[SIGNUP] Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'MISSING')
     console.log('[SIGNUP] Service role key:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'configured' : 'MISSING')
     
+    // Parse first and last names
+    const [firstName, ...lastNameParts] = name.split(' ')
+    const lastName = lastNameParts.join(' ') || ''
+    
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
       user_metadata: {
         name,
+        first_name: firstName,
+        last_name: lastName,
         phone,
         user_type: userType,
       },
@@ -139,58 +145,51 @@ export async function POST(request: NextRequest) {
 
     // Create customer or pro record based on user type
     if (userType === 'customer') {
-      console.log('[SIGNUP] Creating customer record')
-      const [firstName, ...lastNameParts] = name.split(' ')
-      const lastName = lastNameParts.join(' ') || ''
+      console.log('[SIGNUP] Creating customer record for user_id:', userId)
+      console.log('[SIGNUP] Customer data:', { email, firstName, lastName })
       
-      const { error: customerError } = await supabase
+      const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .insert({
           id: userId,
           email,
           first_name: firstName,
           last_name: lastName,
-          phone: phone || null,
-          state: state || null,
-          personal_use: personalUse || null,
-          subscription_active: false,
-          subscription_plan: null,
-          subscription_status: 'inactive',
-          payment_status: 'no_payment_method',
-          delivery_address: null,
-          account_status: 'active',
         })
+        .select()
 
       if (customerError) {
-        console.warn('[SIGNUP] Customer record creation failed:', customerError.message)
+        console.warn('[SIGNUP] ❌ Customer record creation failed:', customerError.message)
+        console.warn('[SIGNUP] Error code:', customerError.code)
+        console.warn('[SIGNUP] Error details:', customerError.details)
         console.warn('[SIGNUP] Continuing anyway - auth user was created successfully')
         // Don't fail - auth user is created
       } else {
-        console.log('[SIGNUP] ✓ Customer record created')
+        console.log('[SIGNUP] ✓ Customer record created:', customerData)
       }
     } else if (userType === 'pro') {
-      console.log('[SIGNUP] Creating pro/employee record')
-      const { error: employeeError } = await supabase
+      console.log('[SIGNUP] Creating pro/employee record for user_id:', userId)
+      console.log('[SIGNUP] Employee data:', { email, name, firstName, lastName })
+      
+      const { data: employeeData, error: employeeError } = await supabase
         .from('employees')
         .insert({
           id: userId,
           email,
           name,
-          phone: phone || null,
-          rating: 0,
-          total_reviews: 0,
-          completed_orders: 0,
-          earnings: 0,
-          availability_status: 'available',
-          account_status: 'pending',
+          first_name: firstName,
+          last_name: lastName,
         })
+        .select()
 
       if (employeeError) {
-        console.warn('[SIGNUP] Pro record creation failed (table may not exist):', employeeError.message)
+        console.warn('[SIGNUP] ❌ Pro record creation failed:', employeeError.message)
+        console.warn('[SIGNUP] Error code:', employeeError.code)
+        console.warn('[SIGNUP] Error details:', employeeError.details)
         console.warn('[SIGNUP] Continuing anyway - auth user was created successfully')
         // Don't fail - auth user is created
       } else {
-        console.log('[SIGNUP] ✓ Pro record created')
+        console.log('[SIGNUP] ✓ Pro record created:', employeeData)
       }
     }
 

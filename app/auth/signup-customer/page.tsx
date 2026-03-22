@@ -591,8 +591,7 @@ export default function SignupCustomer() {
     const handleSkipWashClub = () => {
       setShowWashClubModal(false)
       setIsRedirecting(true)
-      const finalPlanData = formData.selectedPlan === 'none' ? '/' : '/pricing'
-      router.push(finalPlanData)
+      router.push('/')
     }
 
     return (
@@ -609,9 +608,9 @@ export default function SignupCustomer() {
             </div>
             <h1 className="text-3xl font-bold text-dark mb-3">Account Created!</h1>
             <p className="text-gray mb-6">Welcome to Washlee. Your account is all set up.</p>
-            <p className="text-sm text-gray mb-8">Redirecting you to plans...</p>
-            <Link href="/pricing" className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold">
-              Go to Plans
+            <p className="text-sm text-gray mb-8">Redirecting you home...</p>
+            <Link href="/" className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold">
+              Go Home
             </Link>
           </div>
         </div>

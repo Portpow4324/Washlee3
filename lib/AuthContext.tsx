@@ -80,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('[Auth] Found customer profile:', customer.email)
             setUserData({
               ...customer,
+              name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'User',
               user_type: 'customer'
             } as UserData)
             setLoading(false)
@@ -105,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('[Auth] Found employee profile:', employee.email)
             setUserData({
               ...employee,
+              name: `${employee.first_name || employee.name || ''} ${employee.last_name || ''}`.trim() || 'Pro',
               user_type: 'pro'
             } as UserData)
             setLoading(false)
