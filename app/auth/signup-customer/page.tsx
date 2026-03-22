@@ -460,15 +460,23 @@ export default function SignupCustomer() {
       console.log('[Signup] API response ok:', apiResponse.ok)
       
       if (!apiResponse.ok) {
-        console.log('[Signup] Attempting to parse error response as JSON...')
-        let errorData: any = {}
+        console.log('[Signup] Attempting to parse error response...')
+        let errorData: any = { error: 'Unknown error' }
         try {
-          errorData = await apiResponse.json()
-          console.log('[Signup] Parsed error data:', errorData)
+          const responseText = await apiResponse.text()
+          console.log('[Signup] Response text:', responseText)
+          if (responseText) {
+            try {
+              errorData = JSON.parse(responseText)
+              console.log('[Signup] Parsed error data:', errorData)
+            } catch {
+              errorData = { error: responseText || `Server error: ${apiResponse.statusText}` }
+            }
+          } else {
+            errorData = { error: `Server error: ${apiResponse.statusText}` }
+          }
         } catch (parseError) {
-          console.error('[Signup] Failed to parse error response as JSON:', parseError)
-          const textResponse = await apiResponse.text()
-          console.log('[Signup] Response text:', textResponse.substring(0, 200))
+          console.error('[Signup] Failed to parse error response:', parseError)
           errorData = { error: `Server error: ${apiResponse.statusText}` }
         }
         
