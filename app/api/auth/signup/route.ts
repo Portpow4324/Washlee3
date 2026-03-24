@@ -133,8 +133,7 @@ export async function POST(request: NextRequest) {
     const userId = authData.user.id
     console.log('[SIGNUP] Auth user created:', userId)
 
-    // Try to create user record in database
-    // NOTE: This table might not exist, so we'll handle the error gracefully
+    // Create user record in database (REQUIRED - every auth user must have a users record)
     console.log('[SIGNUP] Inserting user record...')
     
     const { error: userError } = await supabase
@@ -142,21 +141,27 @@ export async function POST(request: NextRequest) {
       .insert({
         id: userId,
         email,
-        name,
-        phone: phone || null,
         user_type: userType,
-        state: state || null,
-        usage_type: personalUse || null,
       })
       .select()
 
     if (userError) {
-      console.warn('[SIGNUP] User table insert failed (table may not exist):', userError.message)
-      console.warn('[SIGNUP] Continuing anyway - user auth was created successfully')
-      // Don't fail - auth user is created, just database record failed
-    } else {
-      console.log('[SIGNUP] ✓ User record created in database')
+      console.error('[SIGNUP] ❌ CRITICAL: User table insert failed:', userError.message)
+      console.error('[SIGNUP] Error code:', userError.code)
+      console.error('[SIGNUP] Error details:', userError.details)
+      console.error('[SIGNUP] This is a REQUIRED record - signup cannot continue')
+      
+      return NextResponse.json(
+        { 
+          error: 'Failed to create user account in database. Please try again.',
+          code: 'USER_CREATION_FAILED',
+          details: userError.message
+        },
+        { status: 500 }
+      )
     }
+    
+    console.log('[SIGNUP] ✓ User record created in database')
 
     // Create customer or pro record based on user type
     if (userType === 'customer') {
@@ -170,15 +175,25 @@ export async function POST(request: NextRequest) {
           email,
           first_name: firstName,
           last_name: lastName,
+          phone: phone || null,
+          state: state || null,
+          personal_use: personalUse || null,
         })
         .select()
 
       if (customerError) {
-        console.warn('[SIGNUP] ❌ Customer record creation failed:', customerError.message)
-        console.warn('[SIGNUP] Error code:', customerError.code)
-        console.warn('[SIGNUP] Error details:', customerError.details)
-        console.warn('[SIGNUP] Continuing anyway - auth user was created successfully')
-        // Don't fail - auth user is created
+        console.error('[SIGNUP] ❌ Customer record creation failed:', customerError.message)
+        console.error('[SIGNUP] Error code:', customerError.code)
+        console.error('[SIGNUP] Error details:', customerError.details)
+        
+        return NextResponse.json(
+          { 
+            error: 'Failed to create customer profile. Please try again.',
+            code: 'CUSTOMER_CREATION_FAILED',
+            details: customerError.message
+          },
+          { status: 500 }
+        )
       } else {
         console.log('[SIGNUP] ✓ Customer record created:', customerData)
       }
@@ -192,17 +207,23 @@ export async function POST(request: NextRequest) {
           id: userId,
           email,
           name,
-          first_name: firstName,
-          last_name: lastName,
+          phone: phone || null,
         })
         .select()
 
       if (employeeError) {
-        console.warn('[SIGNUP] ❌ Pro record creation failed:', employeeError.message)
-        console.warn('[SIGNUP] Error code:', employeeError.code)
-        console.warn('[SIGNUP] Error details:', employeeError.details)
-        console.warn('[SIGNUP] Continuing anyway - auth user was created successfully')
-        // Don't fail - auth user is created
+        console.error('[SIGNUP] ❌ Pro record creation failed:', employeeError.message)
+        console.error('[SIGNUP] Error code:', employeeError.code)
+        console.error('[SIGNUP] Error details:', employeeError.details)
+        
+        return NextResponse.json(
+          { 
+            error: 'Failed to create pro profile. Please try again.',
+            code: 'PRO_CREATION_FAILED',
+            details: employeeError.message
+          },
+          { status: 500 }
+        )
       } else {
         console.log('[SIGNUP] ✓ Pro record created:', employeeData)
       }
