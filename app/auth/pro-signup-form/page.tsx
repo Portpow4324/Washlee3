@@ -508,19 +508,16 @@ function ProSignupFormContent() {
         })
 
       console.log('[Form] Current user:', authUser?.id)
-      if (!authUser) throw new Error('User not found. Please log in again.')
-
-      // Small delay to ensure Firebase is ready
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // If form fields are empty, try to fetch from customer profile
+      
+      // For signup (not logged in), use form data directly
+      // For logged-in users, try to prefill from customer profile
       let firstName = formData.firstName
       let lastName = formData.lastName
       let email = formData.email
       let phone = formData.phone
       let state = formData.state
 
-      if (!firstName || !lastName || !email || !phone || !state) {
+      if (authUser && (!firstName || !lastName || !email || !phone || !state)) {
         console.log('[Form] Form data incomplete, fetching from customer profile...')
         try {
           const customerData = await getCustomerProfile(authUser.id)
@@ -540,7 +537,6 @@ function ProSignupFormContent() {
 
       // Validate that all required fields are populated
       const missingFields = []
-      if (!authUser.id) missingFields.push('userId')
       if (!firstName?.trim()) missingFields.push('firstName')
       if (!lastName?.trim()) missingFields.push('lastName')
       if (!email?.trim()) missingFields.push('email')
@@ -551,8 +547,11 @@ function ProSignupFormContent() {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}. Please go back to step 1 and fill in your information.`)
       }
 
+      // For signup: use email-based ID if not logged in, otherwise use authUser.id
+      const userId = authUser?.id || `employee_${email}_${Date.now()}`
+
       const inquiryPayload = {
-        userId: authUser.id,
+        userId,
         firstName,
         lastName,
         email,
