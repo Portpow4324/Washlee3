@@ -398,6 +398,53 @@ export default function SignupCustomer() {
     }
   }
 
+  const handleAutoLogin = async () => {
+    console.log('[AutoLogin] Attempting to auto-login user...')
+    setIsLoading(true)
+    
+    try {
+      // Use Supabase directly for login - this will set the session
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      })
+
+      if (error) {
+        console.warn('[AutoLogin] Auto-login failed:', error.message)
+        console.log('[AutoLogin] User can login manually later')
+        setIsLoading(false)
+        setIsRedirecting(true)
+        // Still redirect even if auto-login fails
+        setTimeout(() => router.push('/'), 1500)
+        return
+      }
+
+      if (!data.user) {
+        console.warn('[AutoLogin] No user returned from login')
+        setIsLoading(false)
+        setIsRedirecting(true)
+        setTimeout(() => router.push('/'), 1500)
+        return
+      }
+
+      console.log('[AutoLogin] ✓ Auto-login successful! User:', data.user.id)
+      setIsLoading(false)
+      setIsRedirecting(true)
+      
+      // Small delay to allow session to be set before redirect
+      setTimeout(() => {
+        console.log('[AutoLogin] Redirecting to home...')
+        router.push('/')
+      }, 1500)
+    } catch (error) {
+      console.error('[AutoLogin] Error:', error)
+      // Don't block redirect on auto-login failure
+      setIsLoading(false)
+      setIsRedirecting(true)
+      setTimeout(() => router.push('/'), 1500)
+    }
+  }
+
   const resendVerificationEmail = async (email: string) => {
     console.log('[Signup] Requesting to resend verification email for:', email)
     try {
@@ -590,6 +637,11 @@ export default function SignupCustomer() {
   }
 
   if (currentStep === steps.length) {
+    // Auto-login on account completion
+    if (!isRedirecting && !isLoading) {
+      handleAutoLogin()
+    }
+
     const handleJoinWashClub = () => {
       setShowWashClubModal(false)
       setIsRedirecting(true)
@@ -616,7 +668,7 @@ export default function SignupCustomer() {
             </div>
             <h1 className="text-3xl font-bold text-dark mb-3">Account Created!</h1>
             <p className="text-gray mb-6">Welcome to Washlee. Your account is all set up.</p>
-            <p className="text-sm text-gray mb-8">Redirecting you home...</p>
+            <p className="text-sm text-gray mb-8">Logging you in and redirecting you home...</p>
             <Link href="/" className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold">
               Go Home
             </Link>
