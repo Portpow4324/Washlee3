@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, ReactNode } from 'react';
-import { User } from 'firebase/auth';
+import { User } from '@supabase/supabase-js';
 
 interface AdminContextType {
   isAdmin: boolean;

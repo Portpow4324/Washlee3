@@ -7,7 +7,8 @@
  * A user can have multiple roles stored in users/{uid}.userTypes array
  */
 
-import { Timestamp } from 'firebase/firestore'
+// Supabase uses Date strings (ISO 8601) or Date objects
+type Timestamp = string | Date
 
 // ============================================
 // ROLE TYPES

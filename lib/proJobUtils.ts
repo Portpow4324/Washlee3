@@ -1,4 +1,5 @@
-import { Timestamp } from 'firebase/firestore'
+// Supabase uses Date strings (ISO 8601) or Date objects
+type Timestamp = string | Date
 
 export type ProJobStatus = 'available' | 'accepted' | 'in-progress' | 'completed' | 'cancelled'
 
