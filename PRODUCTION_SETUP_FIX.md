@@ -50,10 +50,16 @@ ADD COLUMN IF NOT EXISTS equipment BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS id_document_url TEXT,
 ADD COLUMN IF NOT EXISTS availability JSON;
 
--- Add constraint
-ALTER TABLE employees
-ADD CONSTRAINT IF NOT EXISTS check_application_status 
-CHECK (application_status IN ('pending', 'approved', 'rejected', 'completed'));
+-- Add constraint (without IF NOT EXISTS - PostgreSQL limitation)
+DO $$ 
+BEGIN
+  ALTER TABLE employees
+  ADD CONSTRAINT check_application_status 
+  CHECK (application_status IN ('pending', 'approved', 'rejected', 'completed'));
+EXCEPTION WHEN duplicate_object THEN 
+  -- Constraint already exists, ignore
+  NULL;
+END $$;
 
 -- Add indexes
 CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(application_status);
