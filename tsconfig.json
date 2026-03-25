@@ -33,6 +33,9 @@
   "exclude": [
     "node_modules",
     "FIRESTORE_SECURITY_RULES.firestore",
-    "**/*.firestore"
+    "**/*.firestore",
+    "functions/**",
+    "scripts/**",
+    "EXPORT_FIREBASE_DATA.ts"
   ]
 }
