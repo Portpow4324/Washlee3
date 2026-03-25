@@ -2244,6 +2244,69 @@ NEXT_PUBLIC_ALLOW_GET_CODE=true
 
 ## Troubleshooting
 
+### Error: PGRST204 - "Could not find the 'applicationStep' column of 'employees' in the schema cache"
+**Status:** ❌ Employee signup fails  
+**Console Errors:**
+```
+[UserMgmt] Failed to create employee profile: {code: 'PGRST204', message: "Could not find the 'applicationStep' column..."}
+[Signup] ⚠️ Profile creation failed: Could not find the 'applicationStep' column of 'employees' in the schema cache
+```
+
+**Root Cause:** The employees table exists but is missing 6 required columns that the signup code tries to insert into.
+
+**STEP-BY-STEP FIX:**
+
+1. **Open Supabase Dashboard**
+   - Go to https://app.supabase.com
+   - Select your project
+   - Go to SQL Editor (left sidebar)
+
+2. **Create New Query** (Click "New Query" button)
+
+3. **Paste This SQL:**
+   ```sql
+   -- Add missing columns to employees table
+   ALTER TABLE employees
+   ADD COLUMN IF NOT EXISTS application_step INTEGER DEFAULT 0,
+   ADD COLUMN IF NOT EXISTS application_status TEXT DEFAULT 'pending',
+   ADD COLUMN IF NOT EXISTS skills JSON,
+   ADD COLUMN IF NOT EXISTS transport BOOLEAN DEFAULT FALSE,
+   ADD COLUMN IF NOT EXISTS equipment BOOLEAN DEFAULT FALSE,
+   ADD COLUMN IF NOT EXISTS id_document_url TEXT;
+
+   -- Add constraint for application_status
+   ALTER TABLE employees
+   ADD CONSTRAINT IF NOT EXISTS check_application_status 
+   CHECK (application_status IN ('pending', 'approved', 'rejected', 'completed'));
+
+   -- Add index for better performance
+   CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(application_status);
+
+   -- Verify columns (optional - see the result)
+   SELECT column_name, data_type, column_default 
+   FROM information_schema.columns 
+   WHERE table_name = 'employees' 
+   ORDER BY ordinal_position;
+   ```
+
+4. **Run the Query** (Click "Run" or Ctrl+Enter)
+   - Should show ✅ "Success"
+   - The last query shows all columns in the table
+
+5. **Refresh Your App**
+   - Stop dev server: `Ctrl+C`
+   - Clear Supabase cache: Wait 30 seconds
+   - Restart dev server: `npm run dev`
+   - Clear browser cache: `Cmd+Shift+Delete` → Clear all
+   - Try signup again
+
+6. **Still not working?**
+   - Check that the SQL ran without errors
+   - Verify columns were added (run the SELECT query again)
+   - Make sure you're using the service role key in .env.local
+
+---
+
 ### Error: 400 Bad Request on Signup
 **Message:** `Failed to load resource: the server responded with a status of 400`  
 **Console Log:** `[UserMgmt] Failed to create employee profile: Object`
@@ -2255,32 +2318,15 @@ NEXT_PUBLIC_ALLOW_GET_CODE=true
    - Ensure password is at least 8 characters
    - Verify email format is valid
 
-2. **Employee Table Schema Error** (Most Common)
-   - **Error:** `Could not find the 'applicationStep' column of 'employees' in the schema cache`
-   - **Cause:** Employee table missing required columns
-   - **Solution:** Run this SQL migration:
-   ```sql
-   ALTER TABLE employees
-   ADD COLUMN application_step INTEGER DEFAULT 0,
-   ADD COLUMN application_status TEXT DEFAULT 'pending',
-   ADD COLUMN skills JSON,
-   ADD COLUMN transport BOOLEAN DEFAULT FALSE,
-   ADD COLUMN equipment BOOLEAN DEFAULT FALSE,
-   ADD COLUMN id_document_url TEXT;
-
-   ALTER TABLE employees
-   ADD CONSTRAINT check_application_status CHECK (application_status IN ('pending', 'approved', 'rejected', 'completed'));
-
-   CREATE INDEX idx_employees_status ON employees(application_status);
-   ```
-
-3. **Invalid Email or Password Format**
+2. **Invalid Email or Password Format**
    - Email must contain @ and a domain (e.g., user@example.com)
    - Password must have: 8+ chars, number, uppercase, lowercase, special char
 
-4. **User Already Exists**
+3. **User Already Exists**
    - If you get `DUPLICATE_EMAIL` error, the email is already registered
    - Try logging in instead or use a different email
+
+4. **See PGRST204 error above** for employee table schema issues
 
 ### Error: 403 on `/api/verification/get-code`
 **Solution:** Add `NEXT_PUBLIC_ALLOW_GET_CODE=true` to `.env.local` for development. This endpoint is disabled in production.
