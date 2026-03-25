@@ -298,7 +298,7 @@ function ProSignupFormContent() {
           formData.workAddress.trim() &&
           isPasswordValid &&
           formData.password === formData.confirmPassword &&
-          formData.termsAccepted // Only check formData.termsAccepted now
+          formData.termsAccepted
         )
       case 1: // Email confirmation - just show info, Next button will confirm
         return true
@@ -428,84 +428,117 @@ function ProSignupFormContent() {
 
   const handleNext = async () => {
     if (currentStep === 0) {
-      // Send verification codes before creating an account.
-      // Account creation happens later (after email/phone/ID verification)
-      await Promise.all([sendEmailVerification(), sendPhoneVerification()])
+      // Step 0: Collect details, create account, send email verification
+      if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.phone.trim()) {
+        setError('Please fill in all required fields')
+        return
+      }
+      
+      // Create account
+      setError('')
+      setIsLoading(true)
+      const accountCreated = await handleCreateAccount()
+      setIsLoading(false)
+      
+      if (!accountCreated) {
+        setError('Failed to create account. Check console for details.')
+        return
+      }
+      
+      // Account created, send email verification code
+      setIsLoading(true)
+      await sendEmailVerification()
+      setIsLoading(false)
+      
+      // Move to Step 1 (email verification)
       setCurrentStep(1)
     } else if (currentStep === 1) {
-      // Email verification - verify the code
-      if (!emailCodeSent) {
-        await sendEmailVerification()
-        return // Don't advance yet
-      }
-      // If code was sent, verify it
-
+      // Step 1: Email verification
       const trimmedEmailCode = formData.emailVerificationCode.trim().replace(/\s+/g, '')
       if (trimmedEmailCode.length !== 6) {
         setError('Please enter a 6-digit verification code')
         return
       }
+      
+      setIsLoading(true)
       const emailVerified = await verifyCode(
         formData.email,
         formData.phone,
         trimmedEmailCode
       )
+      setIsLoading(false)
+      
       if (!emailVerified) {
         setError('Invalid verification code')
         return
       }
 
       setFormData({ ...formData, emailConfirmed: true })
-      setTimeout(() => setCurrentStep(currentStep + 1), 100)
+      setCurrentStep(2)
     } else if (currentStep === 2) {
-      // Phone verification - verify the entered code
+      // Step 2: Phone verification
       if (!phoneCodeSent) {
+        setError('')
+        setIsLoading(true)
         await sendPhoneVerification()
+        setIsLoading(false)
         return // Don't advance yet
       }
       
-
       const trimmedPhoneCode = formData.phoneVerificationCode.trim().replace(/\s+/g, '')
       if (trimmedPhoneCode.length !== 6) {
         setError('Please enter a 6-digit verification code')
         return
       }
+      
+      setIsLoading(true)
       const phoneVerified = await verifyCode(
         formData.email,
         formData.phone,
         trimmedPhoneCode
       )
+      setIsLoading(false)
+      
       if (!phoneVerified) {
         setError('Invalid verification code')
         return
       }
       
       setFormData({ ...formData, phoneVerified: true })
-      setTimeout(() => setCurrentStep(currentStep + 1), 100)
+      setCurrentStep(3)
     } else if (currentStep === 3) {
-      // ID verification - process the uploaded ID
+      // Step 3: ID verification
       if (!formData.idVerified) {
+        setError('')
+        setIsLoading(true)
         await processIdVerification()
+        setIsLoading(false)
         return // Don't advance yet
       }
-
-      // After completing ID verification, create the account and profile.
-      // This ensures the user is only created once they complete the core verification steps.
-      const accountCreated = await handleCreateAccount()
-      if (!accountCreated) return
-      setTimeout(() => setCurrentStep(currentStep + 1), 100)
+      setCurrentStep(4)
     } else if (currentStep === 4) {
-      // Auto-pass intro step
-      setCurrentStep(currentStep + 1)
+      // Step 4: Washlee Pro Introduction - just advance
+      setCurrentStep(5)
     } else if (currentStep === 5) {
-      // Availability step - just move forward
-      setCurrentStep(currentStep + 1)
-    } else if (isStepValid()) {
-      if (currentStep < steps.length - 1) {
-        setCurrentStep(currentStep + 1)
+      // Step 5: Availability - validate and move forward
+      if (isStepValid()) {
+        setCurrentStep(6)
       } else {
-        // Final submission - create inquiry
+        setError('Please complete this step')
+      }
+    } else if (currentStep === 6) {
+      // Step 6: Workplace Verification - validate and move forward
+      if (isStepValid()) {
+        setCurrentStep(7)
+      } else {
+        setError('Please complete this step')
+      }
+    } else if (currentStep === 7) {
+      // Step 7: Skills Assessment - validate and submit
+      if (isStepValid()) {
         await handleSubmitInquiry()
+      } else {
+        setError('Please complete this step')
       }
     } else {
       setError('Please complete this step')
@@ -850,21 +883,11 @@ function ProSignupFormContent() {
       const adminStatus = await isAdminUser(authResult.user.uid)
       setIsAdmin(adminStatus)
       
-      // Generate and send verification codes ASYNC (don't wait for these)
-      if (!adminStatus) {
-        // Send codes in background (development uses test code / logs)
-        sendEmailVerification().catch((err: any) => {
-          console.error('[ProSignup] Error sending email verification:', err)
-        })
-        sendPhoneVerification().catch((err: any) => {
-          console.error('[ProSignup] Error sending phone verification:', err)
-        })
-      }
+      // Don't send codes here - they're sent explicitly at Step 1 in handleNext()
       
       const totalTime = performance.now() - signupStartTime
       console.log('[Signup] ✅ Account creation completed in', Math.round(totalTime), 'ms')
       
-      setTimeout(() => setSuccessMessage(''), 2000)
       return true
     } catch (err: any) {
       const totalTime = performance.now() - signupStartTime
@@ -1213,9 +1236,9 @@ function ProSignupFormContent() {
                   <button
                     onClick={() => sendEmailVerification()}
                     disabled={emailCodeSent || isLoading}
-                    className="text-primary font-semibold hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-primary font-semibold hover:underline disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                   >
-                    {emailCodeSent ? 'Code Sent' : 'Send Code'}
+                    Resend Code
                   </button>
                 </div>
               </div>
@@ -1264,7 +1287,7 @@ function ProSignupFormContent() {
                     disabled={phoneCodeSent || isLoading}
                     className="text-primary font-semibold hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {phoneCodeSent ? 'Code Sent' : 'Resend Code'}
+                    {phoneCodeSent ? 'Code Sent' : 'Send Code'}
                   </button>
                   <div className="text-xs text-gray">
                     <strong>🔧 Development Mode:</strong> Test code: <code className="bg-white px-2 py-1 rounded font-bold">
