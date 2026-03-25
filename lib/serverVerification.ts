@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseServer'
 
 /**
  * Server-side verification utilities.
@@ -42,7 +42,7 @@ export async function storeVerificationCode(email: string, phone: string, code: 
     used: false,
   }
   
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('verification_codes')
     .insert([record])
   
@@ -58,7 +58,7 @@ export async function verifyCode(email: string, phone: string, code: string): Pr
   const normalizedEmail = email.trim().toLowerCase()
   const normalizedPhone = phone.replace(/\D/g, '')
   
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('verification_codes')
     .select('*')
     .eq('email', normalizedEmail)
@@ -78,7 +78,7 @@ export async function verifyCode(email: string, phone: string, code: string): Pr
   if (new Date(stored.expires_at) < new Date()) {
     console.log('[ServerVerification] Code expired for', key)
     // Delete expired code
-    await supabase.from('verification_codes').delete().eq('id', stored.id)
+    await supabaseAdmin.from('verification_codes').delete().eq('id', stored.id)
     return false
   }
 
@@ -96,7 +96,7 @@ export async function verifyCode(email: string, phone: string, code: string): Pr
   }
 
   // Mark code as used
-  const { error: updateError } = await supabase
+  const { error: updateError } = await supabaseAdmin
     .from('verification_codes')
     .update({ used: true, used_at: new Date().toISOString() })
     .eq('id', stored.id)
@@ -114,7 +114,7 @@ export async function getVerificationCodeForTesting(email: string, phone: string
   const normalizedEmail = email.trim().toLowerCase()
   const normalizedPhone = phone.replace(/\D/g, '')
   
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('verification_codes')
     .select('code')
     .eq('email', normalizedEmail)
