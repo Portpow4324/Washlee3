@@ -342,6 +342,15 @@ function ProSignupFormContent() {
       if (result.success) {
         setEmailCodeSent(true)
         setSuccessMessage('Verification code sent to your email')
+        
+        // In dev mode, auto-fill the code for testing
+        if (result.code) {
+          setFormData((prev) => ({
+            ...prev,
+            emailCode: result.code || '',
+          }))
+          console.log('[Dev Mode] Email code auto-filled:', result.code)
+        }
       } else {
         setError(result.error || 'Failed to send email verification')
       }
@@ -369,6 +378,15 @@ function ProSignupFormContent() {
       if (result.success) {
         setPhoneCodeSent(true)
         setSuccessMessage('Verification code sent to your phone')
+        
+        // In dev mode, auto-fill the code for testing
+        if (result.code) {
+          setFormData((prev) => ({
+            ...prev,
+            phoneCode: result.code || '',
+          }))
+          console.log('[Dev Mode] Phone code auto-filled:', result.code)
+        }
       } else {
         setError(result.error || 'Failed to send phone verification')
       }
