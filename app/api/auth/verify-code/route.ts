@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdminClient } from '@/lib/supabaseFactory'
+import { verifyCode } from '@/lib/serverVerification'
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,7 +9,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[VerifyCode] POST endpoint called')
     const body = await request.json()
-    const { email, code } = body
+    const { email, code, phone } = body
 
     console.log('[VerifyCode] Verifying code for email:', email)
     console.log('[VerifyCode] Code entered:', code)
@@ -21,67 +22,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if code exists and is valid
-    console.log('[VerifyCode] Looking up verification code...')
-    const now = new Date()
-    const currentTime = now.toISOString()
-    console.log('[VerifyCode] Current server time:', currentTime)
+    // Verify code using in-memory storage (server verification)
+    console.log('[VerifyCode] Checking in-memory verification code...')
+    const phoneForVerification = phone || ''
+    const isCodeValid = await verifyCode(email, phoneForVerification, code)
     
-    const { data: codeRecord, error: lookupError } = await supabase
-      .from('verification_codes')
-      .select('*')
-      .eq('email', email)
-      .eq('code', code.toUpperCase())
-      .eq('used', false)
-      .gt('expires_at', currentTime)
-      .single()
-    
-    if (lookupError || !codeRecord) {
-      console.warn('[VerifyCode] Looking for all codes for debugging...')
-      const { data: allCodes } = await supabase
-        .from('verification_codes')
-        .select('*')
-        .eq('email', email)
-        .eq('code', code.toUpperCase())
-      
-      if (allCodes && allCodes.length > 0) {
-        console.log('[VerifyCode] Code exists but is expired or used')
-        console.log('[VerifyCode] Code record:', {
-          used: allCodes[0].used,
-          expires_at: allCodes[0].expires_at,
-          current_time: currentTime,
-          is_expired: allCodes[0].expires_at < currentTime
-        })
-      }
-    }
-
-    if (lookupError || !codeRecord) {
-      console.warn('[VerifyCode] Code verification failed:', lookupError?.message || 'Code not found or expired')
+    if (!isCodeValid) {
+      console.warn('[VerifyCode] Code verification failed: Invalid or expired code')
       return NextResponse.json(
         { error: 'Invalid or expired verification code' },
         { status: 400 }
       )
     }
 
-    console.log('[VerifyCode] ✓ Code is valid, marking as used...')
-
-    // Mark code as used
-    const { error: updateError } = await supabase
-      .from('verification_codes')
-      .update({
-        used: true
-      })
-      .eq('id', codeRecord.id)
-
-    if (updateError) {
-      console.error('[VerifyCode] Failed to mark code as used:', updateError.message)
-      return NextResponse.json(
-        { error: 'Failed to verify code' },
-        { status: 500 }
-      )
-    }
-
-    console.log('[VerifyCode] ✓ Code marked as used')
+    console.log('[VerifyCode] ✓ Code is valid')
 
     // Confirm email in Supabase Auth by looking up user by email
     console.log('[VerifyCode] Looking up user by email in Supabase Auth...')
@@ -123,6 +77,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Email verified successfully',
+      email_confirmed: true,
       email,
       userId: authUser?.id
     })
