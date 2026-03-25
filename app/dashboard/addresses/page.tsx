@@ -41,25 +41,16 @@ export default function ManageAddresses() {
     const loadAddresses = async () => {
       try {
         setIsLoading(true)
-        const { data, error: queryError } = await supabase
-          .from('business_accounts')
-          .select('*')
-          .eq('owner_id', user.id)
-
-        if (queryError) throw queryError
-
-        // Transform business accounts to addresses format
-        const formattedAddresses = (data || []).map((acc: any) => ({
-          id: acc.id,
-          label: acc.business_name,
-          address: acc.address,
-          city: acc.city || '',
-          postcode: acc.postcode || '',
-          state: acc.state || '',
-          is_default: acc.is_primary,
-        }))
-
-        setAddresses(formattedAddresses)
+        // TODO: Create customer_addresses table in Supabase
+        // For now, just show empty state
+        // const { data, error: queryError } = await supabase
+        //   .from('customer_addresses')
+        //   .select('*')
+        //   .eq('customer_id', user.id)
+        // if (queryError) throw queryError
+        // setAddresses(data || [])
+        
+        setAddresses([]) // Empty for now
       } catch (err: any) {
         console.error('Error loading addresses:', err)
         setError(err.message || 'Failed to load addresses')
@@ -76,38 +67,19 @@ export default function ManageAddresses() {
     if (!user) return
 
     try {
-      const { error: insertError } = await supabase
-        .from('business_accounts')
-        .insert({
-          owner_id: user.id,
-          business_name: newAddress.label,
-          address: newAddress.address,
-          city: newAddress.city,
-          postcode: newAddress.postcode,
-          state: newAddress.state,
-          is_primary: addresses.length === 0,
-          created_at: new Date().toISOString(),
-        })
-
-      if (insertError) throw insertError
-
-      // Reload addresses
-      const { data } = await supabase
-        .from('business_accounts')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      const formattedAddresses = (data || []).map((acc: any) => ({
-        id: acc.id,
-        label: acc.business_name,
-        address: acc.address,
-        city: acc.city || '',
-        postcode: acc.postcode || '',
-        state: acc.state || '',
-        is_default: acc.is_primary,
-      }))
-
-      setAddresses(formattedAddresses)
+      setError('')
+      // TODO: Implement once customer_addresses table is created
+      // For now, just show success message
+      setAddresses([...addresses, {
+        id: Math.random().toString(36).substring(7),
+        label: newAddress.label,
+        address: newAddress.address,
+        city: newAddress.city,
+        postcode: newAddress.postcode,
+        state: newAddress.state,
+        is_default: addresses.length === 0,
+      }])
+      
       setNewAddress({ label: '', address: '', city: '', postcode: '', state: '' })
       setShowAddForm(false)
     } catch (err: any) {
@@ -119,13 +91,7 @@ export default function ManageAddresses() {
     if (!window.confirm('Are you sure you want to delete this address?')) return
 
     try {
-      const { error: deleteError } = await supabase
-        .from('business_accounts')
-        .delete()
-        .eq('id', addressId)
-
-      if (deleteError) throw deleteError
-
+      // TODO: Implement once customer_addresses table is created
       setAddresses(addresses.filter(a => a.id !== addressId))
     } catch (err: any) {
       setError(err.message || 'Failed to delete address')
