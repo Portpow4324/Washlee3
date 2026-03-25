@@ -142,7 +142,7 @@ export function getJobStatusColor(status: ProJobStatus): string {
 // Scheduling
 export function getProAvailabilityForDay(jobs: ProJob[], date: Date, maxJobsPerDay: number = 8): number {
   const dayJobs = jobs.filter(j => {
-    const jobDate = new Date(j.createdAt.toMillis?.() || 0)
+    const jobDate = new Date(typeof j.createdAt === 'string' ? j.createdAt : j.createdAt)
     return jobDate.toDateString() === date.toDateString() && j.status !== 'cancelled'
   })
   return Math.max(0, maxJobsPerDay - dayJobs.length)
@@ -151,7 +151,7 @@ export function getProAvailabilityForDay(jobs: ProJob[], date: Date, maxJobsPerD
 export function getProTotalEarningsForDay(jobs: ProJob[], date: Date): number {
   return jobs
     .filter(j => {
-      const jobDate = new Date(j.createdAt.toMillis?.() || 0)
+      const jobDate = new Date(typeof j.createdAt === 'string' ? j.createdAt : j.createdAt)
       return jobDate.toDateString() === date.toDateString() && j.status === 'completed'
     })
     .reduce((sum, j) => sum + j.earnings, 0)
@@ -173,8 +173,8 @@ export function sortJobsByDistance(jobs: ProJob[]): ProJob[] {
 
 export function sortJobsByTime(jobs: ProJob[]): ProJob[] {
   return [...jobs].sort((a, b) => {
-    const timeA = a.pickupTime.toMillis?.() || 0
-    const timeB = b.pickupTime.toMillis?.() || 0
+    const timeA = new Date(typeof a.pickupTime === 'string' ? a.pickupTime : a.pickupTime).getTime()
+    const timeB = new Date(typeof b.pickupTime === 'string' ? b.pickupTime : b.pickupTime).getTime()
     return timeA - timeB
   })
 }
