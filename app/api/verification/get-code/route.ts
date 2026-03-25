@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getVerificationCodeForTesting } from '@/lib/serverVerification'
 
 export async function GET(request: NextRequest) {
-  if (process.env.NODE_ENV !== 'development') {
+  // Allow in development or when explicitly enabled
+  const isDev = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ALLOW_GET_CODE === 'true'
+  if (!isDev) {
     return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
   }
 

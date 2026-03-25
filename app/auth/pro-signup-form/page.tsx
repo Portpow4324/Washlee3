@@ -843,9 +843,11 @@ function ProSignupFormContent() {
         
         try {
           await Promise.race([profilePromise, timeoutPromise])
-        } catch (profileTimeoutError: any) {
-          console.warn('[Signup] Profile creation timeout (continuing anyway):', profileTimeoutError.message)
-          // Continue - don't block signup for profile creation timeout
+        } catch (profileError: any) {
+          console.error('[Signup] ⚠️  Profile creation failed:', profileError.message)
+          // Log the full error for debugging
+          console.error('[Signup] Profile error details:', profileError)
+          // Still continue - account was created, just profile missing
         }
 
         const profileDuration = performance.now() - profileStartTime

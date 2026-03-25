@@ -60,13 +60,28 @@ function LoginContent() {
     setEmailNotConfirmedError('')
     setIsLoading(true)
 
+    console.log('[Login] Attempting login with email:', email)
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
+      console.log('[Login] Response:', { 
+        hasData: !!data, 
+        hasError: !!error,
+        errorMessage: error?.message,
+        userId: data?.user?.id,
+        emailConfirmed: data?.user?.email_confirmed_at
+      })
+
       if (error) {
+        console.error('[Login] Supabase error:', {
+          message: error.message,
+          status: error.status,
+          type: error.name
+        })
         throw error
       }
 
@@ -78,6 +93,7 @@ function LoginContent() {
         return
       }
 
+      console.log('[Login] ✅ Login successful for:', email)
       setSuccessMessage(`✅ Welcome back! Logging you in...`)
 
       setTimeout(() => {
@@ -88,9 +104,13 @@ function LoginContent() {
         }
       }, 1500)
     } catch (err: any) {
-      console.error('Login error:', err)
+      console.error('Login error:', {
+        message: err.message,
+        status: err.status,
+        fullError: err
+      })
       if (err.message.includes('Invalid login credentials')) {
-        setError('Incorrect email or password. Please try again or use Forgot Password.')
+        setError('❌ Incorrect email or password. Please try again.\n\nTip: If you signed up via Google, use "Sign in with Google" instead.')
       } else {
         setError(err.message || 'Failed to sign in')
       }
