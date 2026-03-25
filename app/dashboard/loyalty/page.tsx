@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import Link from 'next/link'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Gift, TrendingUp, Award } from 'lucide-react'
 import Card from '@/components/Card'
@@ -41,7 +40,6 @@ export default function LoyaltyPage() {
   if (loading) {
     return (
       <>
-        <Header />
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#48C9B0] mx-auto mb-4"></div>
@@ -59,7 +57,6 @@ export default function LoyaltyPage() {
 
   return (
     <>
-      <Header />
       <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white py-12 px-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}

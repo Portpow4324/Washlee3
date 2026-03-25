@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Header from '@/components/Header'
+import { getCustomerAddresses, setDefaultAddress } from '@/lib/addressSync'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import Spinner from '@/components/Spinner'
@@ -41,16 +41,8 @@ export default function ManageAddresses() {
     const loadAddresses = async () => {
       try {
         setIsLoading(true)
-        // TODO: Create customer_addresses table in Supabase
-        // For now, just show empty state
-        // const { data, error: queryError } = await supabase
-        //   .from('customer_addresses')
-        //   .select('*')
-        //   .eq('customer_id', user.id)
-        // if (queryError) throw queryError
-        // setAddresses(data || [])
-        
-        setAddresses([]) // Empty for now
+        const data = await getCustomerAddresses(user.id)
+        setAddresses(data as Address[])
       } catch (err: any) {
         console.error('Error loading addresses:', err)
         setError(err.message || 'Failed to load addresses')
@@ -141,7 +133,6 @@ export default function ManageAddresses() {
   if (authLoading || isLoading) {
     return (
       <>
-        <Header />
         <div className="min-h-screen flex items-center justify-center">
           <Spinner />
         </div>
@@ -153,7 +144,6 @@ export default function ManageAddresses() {
   if (!user) {
     return (
       <>
-        <Header />
         <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white flex items-center justify-center p-4">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-[#1f2d2b] mb-4">Sign In Required</h1>
@@ -169,7 +159,6 @@ export default function ManageAddresses() {
 
   return (
     <>
-      <Header />
       <main className="min-h-screen bg-gradient-to-b from-[#E8FFFB] to-white py-12 px-4">
         <div className="max-w-2xl mx-auto">
           {/* Header */}

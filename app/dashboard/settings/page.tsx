@@ -3,7 +3,6 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import Spinner from '@/components/Spinner'
@@ -119,7 +118,6 @@ export default function SettingsPage() {
   if (authLoading) {
     return (
       <>
-        <Header />
         <div className="min-h-screen flex items-center justify-center">
           <Spinner />
         </div>
@@ -131,7 +129,6 @@ export default function SettingsPage() {
   if (!user) {
     return (
       <>
-        <Header />
         <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white flex items-center justify-center p-4">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-[#1f2d2b] mb-4">Sign In Required</h1>
@@ -147,7 +144,6 @@ export default function SettingsPage() {
 
   return (
     <>
-      <Header />
       <main className="min-h-screen bg-gradient-to-b from-[#E8FFFB] to-white py-12 px-4">
         <div className="max-w-2xl mx-auto">
           {/* Header */}

@@ -3,7 +3,6 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import Spinner from '@/components/Spinner'
@@ -35,18 +34,35 @@ export default function OrdersPage() {
     const loadOrders = async () => {
       try {
         setIsLoading(true)
-        const { data, error: queryError } = await supabase
+        setError('')
+        
+        // Add timeout to prevent infinite loading
+        const queryTimeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Orders query timeout')), 10000)
+        )
+
+        const ordersPromise = supabase
           .from('orders')
           .select('*')
           .eq('customer_id', user.id)
           .order('created_at', { ascending: false })
 
-        if (queryError) throw queryError
+        const { data, error: queryError } = await Promise.race([
+          ordersPromise,
+          queryTimeout as any
+        ]) as any
 
-        setOrders(data || [])
+        if (queryError) {
+          console.error('[Orders] Query error:', queryError.message)
+          // Show empty state instead of error
+          setOrders([])
+        } else {
+          setOrders(data || [])
+        }
       } catch (err: any) {
-        console.error('Error loading orders:', err)
-        setError(err.message || 'Failed to load orders')
+        console.error('[Orders] Error loading orders:', err.message)
+        // On timeout or error, just show empty orders
+        setOrders([])
       } finally {
         setIsLoading(false)
       }
@@ -58,7 +74,6 @@ export default function OrdersPage() {
   if (authLoading || isLoading) {
     return (
       <>
-        <Header />
         <div className="min-h-screen flex items-center justify-center">
           <Spinner />
         </div>
@@ -70,7 +85,6 @@ export default function OrdersPage() {
   if (!user) {
     return (
       <>
-        <Header />
         <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white flex items-center justify-center p-4">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-[#1f2d2b] mb-4">Sign In Required</h1>
@@ -87,7 +101,6 @@ export default function OrdersPage() {
 
   return (
     <>
-      <Header />
       <main className="min-h-screen bg-gradient-to-b from-[#E8FFFB] to-white py-12 px-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}

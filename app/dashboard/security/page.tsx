@@ -3,7 +3,6 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import Spinner from '@/components/Spinner'
@@ -122,7 +121,6 @@ export default function SecurityPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-mint to-white flex flex-col">
-      <Header />
       
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
         <div className="mb-8">

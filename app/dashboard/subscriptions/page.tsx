@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
+import { subscriptionPlans, formatPlanPrice } from '@/lib/plansData'
 import Link from 'next/link'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { Check, Zap, Crown } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function SubscriptionsPage() {
@@ -39,62 +39,11 @@ export default function SubscriptionsPage() {
     fetchSubscription()
   }, [user])
 
-  const plans = [
-    {
-      id: 'monthly',
-      name: 'Monthly Pass',
-      price: '$29',
-      period: '/month',
-      description: 'Perfect for regular laundry',
-      features: [
-        'Unlimited pickups & deliveries',
-        '15% discount on all services',
-        'Priority customer support',
-        'Free protection plan',
-        'Monthly loyalty points bonus',
-      ],
-      icon: Zap,
-    },
-    {
-      id: 'quarterly',
-      name: 'Quarterly Bundle',
-      price: '$79',
-      period: '/quarter',
-      description: 'Best value for monthly users',
-      features: [
-        'Unlimited pickups & deliveries',
-        '20% discount on all services',
-        'Priority support + Express support',
-        'Free premium protection plan',
-        'Double loyalty points',
-        'Exclusive member perks',
-      ],
-      icon: Crown,
-      popular: true,
-    },
-    {
-      id: 'yearly',
-      name: 'Annual Plan',
-      price: '$199',
-      period: '/year',
-      description: 'Maximum savings',
-      features: [
-        'Unlimited pickups & deliveries',
-        '25% discount on all services',
-        'VIP customer support',
-        'Free premium+ protection plan',
-        'Triple loyalty points',
-        'Exclusive member events',
-        'Free service month (April)',
-      ],
-      icon: Crown,
-    },
-  ]
+  // Plans are now imported from shared data
 
   if (loading) {
     return (
       <>
-        <Header />
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#48C9B0] mx-auto mb-4"></div>
@@ -108,7 +57,6 @@ export default function SubscriptionsPage() {
 
   return (
     <>
-      <Header />
       <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white py-12 px-4">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
@@ -127,7 +75,7 @@ export default function SubscriptionsPage() {
 
           {/* Plans Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-            {plans.map((plan) => {
+            {subscriptionPlans.map((plan) => {
               const IconComponent = plan.icon
               const isCurrentPlan = currentPlan === plan.id
               

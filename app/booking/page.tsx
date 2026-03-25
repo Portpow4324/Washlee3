@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabaseClient'
+import { syncBookingAddresses } from '@/lib/addressSync'
+import { getCustomerPresets, trackPresetUsage, createDefaultPresetFromFirstOrder } from '@/lib/orderPresets'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
@@ -27,6 +29,8 @@ export default function BookingHybrid() {
   const [orderConfirmed, setOrderConfirmed] = useState(false)
   const [orderId, setOrderId] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [presets, setPresets] = useState<any[]>([])
+  const [showPresetsModal, setShowPresetsModal] = useState(false)
 
   // Modal states
   const [showPickupSpotModal, setShowPickupSpotModal] = useState(false)
@@ -217,6 +221,23 @@ export default function BookingHybrid() {
     }
   }, [userData?.address])
 
+  // Load customer presets
+  useEffect(() => {
+    if (!user) return
+    
+    const loadPresets = async () => {
+      try {
+        const customerPresets = await getCustomerPresets(user.id)
+        setPresets(customerPresets)
+        console.log('[BOOKING] Loaded presets:', customerPresets.length)
+      } catch (err) {
+        console.error('[BOOKING] Error loading presets:', err)
+      }
+    }
+
+    loadPresets()
+  }, [user])
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -251,6 +272,38 @@ export default function BookingHybrid() {
     
     // Enforce minimum $50 AUD
     return Math.max(total, 50.0)
+  }
+
+  const applyPreset = async (preset: any) => {
+    try {
+      // Apply preset data to booking
+      setBookingData({
+        ...bookingData,
+        selectedService: preset.selectedService || bookingData.selectedService,
+        detergent: preset.detergent || bookingData.detergent,
+        bagCount: preset.bagCount || bookingData.bagCount,
+        deliverySpeed: preset.deliverySpeed || bookingData.deliverySpeed,
+        protectionPlan: preset.protectionPlan || bookingData.protectionPlan,
+        delicateCycle: preset.delicateCycle || false,
+        hangDry: preset.hangDry || false,
+        returnsOnHangers: preset.returnsOnHangers || false,
+        delicatesCare: preset.delicatesCare || false,
+        comforterService: preset.comforterService || false,
+        stainTreatment: preset.stainTreatment || false,
+        ironing: preset.ironing || false,
+      })
+
+      // Track usage
+      if (preset.id) {
+        await trackPresetUsage(preset.id)
+      }
+
+      // Close modal and show success
+      setShowPresetsModal(false)
+      console.log('[BOOKING] Preset applied:', preset.label)
+    } catch (err) {
+      console.error('[BOOKING] Error applying preset:', err)
+    }
   }
 
   const handleNext = () => {
@@ -396,6 +449,15 @@ export default function BookingHybrid() {
       }
       
       setOrderId(createdOrderId)
+      
+      // Sync pickup and delivery addresses to customer_addresses table
+      console.log('[BOOKING] Syncing addresses to customer_addresses table...')
+      const syncResult = await syncBookingAddresses(
+        user.id,
+        bookingData.pickupAddressDetails,
+        bookingData.deliveryAddressDetails
+      )
+      console.log('[BOOKING] Address sync result:', syncResult)
       
       // Now create Stripe checkout session
       console.log('[BOOKING] Creating Stripe checkout session for order:', createdOrderId)
@@ -613,7 +675,17 @@ export default function BookingHybrid() {
         {currentStep === 1 && (
           <div className="max-w-2xl mx-auto">
             <Card className="p-8 mb-8">
-              <h3 className="font-bold text-dark mb-6">STANDARD LAUNDRY SERVICE</h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-bold text-dark">STANDARD LAUNDRY SERVICE</h3>
+                {presets.length > 0 && (
+                  <button
+                    onClick={() => setShowPresetsModal(true)}
+                    className="text-sm px-3 py-1 bg-primary/10 text-primary rounded-full font-semibold hover:bg-primary/20 transition"
+                  >
+                    ⚡ Quick Reorder ({presets.length})
+                  </button>
+                )}
+              </div>
               <p className="text-sm text-gray mb-6">Washlee provides professional wash, dry, and fold service. Pick up tomorrow or get express same-day service.</p>
               
               <div className="space-y-4">
@@ -1498,6 +1570,56 @@ export default function BookingHybrid() {
                 className="w-full py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
               >
                 Got it
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Presets Modal */}
+        {showPresetsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-dark">⚡ Quick Reorder</h3>
+                <button onClick={() => setShowPresetsModal(false)} className="text-gray hover:text-dark">
+                  <X size={24} />
+                </button>
+              </div>
+
+              {presets.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray">No saved presets yet. Complete your first order to create a quick reorder preset!</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {presets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      onClick={() => applyPreset(preset)}
+                      className="w-full text-left p-4 border-2 border-gray rounded-lg hover:border-primary hover:bg-mint/50 transition"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-bold text-dark">{preset.label}</p>
+                          <p className="text-xs text-gray mt-1">
+                            {preset.bagCount} bags • {preset.deliverySpeed === 'express' ? 'Express' : 'Standard'} • {preset.detergent}
+                          </p>
+                          {preset.usageCount && (
+                            <p className="text-xs text-primary mt-1">Used {preset.usageCount} time(s)</p>
+                          )}
+                        </div>
+                        <ChevronRight size={16} className="text-primary flex-shrink-0 mt-1" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowPresetsModal(false)}
+                className="w-full mt-6 py-2 border-2 border-gray text-dark rounded-lg font-semibold hover:bg-light transition"
+              >
+                Cancel
               </button>
             </div>
           </div>

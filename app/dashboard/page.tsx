@@ -3,7 +3,6 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Spinner from '@/components/Spinner'
 import Link from 'next/link'
@@ -135,7 +134,6 @@ export default function CustomerDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-light flex flex-col">
-        <Header />
         <main className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <Spinner />
@@ -153,7 +151,6 @@ export default function CustomerDashboard() {
 
   return (
     <div className="min-h-screen bg-light flex flex-col">
-      <Header />
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-12">
         <div className="mb-12 flex items-start justify-between">
           <div>

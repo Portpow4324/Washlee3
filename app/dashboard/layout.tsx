@@ -8,7 +8,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { 
   Home, Package, Settings, Lock, CreditCard, MapPin, LifeBuoy, 
-  Smartphone, Menu, X, LogOut, ChevronRight
+  Smartphone, Menu, X, LogOut, ChevronRight, Gift
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -114,6 +114,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/addresses', label: 'Addresses', icon: MapPin },
     { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
     { href: '/dashboard/subscriptions', label: 'Subscriptions', icon: Settings },
+    { href: '/dashboard/washclub', label: 'Wash Club', icon: Gift },
     { href: '/dashboard/security', label: 'Security', icon: Lock },
     { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
     { href: '/dashboard/mobile', label: 'Mobile App', icon: Smartphone },
