@@ -62,9 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(session.user)
           console.log('[Auth] Looking up customer record for user ID:', session.user.id)
 
-          // Wrap query in timeout to prevent hanging
+          // Wrap query in timeout to prevent hanging (increased to 10 seconds)
           const queryTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Customer query timeout - RLS or database issue')), 5000)
+            setTimeout(() => reject(new Error('Customer query timeout - RLS or database issue')), 10000)
           )
 
           try {
@@ -74,131 +74,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .select('*')
               .eq('id', session.user.id)
               .limit(1)
+              .single() // Use single() to get one record or error
 
             const { data: customerData, error: customerError } = await Promise.race([
               customerPromise,
               queryTimeout as any
             ]) as any
 
-            if (customerError) {
-              console.error('[Auth] ❌ Customer query error:', customerError.message)
-            } else {
-              console.log('[Auth] ✓ Customer query succeeded, records found:', customerData?.length || 0)
-            }
-
-            if (!customerError && customerData && customerData.length > 0) {
-              const customer = customerData[0]
-              console.log('[Auth] ✓ Found customer profile:', customer.email)
+            if (!customerError && customerData) {
+              console.log('[Auth] ✓ Found customer profile:', customerData.email)
               setUserData({
-                ...customer,
-                name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'User',
+                ...customerData,
+                name: `${customerData.first_name || ''} ${customerData.last_name || ''}`.trim() || 'User',
                 user_type: 'customer'
               } as UserData)
               setLoading(false)
               return
             }
 
+            console.log('[Auth] ℹ️ No customer found, trying employees table...')
+            
             // If not a customer, try employees table
-            console.log('[Auth] No customer found, trying employees table...')
             const employeePromise = supabase
               .from('employees')
               .select('*')
               .eq('id', session.user.id)
               .limit(1)
+              .single()
 
             const { data: employeeData, error: employeeError } = await Promise.race([
               employeePromise,
               queryTimeout as any
             ]) as any
 
-            if (employeeError) {
-              console.error('[Auth] ❌ Employee query error:', employeeError.message)
-            } else {
-              console.log('[Auth] ✓ Employee query succeeded, records found:', employeeData?.length || 0)
-            }
-
-            if (!employeeError && employeeData && employeeData.length > 0) {
-              const employee = employeeData[0]
-              console.log('[Auth] ✓ Found employee profile:', employee.email)
+            if (!employeeError && employeeData) {
+              console.log('[Auth] ✓ Found employee profile:', employeeData.email)
               setUserData({
-                ...employee,
-                name: `${employee.first_name || employee.name || ''} ${employee.last_name || ''}`.trim() || 'Pro',
+                ...employeeData,
+                name: `${employeeData.first_name || employeeData.name || ''} ${employeeData.last_name || ''}`.trim() || 'Pro',
                 user_type: 'pro'
               } as UserData)
               setLoading(false)
               return
             }
 
-            // If neither table has data, create a profile for them
-            console.log('[Auth] User profile not found in customers or employees table')
-            console.log('[Auth] Attempting to create profile automatically...')
-            
-            try {
-              // Extract name from email or use default
-              const nameParts = session.user.email?.split('@')[0].split('.') || ['User']
-              const firstName = nameParts[0] || 'User'
-              const lastName = nameParts[1] || ''
-              
-              // Try to create a customer profile
-              const { data: newCustomer, error: createError } = await supabase
-                .from('customers')
-                .insert({
-                  id: session.user.id,
-                  email: session.user.email,
-                  first_name: firstName,
-                  last_name: lastName,
-                })
-                .select()
-              
-              if (!createError && newCustomer && newCustomer.length > 0) {
-                console.log('[Auth] ✓ Created customer profile automatically')
-                setUserData({
-                  ...newCustomer[0],
-                  name: `${firstName} ${lastName}`.trim(),
-                  user_type: 'customer'
-                } as UserData)
-                setLoading(false)
-                return
-              } else if (createError) {
-                console.warn('[Auth] ⚠️ Failed to auto-create customer profile:', createError.message)
-              }
-            } catch (autoCreateError) {
-              console.warn('[Auth] ⚠️ Error auto-creating profile:', autoCreateError)
-            }
-          
-          // Fall back to just using auth user data
-          console.log('[Auth] Using auth user data without database profile')
-          const emailParts = session.user.email?.split('@')[0].split('.') || ['User']
-          const fallbackFirstName = emailParts[0] || 'User'
-          const fallbackLastName = emailParts[1] || ''
-          setUserData({
-            id: session.user.id,
-            email: session.user.email || '',
-            first_name: fallbackFirstName,
-            last_name: fallbackLastName,
-            name: `${fallbackFirstName} ${fallbackLastName}`.trim(),
-            user_type: 'customer',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          } as UserData)
-          setLoading(false)
-          } catch (timeoutError) {
-            console.error('[Auth] ❌ Timeout while querying customer/employee data:', timeoutError)
-            // Fall back to auth user data
-            const emailParts = session.user.email?.split('@')[0].split('.') || ['User']
-            const fallbackFirstName = emailParts[0] || 'User'
-            const fallbackLastName = emailParts[1] || ''
+            // Fallback: Create minimal user profile from auth data
+            console.log('[Auth] ⚠️ No profile found, creating fallback from auth data...')
+            const fallbackName = session.user.user_metadata?.firstName || session.user.email?.split('@')[0] || 'User'
             setUserData({
               id: session.user.id,
-              email: session.user.email || '',
-              first_name: fallbackFirstName,
-              last_name: fallbackLastName,
-              name: `${fallbackFirstName} ${fallbackLastName}`.trim(),
+              email: session.user.email,
+              name: fallbackName,
               user_type: 'customer',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              created_at: new Date().toISOString()
             } as UserData)
             setLoading(false)
+            return
+          } catch (timeoutError: any) {
+            console.error('[Auth] ❌ Query timeout or error:', timeoutError.message)
+            // Still set fallback user data so app doesn't hang
+            const fallbackName = session.user.user_metadata?.firstName || session.user.email?.split('@')[0] || 'User'
+            setUserData({
+              id: session.user.id,
+              email: session.user.email,
+              name: fallbackName,
+              user_type: 'customer',
+              created_at: new Date().toISOString()
+            } as UserData)
+            setLoading(false)
+            return
           }
         } else {
           // User logged out
