@@ -393,21 +393,45 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!email || !password || !name || !userType) {
       return NextResponse.json(
-        { error: 'Missing required fields: email, password, name, userType' },
+        { 
+          error: 'Missing required fields: email, password, name, userType',
+          code: 'MISSING_FIELDS',
+          details: { email: !!email, password: !!password, name: !!name, userType: !!userType }
+        },
         { status: 400 }
       )
     }
 
     if (!['customer', 'pro'].includes(userType)) {
       return NextResponse.json(
-        { error: 'userType must be "customer" or "pro"' },
+        { 
+          error: 'Invalid userType. Must be "customer" or "pro"',
+          code: 'INVALID_USER_TYPE',
+          receivedValue: userType
+        },
         { status: 400 }
       )
     }
 
     if (password.length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters' },
+        { 
+          error: 'Password must be at least 8 characters',
+          code: 'PASSWORD_TOO_SHORT',
+          receivedLength: password.length
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid email format',
+          code: 'INVALID_EMAIL'
+        },
         { status: 400 }
       )
     }
@@ -432,25 +456,45 @@ export async function POST(request: NextRequest) {
     })
 
     if (authError) {
+      console.error('[Auth Error]', authError)
+      
       if (authError.message.includes('already registered') || authError.message.includes('User already exists')) {
         return NextResponse.json(
           {
             error: 'A user with this email has already been registered',
             code: 'DUPLICATE_EMAIL',
+            email,
           },
           { status: 409 }
         )
       }
 
+      if (authError.message.includes('invalid') || authError.message.includes('Invalid')) {
+        return NextResponse.json(
+          {
+            error: 'Invalid email or password format',
+            code: 'INVALID_AUTH_DATA',
+          },
+          { status: 400 }
+        )
+      }
+
       return NextResponse.json(
-        { error: authError.message || 'Authentication failed' },
+        { 
+          error: authError.message || 'Authentication failed',
+          code: 'AUTH_CREATION_FAILED',
+          details: authError
+        },
         { status: 400 }
       )
     }
 
     if (!authData.user) {
       return NextResponse.json(
-        { error: 'Failed to create user account' },
+        { 
+          error: 'Failed to create user account',
+          code: 'NO_USER_RETURNED'
+        },
         { status: 500 }
       )
     }
@@ -467,8 +511,13 @@ export async function POST(request: NextRequest) {
       })
 
     if (userError) {
+      console.error('[Users Table Error]', userError)
       return NextResponse.json(
-        { error: 'Failed to create user profile: ' + userError.message },
+        { 
+          error: 'Failed to create user profile: ' + userError.message,
+          code: 'USER_PROFILE_CREATION_FAILED',
+          details: userError
+        },
         { status: 500 }
       )
     }
@@ -489,8 +538,13 @@ export async function POST(request: NextRequest) {
         })
 
       if (customerError) {
+        console.error('[Customers Table Error]', customerError)
         return NextResponse.json(
-          { error: 'Failed to create customer profile' },
+          { 
+            error: 'Failed to create customer profile: ' + customerError.message,
+            code: 'CUSTOMER_PROFILE_CREATION_FAILED',
+            details: customerError
+          },
           { status: 500 }
         )
       }
@@ -504,11 +558,37 @@ export async function POST(request: NextRequest) {
           last_name: lastName,
           phone,
           state,
+          application_step: 0,
+          application_status: 'pending',
+          skills: [],
+          transport: false,
+          equipment: false,
         })
 
       if (employeeError) {
+        console.error('[Employees Table Error]', employeeError)
+        
+        // Check if it's a schema error (missing columns)
+        if (employeeError.message.includes('applicationStep') || 
+            employeeError.message.includes('application_step') ||
+            employeeError.message.includes('schema cache')) {
+          return NextResponse.json(
+            { 
+              error: 'Employee table is not properly configured. Missing required columns: applicationStep, applicationStatus, skills, transport, equipment.',
+              code: 'EMPLOYEE_TABLE_SCHEMA_ERROR',
+              solution: 'Run the SQL migration script provided in the troubleshooting guide.',
+              details: employeeError.message
+            },
+            { status: 500 }
+          )
+        }
+
         return NextResponse.json(
-          { error: 'Failed to create employee profile' },
+          { 
+            error: 'Failed to create employee profile: ' + employeeError.message,
+            code: 'EMPLOYEE_PROFILE_CREATION_FAILED',
+            details: employeeError
+          },
           { status: 500 }
         )
       }
@@ -521,8 +601,13 @@ export async function POST(request: NextRequest) {
       user: { id: userId, email, emailConfirmed: false },
     })
   } catch (error: any) {
+    console.error('[Signup Error]', error)
     return NextResponse.json(
-      { error: error.message || 'Signup failed' },
+      { 
+        error: error.message || 'Signup failed',
+        code: 'UNKNOWN_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     )
   }
@@ -1534,7 +1619,35 @@ export async function POST(request: NextRequest) {
 
     if (!email || !code) {
       return NextResponse.json(
-        { error: 'Email and code required' },
+        { 
+          error: 'Email and code required',
+          code: 'MISSING_FIELDS',
+          details: { email: !!email, code: !!code }
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid email format',
+          code: 'INVALID_EMAIL'
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validate code format (6 digits)
+    if (!/^\d{6}$/.test(code.toString())) {
+      return NextResponse.json(
+        { 
+          error: 'Code must be 6 digits',
+          code: 'INVALID_CODE_FORMAT',
+          receivedLength: code.toString().length
+        },
         { status: 400 }
       )
     }
@@ -1550,27 +1663,84 @@ export async function POST(request: NextRequest) {
       .gt('expires_at', now)
       .single()
 
-    if (lookupError || !codeRecord) {
+    if (lookupError) {
+      console.error('[Verification Code Lookup Error]', lookupError)
+      
+      // No matching code found
+      if (lookupError.code === 'PGRST116') {
+        return NextResponse.json(
+          { 
+            error: 'Invalid or expired verification code',
+            code: 'CODE_NOT_FOUND',
+            details: 'No matching code found. Code may be expired (15 min) or already used.'
+          },
+          { status: 400 }
+        )
+      }
+
       return NextResponse.json(
-        { error: 'Invalid or expired verification code' },
+        { 
+          error: 'Failed to verify code: ' + lookupError.message,
+          code: 'CODE_LOOKUP_ERROR',
+          details: lookupError
+        },
+        { status: 500 }
+      )
+    }
+
+    if (!codeRecord) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid or expired verification code',
+          code: 'CODE_NOT_FOUND'
+        },
         { status: 400 }
       )
     }
 
     // Mark code as used
-    await supabase
+    const { error: updateCodeError } = await supabase
       .from('verification_codes')
       .update({ used: true })
       .eq('id', codeRecord.id)
 
+    if (updateCodeError) {
+      console.error('[Mark Code Used Error]', updateCodeError)
+      return NextResponse.json(
+        { 
+          error: 'Failed to mark code as used',
+          code: 'CODE_UPDATE_ERROR',
+          details: updateCodeError
+        },
+        { status: 500 }
+      )
+    }
+
     // Find the user in Supabase Auth by email
     const { data: { users }, error: userListError } = await supabase.auth.admin.listUsers()
+
+    if (userListError) {
+      console.error('[User List Error]', userListError)
+      return NextResponse.json(
+        { 
+          error: 'Failed to fetch users',
+          code: 'USER_LIST_ERROR',
+          details: userListError
+        },
+        { status: 500 }
+      )
+    }
 
     const user = users?.find((u) => u.email === email)
 
     if (!user) {
+      console.error('[User Not Found]', { email })
       return NextResponse.json(
-        { error: 'User not found' },
+        { 
+          error: 'User not found',
+          code: 'USER_NOT_FOUND',
+          email
+        },
         { status: 404 }
       )
     }
@@ -1582,9 +1752,13 @@ export async function POST(request: NextRequest) {
     })
 
     if (updateError) {
-      console.error('Error confirming email:', updateError)
+      console.error('[Email Confirm Error]', updateError)
       return NextResponse.json(
-        { error: 'Failed to confirm email: ' + updateError.message },
+        { 
+          error: 'Failed to confirm email: ' + updateError.message,
+          code: 'EMAIL_CONFIRM_ERROR',
+          details: updateError
+        },
         { status: 500 }
       )
     }
@@ -1597,9 +1771,13 @@ export async function POST(request: NextRequest) {
       email_confirmed: true,
     })
   } catch (error: any) {
-    console.error('Verification error:', error)
+    console.error('[Verification Error]', error)
     return NextResponse.json(
-      { error: error.message || 'Verification failed' },
+      { 
+        error: error.message || 'Verification failed',
+        code: 'UNKNOWN_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     )
   }
@@ -2066,32 +2244,49 @@ NEXT_PUBLIC_ALLOW_GET_CODE=true
 
 ## Troubleshooting
 
+### Error: 400 Bad Request on Signup
+**Message:** `Failed to load resource: the server responded with a status of 400`  
+**Console Log:** `[UserMgmt] Failed to create employee profile: Object`
+
+**Possible Causes & Solutions:**
+
+1. **Missing Required Fields**
+   - Check that email, password, name, phone, state, and userType are all provided
+   - Ensure password is at least 8 characters
+   - Verify email format is valid
+
+2. **Employee Table Schema Error** (Most Common)
+   - **Error:** `Could not find the 'applicationStep' column of 'employees' in the schema cache`
+   - **Cause:** Employee table missing required columns
+   - **Solution:** Run this SQL migration:
+   ```sql
+   ALTER TABLE employees
+   ADD COLUMN application_step INTEGER DEFAULT 0,
+   ADD COLUMN application_status TEXT DEFAULT 'pending',
+   ADD COLUMN skills JSON,
+   ADD COLUMN transport BOOLEAN DEFAULT FALSE,
+   ADD COLUMN equipment BOOLEAN DEFAULT FALSE,
+   ADD COLUMN id_document_url TEXT;
+
+   ALTER TABLE employees
+   ADD CONSTRAINT check_application_status CHECK (application_status IN ('pending', 'approved', 'rejected', 'completed'));
+
+   CREATE INDEX idx_employees_status ON employees(application_status);
+   ```
+
+3. **Invalid Email or Password Format**
+   - Email must contain @ and a domain (e.g., user@example.com)
+   - Password must have: 8+ chars, number, uppercase, lowercase, special char
+
+4. **User Already Exists**
+   - If you get `DUPLICATE_EMAIL` error, the email is already registered
+   - Try logging in instead or use a different email
+
 ### Error: 403 on `/api/verification/get-code`
 **Solution:** Add `NEXT_PUBLIC_ALLOW_GET_CODE=true` to `.env.local` for development. This endpoint is disabled in production.
 
-### Error: Could not find the 'applicationStep' column in 'employees' table
-**Solution:** Update your employees table with the new schema above. Run this SQL:
-
-```sql
--- Add missing columns to existing employees table
-ALTER TABLE employees
-ADD COLUMN application_step INTEGER DEFAULT 0,
-ADD COLUMN application_status TEXT DEFAULT 'pending',
-ADD COLUMN skills JSON,
-ADD COLUMN transport BOOLEAN DEFAULT FALSE,
-ADD COLUMN equipment BOOLEAN DEFAULT FALSE,
-ADD COLUMN id_document_url TEXT;
-
--- Add constraint
-ALTER TABLE employees
-ADD CONSTRAINT check_application_status CHECK (application_status IN ('pending', 'approved', 'rejected', 'completed'));
-
--- Add indexes
-CREATE INDEX idx_employees_status ON employees(application_status);
-```
-
-### Error: "Failed to send email via both SendGrid and Gmail" or "Failed to send verification code"
-**Cause:** Both SendGrid and Gmail are not configured or have failed  
+### Error: "Failed to send email via both SendGrid and Gmail"
+**Cause:** Both email services are not configured or have failed  
 **Solution:**
 1. **Option A - Use SendGrid (Recommended):**
    - Create account: https://sendgrid.com
@@ -2112,24 +2307,34 @@ CREATE INDEX idx_employees_status ON employees(application_status);
 
 **Note:** SendGrid is tried first. If it fails or isn't configured, Gmail is used automatically. At least one must be configured.
 
-### Error: "User still getting Supabase confirmation email"
-**Cause:** `email_confirm` flag still set to `true`  
-**Solution:** Update signup API to use `email_confirm: false`:
-```typescript
-const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-  email,
-  password,
-  email_confirm: false, // ← Must be false
-  user_metadata: { ... }
-})
-```
+### Error: "Invalid or expired verification code"
+**Cause:** Code is invalid, expired, or already used  
+**Solutions:**
+- Code is 6 digits only (0-9)
+- Code expires after 15 minutes
+- Each code can only be used once
+- Check email for correct code (case-insensitive)
 
-### Verification Code Not Updating Supabase
-**Cause:** `supabase.auth.admin.updateUserById` may need service role key  
-**Solution:** Ensure you're using `getServiceRoleClient()` not the anon client:
-```typescript
-const supabase = getServiceRoleClient() // ✅ Correct
-// NOT: getAnonClient() ❌ Won't work for admin updates
+### Error: "User not found" during verification
+**Cause:** User was created but database query can't find them
+**Solutions:**
+- Ensure user was successfully created (check `users` table)
+- Wait a moment and retry (eventual consistency)
+- Check that the email in verification matches the signup email exactly
+
+### Debug Mode (Development Only)
+To see full error details and stack traces in responses, the API automatically includes them when `NODE_ENV === 'development'`.
+
+Response format with detailed errors:
+```json
+{
+  "success": false,
+  "error": "Failed to create employee profile",
+  "code": "EMPLOYEE_TABLE_SCHEMA_ERROR",
+  "solution": "Run the SQL migration script provided in the troubleshooting guide.",
+  "details": "Could not find the 'applicationStep' column...",
+  "details.stack": "(only in development mode)"
+}
 ```
 
 ---
