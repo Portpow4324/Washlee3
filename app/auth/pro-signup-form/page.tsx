@@ -1200,11 +1200,6 @@ function ProSignupFormContent() {
                   >
                     {emailCodeSent ? 'Code Sent' : 'Send Code'}
                   </button>
-                  <div className="text-xs text-gray">
-                    <strong>🔧 Development Mode:</strong> Test code: <code className="bg-white px-2 py-1 rounded font-bold">
-                      {formData.email && formData.phone ? (testVerificationCode || 'Loading...') : 'Enter email/phone first'}
-                    </code>
-                  </div>
                 </div>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
