@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Button from '@/components/Button'
 import Spinner from '@/components/Spinner'
 import Link from 'next/link'
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useEffect } from 'react'
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
@@ -17,6 +17,7 @@ function LoginContent() {
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -25,6 +26,27 @@ function LoginContent() {
   const [successMessage, setSuccessMessage] = useState('')
   const [resetSuccessMessage, setResetSuccessMessage] = useState('')
   const [emailNotConfirmedError, setEmailNotConfirmedError] = useState('')
+
+  // Load remember me credentials on mount
+  useEffect(() => {
+    const storedEmail = localStorage.getItem('loginEmail')
+    const rememberMeEnabled = localStorage.getItem('rememberMe') === 'true'
+    const rememberMeExpiry = localStorage.getItem('rememberMeExpiry')
+
+    if (storedEmail && rememberMeEnabled && rememberMeExpiry) {
+      const expiryDate = new Date(rememberMeExpiry)
+      if (expiryDate > new Date()) {
+        // Remember me still valid
+        setEmail(storedEmail)
+        setRememberMe(true)
+      } else {
+        // Remember me expired, clear it
+        localStorage.removeItem('loginEmail')
+        localStorage.removeItem('rememberMe')
+        localStorage.removeItem('rememberMeExpiry')
+      }
+    }
+  }, [])
 
   const handleGoogleSignIn = async () => {
     setError('')
@@ -95,6 +117,19 @@ function LoginContent() {
 
       console.log('[Login] ✅ Login successful for:', email)
       setSuccessMessage(`✅ Welcome back! Logging you in...`)
+
+      // Store remember me if checked
+      if (rememberMe) {
+        localStorage.setItem('loginEmail', email)
+        localStorage.setItem('rememberMe', 'true')
+        const expiryDate = new Date()
+        expiryDate.setDate(expiryDate.getDate() + 7) // 7 days
+        localStorage.setItem('rememberMeExpiry', expiryDate.toISOString())
+      } else {
+        localStorage.removeItem('loginEmail')
+        localStorage.removeItem('rememberMe')
+        localStorage.removeItem('rememberMeExpiry')
+      }
 
       setTimeout(() => {
         if (redirectTo) {
@@ -363,9 +398,14 @@ function LoginContent() {
 
                 {/* Remember & Forgot */}
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" className="w-4 h-4 rounded border-gray" />
-                    <span className="text-sm text-gray">Remember me</span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border border-gray accent-primary"
+                    />
+                    <span className="text-sm text-gray">Remember me for 7 days</span>
                   </label>
                   <button
                     type="button"
