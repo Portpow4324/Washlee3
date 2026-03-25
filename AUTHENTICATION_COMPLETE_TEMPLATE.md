@@ -2250,6 +2250,7 @@ NEXT_PUBLIC_ALLOW_GET_CODE=true
 ```
 [UserMgmt] Failed to create employee profile: {code: 'PGRST204', message: "Could not find the 'applicationStep' column..."}
 [Signup] ⚠️ Profile creation failed: Could not find the 'applicationStep' column of 'employees' in the schema cache
+[Signup] Profile error details: {code: 'PGRST204', details: null, hint: null, message: "Could not find the 'applicationStep' column of 'employees' in the schema cache"}
 ```
 
 **Root Cause:** The employees table exists but is missing 6 required columns that the signup code tries to insert into.
@@ -2263,7 +2264,7 @@ NEXT_PUBLIC_ALLOW_GET_CODE=true
 
 2. **Create New Query** (Click "New Query" button)
 
-3. **Paste This SQL:**
+3. **Copy & Paste This SQL:**
    ```sql
    -- Add missing columns to employees table
    ALTER TABLE employees
@@ -2272,61 +2273,121 @@ NEXT_PUBLIC_ALLOW_GET_CODE=true
    ADD COLUMN IF NOT EXISTS skills JSON,
    ADD COLUMN IF NOT EXISTS transport BOOLEAN DEFAULT FALSE,
    ADD COLUMN IF NOT EXISTS equipment BOOLEAN DEFAULT FALSE,
-   ADD COLUMN IF NOT EXISTS id_document_url TEXT;
+   ADD COLUMN IF NOT EXISTS id_document_url TEXT,
+   ADD COLUMN IF NOT EXISTS availability JSON;
 
    -- Add constraint for application_status
    ALTER TABLE employees
    ADD CONSTRAINT IF NOT EXISTS check_application_status 
    CHECK (application_status IN ('pending', 'approved', 'rejected', 'completed'));
 
-   -- Add index for better performance
+   -- Add indexes for better performance
    CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(application_status);
+   CREATE INDEX IF NOT EXISTS idx_employees_step ON employees(application_step);
 
-   -- Verify columns (optional - see the result)
-   SELECT column_name, data_type, column_default 
+   -- Verify columns were added (this shows you the result)
+   SELECT column_name, data_type, column_default, is_nullable
    FROM information_schema.columns 
    WHERE table_name = 'employees' 
    ORDER BY ordinal_position;
    ```
 
-4. **Run the Query** (Click "Run" or Ctrl+Enter)
-   - Should show ✅ "Success"
-   - The last query shows all columns in the table
+4. **Run the Query** (Click "Run" or press `Ctrl+Enter`)
+   - Should show ✅ "Success" at the top
+   - The last SELECT query shows all columns in your employees table
+   - You should see the new columns: application_step, application_status, skills, transport, equipment, id_document_url, availability
 
-5. **Refresh Your App**
+5. **Verify the Fix**
+   - Look at the results table - check that ALL these columns exist:
+     - ✅ application_step (integer)
+     - ✅ application_status (text)
+     - ✅ skills (jsonb)
+     - ✅ transport (boolean)
+     - ✅ equipment (boolean)
+     - ✅ id_document_url (text)
+     - ✅ availability (jsonb)
+
+6. **Clear Caches & Restart**
    - Stop dev server: `Ctrl+C`
-   - Clear Supabase cache: Wait 30 seconds
+   - Clear browser cache: `Cmd+Shift+Delete` → "All time" → Clear
+   - Wait 10 seconds for Supabase to refresh schema cache
    - Restart dev server: `npm run dev`
-   - Clear browser cache: `Cmd+Shift+Delete` → Clear all
-   - Try signup again
+   - Try employee signup again
 
-6. **Still not working?**
-   - Check that the SQL ran without errors
-   - Verify columns were added (run the SELECT query again)
-   - Make sure you're using the service role key in .env.local
+7. **Still having issues?**
+   
+   **Check A: Did the SQL run successfully?**
+   - Go back to SQL Editor
+   - Run just the verification query at the bottom
+   - Confirm all 7 new columns appear in results
+   
+   **Check B: Are you using the right Supabase project?**
+   - Verify `NEXT_PUBLIC_SUPABASE_URL` in `.env.local` matches the project URL
+   - Verify `SUPABASE_SERVICE_ROLE_KEY` is set correctly
+   
+   **Check C: Clear Supabase Schema Cache**
+   ```sql
+   -- Run this if columns still don't appear
+   -- (This forces Supabase to refresh its schema cache)
+   SELECT pg_sleep(2);
+   ```
+   - Then try signup again
 
 ---
 
-### Error: 400 Bad Request on Signup
+### Error: 400 Bad Request on Signup (No Details)
 **Message:** `Failed to load resource: the server responded with a status of 400`  
-**Console Log:** `[UserMgmt] Failed to create employee profile: Object`
+**Console Log:** 
+```
+[UserMgmt] Failed to create employee profile: Object
+[Signup] ⚠️ Profile creation failed: ...
+[Signup] Profile error details: Object
+```
 
 **Possible Causes & Solutions:**
 
-1. **Missing Required Fields**
-   - Check that email, password, name, phone, state, and userType are all provided
-   - Ensure password is at least 8 characters
-   - Verify email format is valid
+1. **Missing Required Fields in Signup Form**
+   - ✅ First Name (required)
+   - ✅ Last Name (required)
+   - ✅ Email (required, valid format)
+   - ✅ Phone (required)
+   - ✅ State (required, select from dropdown)
+   - ✅ Password (required, 8+ chars with number, uppercase, lowercase, special char)
+   - ✅ Confirm Password (must match password)
 
-2. **Invalid Email or Password Format**
-   - Email must contain @ and a domain (e.g., user@example.com)
-   - Password must have: 8+ chars, number, uppercase, lowercase, special char
+2. **Invalid Email Format**
+   - ❌ `user@` (missing domain)
+   - ❌ `user@com` (missing domain extension)
+   - ❌ `user.com` (missing @)
+   - ✅ `user@example.com` (correct format)
 
-3. **User Already Exists**
-   - If you get `DUPLICATE_EMAIL` error, the email is already registered
-   - Try logging in instead or use a different email
+3. **Weak Password**
+   - Must have ALL of these:
+     - ✅ At least 8 characters
+     - ✅ At least one number (0-9)
+     - ✅ At least one uppercase letter (A-Z)
+     - ✅ At least one lowercase letter (a-z)
+     - ✅ At least one special character (!@#$%^&*)
+   - Example: `SecurePass123!`
 
-4. **See PGRST204 error above** for employee table schema issues
+4. **Duplicate Email (User Already Exists)**
+   - Error: `DUPLICATE_EMAIL` or "A user with this email has already been registered"
+   - **Solution:** Use a different email address or log in instead
+
+5. **State/Region Not Selected**
+   - Ensure you selected a state from the dropdown
+   - Don't leave it blank
+
+6. **Employee Table Schema Issue**
+   - See **PGRST204 error** section above
+   - Run the SQL migration to add missing columns
+
+7. **Debug: Check Network Request**
+   - Open Browser DevTools: `F12` or `Cmd+Option+I`
+   - Go to Network tab
+   - Look for the failing request (usually POST to `/api/auth/signup`)
+   - Click on it and check the Response tab
+   - It should show the exact error message from the server
 
 ### Error: 403 on `/api/verification/get-code`
 **Solution:** Add `NEXT_PUBLIC_ALLOW_GET_CODE=true` to `.env.local` for development. This endpoint is disabled in production.
@@ -2367,6 +2428,107 @@ NEXT_PUBLIC_ALLOW_GET_CODE=true
 - Ensure user was successfully created (check `users` table)
 - Wait a moment and retry (eventual consistency)
 - Check that the email in verification matches the signup email exactly
+
+---
+
+## Complete Debugging Guide
+
+### How to Debug Auth Issues
+
+**1. Check Browser Console (F12)**
+```
+Look for [Signup], [UserMgmt], [Email] prefixed logs
+These show step-by-step what's happening
+```
+
+**2. Check Network Tab (F12 → Network)**
+```
+Filter for XHR/Fetch requests
+Look for requests to:
+  - /api/auth/signup
+  - /api/verification/send-code
+  - /api/auth/verify-code
+Click on each and check Response tab for error messages
+```
+
+**3. Check Supabase Logs**
+```
+Go to: https://app.supabase.com → Your Project → Logs
+Filter by your email or user ID
+Look for errors from the auth API calls
+```
+
+**4. Check Database Tables**
+```
+Go to: https://app.supabase.com → Your Project → Table Editor
+
+Check these tables:
+  ✅ users (should have entry with your email)
+  ✅ customers or employees (depending on signup type)
+  ✅ verification_codes (should have entry with your email)
+
+Click on each row to see the exact data stored
+```
+
+**5. Enable Detailed Logging**
+
+Add this to your signup component to see more details:
+```typescript
+// In your signup API call
+const response = await fetch('/api/auth/signup', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ /* ... */ }),
+})
+
+const data = await response.json()
+
+// Log everything
+console.log('[Signup] Full response:', data)
+console.log('[Signup] Status:', response.status)
+console.log('[Signup] Headers:', response.headers)
+```
+
+**6. Test Individual APIs with cURL**
+
+Test signup directly:
+```bash
+curl -X POST http://localhost:3000/api/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "SecurePass123!",
+    "name": "John Doe",
+    "phone": "0412345678",
+    "state": "NSW",
+    "userType": "customer"
+  }'
+```
+
+Test verification code send:
+```bash
+curl -X POST http://localhost:3000/api/verification/send-code \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "codeType": "signup"}'
+```
+
+---
+
+## Quick Checklist Before Reporting Issues
+
+- [ ] All `.env.local` variables are set
+- [ ] Supabase tables exist (users, customers/employees, verification_codes)
+- [ ] Employee table has all 7 new columns (run migration SQL)
+- [ ] Browser cache cleared (`Cmd+Shift+Delete`)
+- [ ] Dev server restarted (`Ctrl+C` then `npm run dev`)
+- [ ] Checked browser console for errors (F12)
+- [ ] Checked network tab for failed requests (F12 → Network)
+- [ ] Verified Supabase credentials in `.env.local`
+- [ ] Email service configured (SendGrid or Gmail)
+- [ ] At least one email provider credentials added
+
+If all above ✅, your auth system should work!
+````
 
 ### Debug Mode (Development Only)
 To see full error details and stack traces in responses, the API automatically includes them when `NODE_ENV === 'development'`.
