@@ -440,8 +440,9 @@ export async function POST(request: NextRequest) {
     const [firstName, ...lastNameParts] = name.split(' ')
     const lastName = lastNameParts.join(' ') || ''
 
-    // Create user via admin API (bypasses rate limits)
-    // NOTE: email_confirm is set to false - we'll verify via SendGrid and update it manually
+    // Create user via admin API (bypasses rate limits + email confirmation requirement)
+    console.log('[Auth] Creating user with admin API for userType:', userType)
+    
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -452,7 +453,7 @@ export async function POST(request: NextRequest) {
         phone,
         user_type: userType,
       },
-      email_confirm: false, // Disabled - using SendGrid verification instead
+      email_confirm: false, // We'll verify via SendGrid and update it manually
     })
 
     if (authError) {
@@ -549,35 +550,67 @@ export async function POST(request: NextRequest) {
         )
       }
     } else if (userType === 'pro') {
-      const { error: employeeError } = await supabase
-        .from('employees')
-        .insert({
-          id: userId,
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          phone,
-          state,
-          application_step: 0,
-          application_status: 'pending',
-          skills: [],
-          transport: false,
-          equipment: false,
-        })
+      // For employee signup: Create BOTH customer and employee profiles simultaneously
+      console.log('[Signup] Creating both customer and employee profiles for employee signup')
+      
+      const customerProfile = {
+        id: userId,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        state,
+        personal_use: false,
+        account_status: 'active',
+      }
 
-      if (employeeError) {
-        console.error('[Employees Table Error]', employeeError)
+      const employeeProfile = {
+        id: userId,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        state,
+        application_step: 0,
+        application_status: 'pending',
+        skills: [],
+        transport: false,
+        equipment: false,
+        id_document_url: null,
+        availability: {},
+      }
+
+      // Create both profiles in parallel
+      const [customerResult, employeeResult] = await Promise.all([
+        supabase.from('customers').insert(customerProfile),
+        supabase.from('employees').insert(employeeProfile),
+      ])
+
+      if (customerResult.error) {
+        console.error('[Customers Table Error]', customerResult.error)
+        return NextResponse.json(
+          { 
+            error: 'Failed to create customer profile: ' + customerResult.error.message,
+            code: 'CUSTOMER_PROFILE_CREATION_FAILED',
+            details: customerResult.error
+          },
+          { status: 500 }
+        )
+      }
+
+      if (employeeResult.error) {
+        console.error('[Employees Table Error]', employeeResult.error)
         
         // Check if it's a schema error (missing columns)
-        if (employeeError.message.includes('applicationStep') || 
-            employeeError.message.includes('application_step') ||
-            employeeError.message.includes('schema cache')) {
+        if (employeeResult.error.message.includes('applicationStep') || 
+            employeeResult.error.message.includes('application_step') ||
+            employeeResult.error.message.includes('schema cache')) {
           return NextResponse.json(
             { 
-              error: 'Employee table is not properly configured. Missing required columns: applicationStep, applicationStatus, skills, transport, equipment.',
+              error: 'Employee table is not properly configured. Missing required columns: applicationStep, applicationStatus, skills, transport, equipment, availability.',
               code: 'EMPLOYEE_TABLE_SCHEMA_ERROR',
-              solution: 'Run the SQL migration script provided in the troubleshooting guide.',
-              details: employeeError.message
+              solution: 'Run the SQL migration script: ALTER TABLE employees ADD COLUMN IF NOT EXISTS application_step INTEGER DEFAULT 0, ...',
+              details: employeeResult.error.message
             },
             { status: 500 }
           )
@@ -585,13 +618,15 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(
           { 
-            error: 'Failed to create employee profile: ' + employeeError.message,
+            error: 'Failed to create employee profile: ' + employeeResult.error.message,
             code: 'EMPLOYEE_PROFILE_CREATION_FAILED',
-            details: employeeError
+            details: employeeResult.error
           },
           { status: 500 }
         )
       }
+
+      console.log('[Signup] ✓ Both customer and employee profiles created')
     }
 
     return NextResponse.json({
@@ -599,6 +634,10 @@ export async function POST(request: NextRequest) {
       message: 'Account created successfully',
       userId,
       user: { id: userId, email, emailConfirmed: false },
+      profiles: {
+        customer: 'created',
+        employee: userType === 'pro' ? 'created' : 'not_applicable',
+      }
     })
   } catch (error: any) {
     console.error('[Signup Error]', error)
