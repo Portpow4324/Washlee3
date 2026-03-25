@@ -1,10 +1,10 @@
-import { supabaseAdmin } from '@/lib/supabaseServer'
-
 /**
- * Server-side verification utilities.
- *
- * This module stores verification codes in Supabase verification_codes table.
+ * Server-side verification utilities using in-memory storage.
+ * 
+ * This module stores verification codes in memory with expiration.
  * Codes expire after 15 minutes.
+ * 
+ * Note: In production with multiple instances, use Redis or a database table.
  */
 
 type VerificationRecord = {
@@ -12,6 +12,10 @@ type VerificationRecord = {
   expiresAt: number
   used: boolean
 }
+
+// In-memory storage for verification codes
+// Key format: email:phone
+const verificationCodes = new Map<string, VerificationRecord>()
 
 const EXPIRY_MS = 15 * 60 * 1000 // 15 minutes
 
@@ -34,51 +38,42 @@ export function generateVerificationCode(): string {
 
 export async function storeVerificationCode(email: string, phone: string, code: string): Promise<void> {
   const key = makeKey(email, phone)
-  const record = {
-    email: email.trim().toLowerCase(),
-    phone: phone.replace(/\D/g, ''),
+  
+  verificationCodes.set(key, {
     code,
-    expires_at: new Date(Date.now() + EXPIRY_MS).toISOString(),
+    expiresAt: Date.now() + EXPIRY_MS,
     used: false,
-  }
+  })
   
-  const { error } = await supabaseAdmin
-    .from('verification_codes')
-    .insert([record])
-  
-  if (error) {
-    console.error('[ServerVerification] Failed to store code:', error)
-    throw error
-  }
-  
-  console.log('[ServerVerification] Stored code in Supabase:', { key, code })
+  console.log('[ServerVerification] Stored code in memory:', { key, code })
 }
 
 export async function verifyCode(email: string, phone: string, code: string): Promise<boolean> {
   const normalizedEmail = email.trim().toLowerCase()
-  const normalizedPhone = phone.replace(/\D/g, '')
+  let normalizedPhone = phone.replace(/\D/g, '')
   
-  const { data, error } = await supabaseAdmin
-    .from('verification_codes')
-    .select('*')
-    .eq('email', normalizedEmail)
-    .eq('phone', normalizedPhone)
-    .order('created_at', { ascending: false })
-    .limit(1)
+  // Try both formats (with and without country code)
+  let key = `${normalizedEmail}:${normalizedPhone}`
+  let stored = verificationCodes.get(key)
   
-  if (error || !data || data.length === 0) {
-    console.log('[ServerVerification] No code stored for', normalizedEmail, normalizedPhone)
+  // If not found and phone doesn't start with 61, try with country code
+  if (!stored && !normalizedPhone.startsWith('61') && normalizedPhone.length === 10) {
+    normalizedPhone = `61${normalizedPhone.slice(1)}`
+    key = `${normalizedEmail}:${normalizedPhone}`
+    stored = verificationCodes.get(key)
+  }
+  
+  if (!stored) {
+    console.log('[ServerVerification] No code stored for', key)
     return false
   }
   
-  const stored = data[0]
-  const key = `${normalizedEmail}:${normalizedPhone}`
   console.log('[ServerVerification] Attempting to verify code:', { key, inputCode: code, stored })
 
-  if (new Date(stored.expires_at) < new Date()) {
+  // Check expiration
+  if (stored.expiresAt < Date.now()) {
     console.log('[ServerVerification] Code expired for', key)
-    // Delete expired code
-    await supabaseAdmin.from('verification_codes').delete().eq('id', stored.id)
+    verificationCodes.delete(key)
     return false
   }
 
@@ -90,21 +85,15 @@ export async function verifyCode(email: string, phone: string, code: string): Pr
   // Remove all whitespace from code for robust comparison
   const normalizedCode = code.replace(/\s+/g, '')
   const storedCode = stored.code.replace(/\s+/g, '')
+  
   if (storedCode !== normalizedCode) {
-    console.log('[ServerVerification] Code mismatch for', key, { expected: storedCode, got: normalizedCode, rawInput: code, rawStored: stored.code })
+    console.log('[ServerVerification] Code mismatch for', key, { expected: storedCode, got: normalizedCode })
     return false
   }
 
   // Mark code as used
-  const { error: updateError } = await supabaseAdmin
-    .from('verification_codes')
-    .update({ used: true, used_at: new Date().toISOString() })
-    .eq('id', stored.id)
-  
-  if (updateError) {
-    console.error('[ServerVerification] Failed to mark code as used:', updateError)
-    throw updateError
-  }
+  stored.used = true
+  verificationCodes.set(key, stored)
   
   console.log('[ServerVerification] Code verified for', key)
   return true
@@ -112,19 +101,21 @@ export async function verifyCode(email: string, phone: string, code: string): Pr
 
 export async function getVerificationCodeForTesting(email: string, phone: string): Promise<string | null> {
   const normalizedEmail = email.trim().toLowerCase()
-  const normalizedPhone = phone.replace(/\D/g, '')
+  let normalizedPhone = phone.replace(/\D/g, '')
   
-  const { data, error } = await supabaseAdmin
-    .from('verification_codes')
-    .select('code')
-    .eq('email', normalizedEmail)
-    .eq('phone', normalizedPhone)
-    .order('created_at', { ascending: false })
-    .limit(1)
+  let key = `${normalizedEmail}:${normalizedPhone}`
+  let stored = verificationCodes.get(key)
   
-  if (error || !data || data.length === 0) {
+  // If not found and phone doesn't start with 61, try with country code
+  if (!stored && !normalizedPhone.startsWith('61') && normalizedPhone.length === 10) {
+    normalizedPhone = `61${normalizedPhone.slice(1)}`
+    key = `${normalizedEmail}:${normalizedPhone}`
+    stored = verificationCodes.get(key)
+  }
+  
+  if (!stored) {
     return null
   }
   
-  return data[0].code
+  return stored.code
 }
