@@ -1,0 +1,7 @@
+-- Discover all existing tables in the database
+SELECT 
+  table_name,
+  table_schema
+FROM information_schema.tables 
+WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+ORDER BY table_schema, table_name;

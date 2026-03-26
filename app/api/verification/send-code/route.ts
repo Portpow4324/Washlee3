@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
           // Don't fail the whole request - code was stored, email just failed
           return NextResponse.json({ 
             success: true, 
-            code: process.env.NODE_ENV === 'development' ? code : undefined,
+            // Only show code in dev mode
+            ...(process.env.NODE_ENV === 'development' && { code }),
             warning: 'Code stored but email send failed'
           })
         }
@@ -58,7 +59,8 @@ export async function POST(request: NextRequest) {
         // Code was stored, so allow the request to succeed
         return NextResponse.json({ 
           success: true, 
-          code: process.env.NODE_ENV === 'development' ? code : undefined,
+          // Only show code in dev mode
+          ...(process.env.NODE_ENV === 'development' && { code }),
           warning: 'Code stored but email send failed'
         })
       }
@@ -80,7 +82,8 @@ export async function POST(request: NextRequest) {
           // Don't fail - code was stored, SMS just failed
           return NextResponse.json({ 
             success: true, 
-            code: process.env.NODE_ENV === 'development' ? code : undefined,
+            // Only show code in dev mode
+            ...(process.env.NODE_ENV === 'development' && { code }),
             warning: 'Code stored but SMS send failed'
           })
         }
@@ -91,7 +94,8 @@ export async function POST(request: NextRequest) {
         // Code was stored, so allow the request to succeed
         return NextResponse.json({ 
           success: true, 
-          code: process.env.NODE_ENV === 'development' ? code : undefined,
+          // Only show code in dev mode
+          ...(process.env.NODE_ENV === 'development' && { code }),
           warning: 'Code stored but SMS send failed'
         })
       }

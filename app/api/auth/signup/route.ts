@@ -59,27 +59,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Sign up with Supabase Auth using Admin API to bypass rate limits
-    // Regular signUp() is rate-limited; admin API allows direct creation
-    console.log('[SIGNUP] Creating user via admin API to bypass rate limits...')
+    // Sign up with Supabase Auth using regular signup (not admin API)
+    // Admin API has been having issues - use regular signup instead
+    console.log('[SIGNUP] Creating user via regular signup...')
     console.log('[SIGNUP] Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'MISSING')
-    console.log('[SIGNUP] Service role key:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'configured' : 'MISSING')
     
     // Parse first and last names
     const [firstName, ...lastNameParts] = name.split(' ')
     const lastName = lastNameParts.join(' ') || ''
     
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Try regular signup first
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      user_metadata: {
-        name,
-        first_name: firstName,
-        last_name: lastName,
-        phone,
-        user_type: userType,
-      },
-      email_confirm: false  // User must confirm email before logging in
+      options: {
+        data: {
+          name,
+          first_name: firstName,
+          last_name: lastName,
+          phone,
+          user_type: userType,
+        },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`
+      }
     })
 
     console.log('[SIGNUP] Auth response received')
