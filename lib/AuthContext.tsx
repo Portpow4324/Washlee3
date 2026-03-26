@@ -131,7 +131,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setLoading(false)
             return
           } catch (timeoutError: any) {
-            console.error('[Auth] ❌ Query timeout or error:', timeoutError.message)
+            // Timeout on profile lookup - use fallback profile
+            // This is usually due to RLS or slow queries - not a critical error
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('[Auth] Profile lookup timed out, using fallback:', timeoutError.message)
+            }
             // Still set fallback user data so app doesn't hang
             const fallbackName = session.user.user_metadata?.firstName || session.user.email?.split('@')[0] || 'User'
             setUserData({

@@ -7,7 +7,7 @@ import Button from '@/components/Button'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect, Suspense } from 'react'
-import { Mail, Lock, User, Phone, MapPin, CheckCircle, ArrowLeft, Upload, Eye, EyeOff, HelpCircle, AlertCircle, X } from 'lucide-react'
+import { Mail, Lock, User, Phone, MapPin, CheckCircle, ArrowLeft, Upload, Eye, EyeOff, HelpCircle, AlertCircle, X, Info } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AUSTRALIAN_STATES, validateAustralianPhone, formatAustralianPhone, validateEmail, getEmailSuggestions } from '@/lib/australianValidation'
 import { WASHLEE_TERMS } from '@/lib/washleeTerms'
@@ -1707,6 +1707,19 @@ function ProSignupFormContent() {
           {/* Title */}
           <h1 className="text-2xl font-bold text-dark mb-2">{step.title}</h1>
           <p className="text-gray mb-6">{step.description}</p>
+
+          {/* Info for Existing Customers */}
+          {currentStep === 0 && isLoggedInUser && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm">
+              <div className="flex gap-2">
+                <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-blue-900">
+                  <p className="font-semibold mb-1">Welcome back!</p>
+                  <p>We found your existing account. We just need a few more details (phone and state) to complete your Pro profile.</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Content */}
           <div className="mb-8">
