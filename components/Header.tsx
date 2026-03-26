@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Menu, X, ArrowLeft, LogOut, User, Droplets, Shield, Briefcase, Settings, ChevronDown, Home, Package, DollarSign } from 'lucide-react'
+import { Menu, X, ArrowLeft, LogOut, User, Droplets, Shield, Briefcase, Settings, ChevronDown, Home, Package, DollarSign, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { createClient } from '@supabase/supabase-js'
 
@@ -12,6 +12,7 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showRoleSwitch, setShowRoleSwitch] = useState(false)
+  const [showProModal, setShowProModal] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const { user, userData, isAuthenticated, loading } = useAuth()
@@ -187,6 +188,18 @@ export default function Header() {
                                 Pro Dashboard
                               </button>
                             )}
+                            {userData?.user_type !== 'pro' && !userData?.is_employee && (
+                              <button
+                                onClick={() => {
+                                  setShowRoleSwitch(false)
+                                  setShowProModal(true)
+                                }}
+                                className="w-full px-4 py-2 text-dark hover:bg-mint transition text-sm text-left flex items-center gap-2"
+                              >
+                                <Briefcase size={16} className="text-primary" />
+                                Pro Dashboard
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -352,6 +365,52 @@ export default function Header() {
             )}
           </div>
         )}
+
+      {/* Pro Modal - Encourage user to join */}
+      {showProModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[999] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
+                <Briefcase size={24} className="text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold text-dark">Join Our Team</h2>
+            </div>
+            
+            <p className="text-gray mb-4">
+              Want to earn money with Washlee? Become a Pro member and start accepting laundry jobs in your area.
+            </p>
+            
+            <div className="bg-mint rounded-lg p-4 mb-6">
+              <p className="text-sm font-semibold text-dark mb-2">As a Pro member, you'll:</p>
+              <ul className="text-sm text-dark space-y-1">
+                <li>✓ Accept laundry pickup & delivery jobs</li>
+                <li>✓ Earn competitive rates per order</li>
+                <li>✓ Set your own schedule</li>
+                <li>✓ Track earnings in real-time</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowProModal(false)}
+                className="flex-1 px-4 py-3 bg-gray/20 text-dark rounded-lg hover:bg-gray/30 transition font-semibold"
+              >
+                Maybe Later
+              </button>
+              <button
+                onClick={() => {
+                  setShowProModal(false)
+                  router.push('/pro')
+                }}
+                className="flex-1 px-4 py-3 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold"
+              >
+                Learn More
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </nav>
     </header>
   )
