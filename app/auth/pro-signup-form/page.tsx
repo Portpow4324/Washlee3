@@ -45,6 +45,8 @@ function ProSignupFormContent() {
   const [showWorkAddressPredictions, setShowWorkAddressPredictions] = useState(false)
   const [isValidatingWorkAddress, setIsValidatingWorkAddress] = useState(false)
   const [workAddressError, setWorkAddressError] = useState('')
+  const [workAddressCoordinates, setWorkAddressCoordinates] = useState<{ lat: number, lng: number } | null>(null)
+  const [workAddressVerified, setWorkAddressVerified] = useState(false)
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -187,6 +189,15 @@ function ProSignupFormContent() {
         ...formData,
         workAddress: addressDetails.formattedAddress
       })
+      
+      // Store coordinates for existing customers' work address verification
+      if (addressDetails.latitude && addressDetails.longitude) {
+        setWorkAddressCoordinates({
+          lat: addressDetails.latitude,
+          lng: addressDetails.longitude
+        })
+      }
+      
       setShowWorkAddressPredictions(false)
       setWorkAddressPredictions([])
     } catch (err) {
@@ -243,11 +254,11 @@ function ProSignupFormContent() {
             
             // AUTO-ADVANCE: Only advance if customer has ALL required Pro fields including state
             // If state is missing, user needs to stay on Step 0 to fill it in
-            if (initialStep === 0 && data.state) {
-              console.log('[ProSignup] User has existing customer profile WITH state - advancing to step 1')
+            if (initialStep === 0 && data.state && data.phone) {
+              console.log('[ProSignup] User has existing customer profile WITH state and phone - advancing to step 1')
               setCurrentStep(1)
-            } else if (initialStep === 0 && !data.state) {
-              console.log('[ProSignup] User has customer profile but NO state - staying on step 0 to collect it')
+            } else if (initialStep === 0 && (!data.state || !data.phone)) {
+              console.log('[ProSignup] User has customer profile but missing state/phone - staying on step 0 to collect it')
               // Stay on Step 0 to allow user to fill in the state field
             }
           } else {
@@ -288,31 +299,44 @@ function ProSignupFormContent() {
     updateTestCode()
   }, [formData.email, formData.phone, isAdmin])
 
+  // Helper function to get current step title
+  const getCurrentStepTitle = () => {
+    if (currentStep >= 0 && currentStep < steps.length) {
+      return steps[currentStep]?.title || ''
+    }
+    return ''
+  }
+
   const isStepValid = () => {
-    switch (currentStep) {
-      case 0: // Initial application form
+    const stepTitle = getCurrentStepTitle()
+    
+    // Match by step title to handle conditional steps
+    switch (stepTitle) {
+      case 'Tell us about yourself':
         return (
           formData.firstName.trim() && 
           formData.lastName.trim() && 
           validateEmail(formData.email) &&
           validateAustralianPhone(formData.phone) &&
           formData.state && 
-          formData.workAddress.trim() &&
+          (!isLoggedInUser || formData.workAddress.trim()) && // Only require workAddress for new users
           isPasswordValid &&
           formData.password === formData.confirmPassword &&
           formData.termsAccepted
         )
-      case 1: // Email confirmation - just show info, Next button will confirm
-        return true
-      case 2: // Phone verification - just need a valid code entered
+      case 'Verify Your Email':
+        return formData.emailVerificationCode.length === 6
+      case 'Verify Your Phone':
         return formData.phoneVerificationCode.length === 6
-      case 3: // ID verification - just show info, Next button will verify
+      case 'Verify Your Work Location':
+        return formData.workAddress.trim() && workAddressVerified && workAddressCoordinates !== null
+      case 'ID Verification':
         return true
-      case 4: // Washlee intro (auto-pass)
+      case 'Washlee Pro Introduction':
         return true
-      case 5: // Availability and details - optional fields so always true
+      case 'Your Availability & Contact Info':
         return true
-      case 6: // Australian Workplace Verification
+      case 'Australian Workplace Verification':
         return (
           formData.hasWorkRight === true &&
           formData.hasValidLicense === true &&
@@ -320,7 +344,7 @@ function ProSignupFormContent() {
           formData.hasEquipment === true &&
           formData.ageVerified === true
         )
-      case 7: // Skills Assessment
+      case 'Skills & Experience Assessment':
         return formData.skillsAssessment.trim().length >= 50
       default:
         return false
@@ -429,21 +453,37 @@ function ProSignupFormContent() {
   }
 
   const handleNext = async () => {
-    if (currentStep === 0) {
+    const stepTitle = getCurrentStepTitle()
+
+    if (stepTitle === 'Tell us about yourself') {
       // Step 0: Collect details, create account, send email verification
       if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.phone.trim()) {
         setError('Please fill in all required fields')
         return
       }
       
+      // For new users, require workAddress
+      if (!isLoggedInUser && !formData.workAddress.trim()) {
+        setError('Please enter your work address')
+        return
+      }
+      
       // Create account
       setError('')
       setIsLoading(true)
-      const accountCreated = await handleCreateAccount()
+      const result = await handleCreateAccount()
       setIsLoading(false)
       
-      if (!accountCreated) {
+      if (!result.success) {
         setError('Failed to create account. Check console for details.')
+        return
+      }
+      
+      // If existing customer with verified email, skip to phone verification
+      if (result.skipEmailVerification) {
+        console.log('[ProSignup] Existing customer - skipping email verification')
+        // Move directly to phone verification (skip email step)
+        setCurrentStep(currentStep + 2)
         return
       }
       
@@ -452,10 +492,10 @@ function ProSignupFormContent() {
       await sendEmailVerification()
       setIsLoading(false)
       
-      // Move to Step 1 (email verification)
-      setCurrentStep(1)
-    } else if (currentStep === 1) {
-      // Step 1: Email verification
+      // Move to next step (email verification)
+      setCurrentStep(currentStep + 1)
+    } else if (stepTitle === 'Verify Your Email') {
+      // Email verification
       const trimmedEmailCode = formData.emailVerificationCode.trim().replace(/\s+/g, '')
       if (trimmedEmailCode.length !== 6) {
         setError('Please enter a 6-digit verification code')
@@ -476,9 +516,9 @@ function ProSignupFormContent() {
       }
 
       setFormData({ ...formData, emailConfirmed: true })
-      setCurrentStep(2)
-    } else if (currentStep === 2) {
-      // Step 2: Phone verification
+      setCurrentStep(currentStep + 1)
+    } else if (stepTitle === 'Verify Your Phone') {
+      // Phone verification
       if (!phoneCodeSent) {
         setError('')
         setIsLoading(true)
@@ -507,9 +547,27 @@ function ProSignupFormContent() {
       }
       
       setFormData({ ...formData, phoneVerified: true })
-      setCurrentStep(3)
-    } else if (currentStep === 3) {
-      // Step 3: ID verification
+      setCurrentStep(currentStep + 1)
+    } else if (stepTitle === 'Verify Your Work Location') {
+      // Work address verification (for existing customers)
+      if (!formData.workAddress.trim()) {
+        setError('Please enter your work address')
+        return
+      }
+      
+      if (!workAddressCoordinates) {
+        setError('Please select a valid address from the dropdown')
+        return
+      }
+      
+      if (!workAddressVerified) {
+        setError('Please confirm this is your service location')
+        return
+      }
+      
+      setCurrentStep(currentStep + 1)
+    } else if (stepTitle === 'ID Verification') {
+      // ID verification
       if (!formData.idVerified) {
         setError('')
         setIsLoading(true)
@@ -517,26 +575,26 @@ function ProSignupFormContent() {
         setIsLoading(false)
         return // Don't advance yet
       }
-      setCurrentStep(4)
-    } else if (currentStep === 4) {
-      // Step 4: Washlee Pro Introduction - just advance
-      setCurrentStep(5)
-    } else if (currentStep === 5) {
-      // Step 5: Availability - validate and move forward
+      setCurrentStep(currentStep + 1)
+    } else if (stepTitle === 'Washlee Pro Introduction') {
+      // Just advance
+      setCurrentStep(currentStep + 1)
+    } else if (stepTitle === 'Your Availability & Contact Info') {
+      // Validate and move forward
       if (isStepValid()) {
-        setCurrentStep(6)
+        setCurrentStep(currentStep + 1)
       } else {
         setError('Please complete this step')
       }
-    } else if (currentStep === 6) {
-      // Step 6: Workplace Verification - validate and move forward
+    } else if (stepTitle === 'Australian Workplace Verification') {
+      // Validate and move forward
       if (isStepValid()) {
-        setCurrentStep(7)
+        setCurrentStep(currentStep + 1)
       } else {
         setError('Please complete this step')
       }
-    } else if (currentStep === 7) {
-      // Step 7: Skills Assessment - validate and submit
+    } else if (stepTitle === 'Skills & Experience Assessment') {
+      // Validate and submit
       if (isStepValid()) {
         await handleSubmitInquiry()
       } else {
@@ -715,7 +773,7 @@ function ProSignupFormContent() {
     }
   }
 
-  const handleCreateAccount = async (): Promise<boolean> => {
+  const handleCreateAccount = async (): Promise<{ success: boolean, skipEmailVerification: boolean }> => {
     setError('')
     setIsLoading(true)
 
@@ -729,10 +787,11 @@ function ProSignupFormContent() {
         const customerData = await getCustomerProfile(authUser.id)
         const data = customerData as any
         if (customerData && data.state) {
-          console.log('[Signup] User already logged in with complete profile, advancing to email verification')
-          // Already logged in with complete data
+          console.log('[Signup] User already logged in with complete profile, skipping email verification')
+          // Already logged in with complete data - auto-verify email
+          setFormData(prev => ({ ...prev, emailConfirmed: true }))
           setIsLoading(false)
-          return true
+          return { success: true, skipEmailVerification: true }
         } else {
           console.log('[Signup] User logged in but needs to complete profile - creating customer profile')
           // User is logged in but needs customer profile - create it using existing auth user
@@ -751,8 +810,8 @@ function ProSignupFormContent() {
             } as any)
             console.log('[Signup] Customer profile created for existing user')
             
-            // Auto-accept terms for logged-in users
-            setFormData(prev => ({ ...prev, termsAccepted: true }))
+            // Auto-accept terms and email for logged-in users
+            setFormData(prev => ({ ...prev, termsAccepted: true, emailConfirmed: true }))
             
             // Send verification codes automatically for logged-in users too
             const adminStatus = await isAdminUser(authUser.id)
@@ -767,14 +826,14 @@ function ProSignupFormContent() {
               })
             }
             
-            // Now advance to email verification
+            // Skip email verification for existing customers - their email is already verified
             setIsLoading(false)
-            return true
+            return { success: true, skipEmailVerification: true }
           } catch (profileErr: any) {
             console.error('[Signup] Error creating profile for existing user:', profileErr)
             setError('Failed to complete profile setup')
             setIsLoading(false)
-            return false
+            return { success: false, skipEmailVerification: false }
           }
         }
       }
@@ -782,13 +841,13 @@ function ProSignupFormContent() {
       if (formData.password !== formData.confirmPassword) {
         setError('Passwords do not match')
         setIsLoading(false)
-        return false
+        return { success: false, skipEmailVerification: false }
       }
 
       if (!isPasswordValid) {
         setError('Password does not meet requirements')
         setIsLoading(false)
-        return false
+        return { success: false, skipEmailVerification: false }
       }
 
       let authResult
@@ -836,21 +895,21 @@ function ProSignupFormContent() {
             'Click "Already have a customer account? Sign in here" to sign in and upgrade to Pro.'
           )
           setIsLoading(false)
-          return false
+          return { success: false, skipEmailVerification: false }
         } else if (createErr.message && createErr.message.includes('weak password')) {
           setError('Password is too weak.')
           setIsLoading(false)
-          return false
+          return { success: false, skipEmailVerification: false }
         } else {
           setError(createErr.message || 'Failed to create account')
           setIsLoading(false)
-          return false
+          return { success: false, skipEmailVerification: false }
         }
       }
       if (!authResult) {
         setError('Failed to process account')
         setIsLoading(false)
-        return false
+        return { success: false, skipEmailVerification: false }
       }
 
       // Check if admin and set state
@@ -862,12 +921,12 @@ function ProSignupFormContent() {
       const totalTime = performance.now() - signupStartTime
       console.log('[Signup] ✅ Account creation completed in', Math.round(totalTime), 'ms')
       
-      return true
+      return { success: true, skipEmailVerification: false }
     } catch (err: any) {
       const totalTime = performance.now() - signupStartTime
       console.error('[Signup] ❌ Error after', Math.round(totalTime), 'ms:', err)
       setError(err.message || 'Failed to process signup')
-      return false
+      return { success: false, skipEmailVerification: false }
     } finally {
       setIsLoading(false)
     }
@@ -992,6 +1051,8 @@ function ProSignupFormContent() {
               </select>
             </div>
           </div>
+          {/* Work address field - hidden for existing customers (they'll set it in dedicated step) */}
+          {!isLoggedInUser && (
           <div>
             <label className="block text-sm font-semibold text-dark mb-2">Work Address*</label>
             <div className="relative">
@@ -1037,6 +1098,7 @@ function ProSignupFormContent() {
               )}
             </div>
           </div>
+          )}
           <div>
             <label className="block text-sm font-semibold text-dark mb-2">Create Password*</label>
             <div className="relative">
@@ -1280,6 +1342,106 @@ function ProSignupFormContent() {
         </div>
       ),
     },
+    // Work address verification step (only for existing customers)
+    ...(isLoggedInUser ? [{
+      title: 'Verify Your Work Location',
+      description: 'Confirm where you\'ll be providing services',
+      content: (
+        <div className="space-y-4">
+          <div className="bg-mint/20 border-2 border-primary/30 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <Info size={20} className="text-primary flex-shrink-0 mt-1" />
+              <div>
+                <h4 className="font-semibold text-dark mb-1">Service Area Verification</h4>
+                <p className="text-sm text-gray">
+                  We need to confirm your work location is within our service area. You can pick any address where you'll primarily be providing laundry services.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-dark mb-2">Work/Service Location*</label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
+              <input
+                type="text"
+                name="workAddress"
+                value={formData.workAddress}
+                onChange={(e) => {
+                  handleChange(e)
+                  fetchWorkAddressPredictions(e.target.value)
+                }}
+                placeholder="Enter your service area address"
+                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                autoComplete="off"
+                required
+              />
+              {isValidatingWorkAddress && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  <Spinner />
+                </div>
+              )}
+              {showWorkAddressPredictions && workAddressPredictions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                  {workAddressPredictions.map((prediction, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => selectWorkAddress(prediction)}
+                      className="w-full text-left px-4 py-2 hover:bg-light transition border-b border-light last:border-b-0"
+                    >
+                      <div className="font-semibold text-dark text-sm">{prediction.main_text}</div>
+                      <div className="text-gray text-xs">{prediction.secondary_text}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {workAddressError && (
+                <div className="flex items-center gap-2 mt-2 text-red-600 text-sm">
+                  <AlertCircle size={16} />
+                  <span>{workAddressError}</span>
+                </div>
+              )}
+            </div>
+            {workAddressCoordinates && (
+              <div className="mt-4 p-4 bg-green-50 border border-green-300 rounded-lg">
+                <div className="flex items-center gap-2 text-green-700 text-sm font-semibold mb-2">
+                  <CheckCircle size={18} />
+                  <span>Location confirmed</span>
+                </div>
+                <p className="text-sm text-green-600">{formData.workAddress}</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-dark mb-3">
+              I confirm this address is where I'll provide laundry services
+            </label>
+            <div className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+              onClick={() => setWorkAddressVerified(!workAddressVerified)}
+            >
+              <input
+                type="checkbox"
+                checked={workAddressVerified}
+                onChange={() => {}}
+                className="w-5 h-5 rounded border-2 border-gray accent-primary"
+              />
+              <span className="text-dark font-medium">Yes, this is my service location</span>
+            </div>
+          </div>
+
+          {!workAddressCoordinates && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-900">
+                <strong>Tip:</strong> Start typing an address and select from suggestions to verify your work location.
+              </p>
+            </div>
+          )}
+        </div>
+      ),
+    }] : []),
     {
       title: 'ID Verification',
       description: 'Upload a clear photo of your ID',

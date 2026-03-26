@@ -118,6 +118,13 @@ function LoginContent() {
       console.log('[Login] ✅ Login successful for:', email)
       setSuccessMessage(`✅ Welcome back! Logging you in...`)
 
+      // Check if user needs phone verification
+      const { data: userData } = await supabase
+        .from('users')
+        .select('phone_verified, phone')
+        .eq('id', data.user.id)
+        .single()
+
       // Store remember me if checked
       if (rememberMe) {
         localStorage.setItem('loginEmail', email)
@@ -131,13 +138,21 @@ function LoginContent() {
         localStorage.removeItem('rememberMeExpiry')
       }
 
-      setTimeout(() => {
-        if (redirectTo) {
-          router.push(redirectTo)
-        } else {
-          router.push('/')
-        }
-      }, 1500)
+      // Check if phone verification is needed
+      if (userData && !userData.phone_verified) {
+        console.log('[Login] Phone verification needed for:', email)
+        setTimeout(() => {
+          router.push(`/auth/phone-verification?email=${encodeURIComponent(email)}`)
+        }, 1000)
+      } else {
+        setTimeout(() => {
+          if (redirectTo) {
+            router.push(redirectTo)
+          } else {
+            router.push('/')
+          }
+        }, 1500)
+      }
     } catch (err: any) {
       console.error('Login error:', {
         message: err.message,

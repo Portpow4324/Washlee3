@@ -142,6 +142,8 @@ export async function POST(request: NextRequest) {
         id: userId,
         email,
         user_type: userType,
+        phone: phone || null,
+        phone_verified: false,
       })
       .select()
 
