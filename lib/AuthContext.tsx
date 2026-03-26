@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const customerPromise = supabase
               .from('customers')
               .select('*')
-              .eq('user_id', session.user.id)
+              .eq('id', session.user.id)
               .limit(1)
               .single() // Use single() to get one record or error
 
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const employeePromise = supabase
               .from('employees')
               .select('*')
-              .eq('user_id', session.user.id)
+              .eq('id', session.user.id)
               .limit(1)
               .single()
 

@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .insert({
-          user_id: userId,
+          id: userId,
           email,
           first_name: firstName,
           last_name: lastName,
@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
       const { data: employeeData, error: employeeError } = await supabase
         .from('employees')
         .insert({
-          user_id: userId,
+          id: userId,
           email,
           name,
           phone: phone || null,
