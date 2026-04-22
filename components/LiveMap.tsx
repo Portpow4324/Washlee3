@@ -144,7 +144,7 @@ export default function LiveMap({
           }
         } catch (error) {
           console.error('Error adding markers:', error)
-        }        }
+        }
 
         // Draw route if requested
         if (showRoute && proLocation && destinationLocation && window.google.maps.geometry) {
