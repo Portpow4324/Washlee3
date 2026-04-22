@@ -6,7 +6,7 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Link from 'next/link'
 import { useState } from 'react'
-import { ChevronDown, ShoppingBag, Zap, DollarSign, CheckCircle } from 'lucide-react'
+import { ChevronDown, ShoppingBag, Zap, DollarSign, CheckCircle, Lock, Package, Sparkles } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 
@@ -14,8 +14,9 @@ export default function Pricing() {
   const { user, loading, userData } = useAuth()
   const router = useRouter()
   const [openFaq, setOpenFaq] = useState<number | null>(0)
-  const [bagCount, setBagCount] = useState(2)
-  const [weight, setWeight] = useState(5)
+  const [bagCount, setBagCount] = useState(1)
+  const [weight, setWeight] = useState(10)
+  const [customWeight, setCustomWeight] = useState<string>('10')
   const [selectedAddons, setSelectedAddons] = useState<string[]>([])
   const [deliverySpeed, setDeliverySpeed] = useState('standard')
   const [protectionPlan, setProtectionPlan] = useState('basic')
@@ -51,33 +52,21 @@ export default function Pricing() {
     return 'Choose'
   }
 
-  // Bag to weight conversion: 1 bag ≈ 2.5kg
+  // Bag to weight conversion: 1 bag = 10kg
   // Both weight and bagCount are now synced through their setters
   // If user changes weight, bags update; if user changes bags, weight updates
 
   // Calculate pricing
-  const standardPrice = weight * 5.0
-  const expressPrice = weight * 10.0
+  const standardPrice = weight * 7.5
+  const expressPrice = weight * 12.5
   const basePrice = deliverySpeed === 'express' ? expressPrice : standardPrice
-  const minOrder = 50
+  const minOrder = 75
   
   let addonsPrice = 0
   selectedAddons.forEach(addon => {
     switch (addon) {
       case 'hang-dry':
         addonsPrice += 16.50
-        break
-      case 'delicates':
-        addonsPrice += 22.00
-        break
-      case 'comforter':
-        addonsPrice += 25.00
-        break
-      case 'stain':
-        addonsPrice += 0.50
-        break
-      case 'ironing':
-        addonsPrice += 0
         break
     }
   })
@@ -113,23 +102,23 @@ export default function Pricing() {
             <Card className="p-8 text-center">
               <ShoppingBag className="w-12 h-12 text-primary mx-auto mb-4" />
               <h3 className="text-xl font-bold text-dark mb-3">Pick Your Bags</h3>
-              <p className="text-gray mb-4">Minimum 4 bags (10kg) per order</p>
+              <p className="text-gray mb-4">Minimum 1 bag (10kg) per order</p>
               <div className="bg-mint rounded-lg p-4">
                 <p className="text-sm text-gray">Minimum load:</p>
-                <p className="text-xs text-gray mt-1">• 4 bags = 10kg minimum ($50)</p>
-                <p className="text-xs text-gray">• 6 bags = 15kg</p>
-                <p className="text-xs text-gray">• 8 bags = 20kg</p>
+                <p className="text-xs text-gray mt-1">• 1 bag = 10kg minimum ($75)</p>
+                <p className="text-xs text-gray">• 2 bags = 20kg</p>
+                <p className="text-xs text-gray">• 3 bags = 30kg</p>
               </div>
             </Card>
 
             <Card className="p-8 text-center">
               <DollarSign className="w-12 h-12 text-primary mx-auto mb-4" />
               <h3 className="text-xl font-bold text-dark mb-3">Simple Pricing</h3>
-              <p className="text-gray mb-4">Minimum order $50 (10kg)</p>
+              <p className="text-gray mb-4">Minimum order $75 (10kg)</p>
               <div className="bg-mint rounded-lg p-4">
-                <p className="text-3xl font-bold text-primary mb-1">$5.00/kg</p>
+                <p className="text-3xl font-bold text-primary mb-1">$7.50/kg</p>
                 <p className="text-xs text-gray">Standard delivery (by 5pm next day)</p>
-                <p className="text-3xl font-bold text-primary mt-3">$10.00/kg</p>
+                <p className="text-3xl font-bold text-primary mt-3">$12.50/kg</p>
                 <p className="text-xs text-gray">Express delivery (same-day by 7pm)</p>
               </div>
             </Card>
@@ -140,9 +129,7 @@ export default function Pricing() {
               <p className="text-gray mb-4">Enhance your service</p>
               <div className="bg-mint rounded-lg p-4 text-left">
                 <p className="text-xs font-semibold text-dark mb-2">Popular add-ons:</p>
-                <p className="text-xs text-gray">✓ Hang Dry ($16.50)</p>
-                <p className="text-xs text-gray">✓ Delicates Care ($22.00)</p>
-                <p className="text-xs text-gray">✓ Comforter Service ($25.00)</p>
+                <p className="text-xs text-gray flex items-center gap-2"><CheckCircle size={14} className="text-primary" /> Hang Dry ($16.50)</p>
               </div>
             </Card>
           </div>
@@ -175,7 +162,7 @@ export default function Pricing() {
                       <p className="font-semibold text-dark">Standard</p>
                       <p className="text-xs text-gray">Delivered by 5pm next business day</p>
                     </div>
-                    <span className="text-sm font-bold text-primary">$3.00/kg</span>
+                    <span className="text-sm font-bold text-primary">$7.50/kg</span>
                   </label>
 
                   <label 
@@ -203,7 +190,7 @@ export default function Pricing() {
                         {weight > 25 ? '✕ Not available (max 25kg)' : isPastCutoff ? `✕ Unavailable (cutoff 12pm) - ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}` : 'Same-day by 7pm'}
                       </p>
                     </div>
-                    <span className="text-sm font-bold text-primary">$7.50/kg</span>
+                    <span className="text-sm font-bold text-primary">$12.50/kg</span>
                   </label>
                 </div>
               </Card>
@@ -214,10 +201,6 @@ export default function Pricing() {
                 <div className="space-y-3">
                   {[
                     { id: 'hang-dry', name: 'Hang Dry', price: '$16.50' },
-                    { id: 'delicates', name: 'Delicates Care', price: '$22.00' },
-                    { id: 'comforter', name: 'Comforter Service', price: '$25.00' },
-                    { id: 'stain', name: 'Stain Treatment', price: '$0.50/item' },
-                    { id: 'ironing', name: 'Ironing', price: 'Included' },
                   ].map(addon => (
                     <label key={addon.id} className="flex items-center gap-3 p-3 border border-light rounded-lg cursor-pointer hover:bg-light transition">
                       <input
@@ -366,15 +349,16 @@ export default function Pricing() {
                   {showSubscriptionNotice && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                       <div className="bg-white rounded-lg p-6 max-w-sm">
-                        <h3 className="text-lg font-bold text-dark mb-3">🔒 Premium Feature</h3>
+                        <h3 className="text-lg font-bold text-dark mb-3 flex items-center gap-2"><Lock size={20} className="text-orange-600" /> Premium Feature</h3>
                         <p className="text-sm text-gray mb-4">
                           Loads over 25kg are only available with a Professional or Washlee Premium subscription.
                         </p>
                         <p className="text-sm text-gray mb-6">
                           <strong>Your current limit:</strong> Up to 25kg per load
                         </p>
-                        <p className="text-xs text-gray bg-amber-50 border border-amber-200 rounded p-3 mb-6">
-                          💡 Need larger loads? Unlock 30kg-45kg with Premium plans for 3-5 business day delivery.
+                        <p className="text-xs text-gray bg-amber-50 border border-amber-200 rounded p-3 mb-6 flex gap-2">
+                          <Sparkles size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                          <span>Need larger loads? Unlock 30kg-45kg with Premium plans for 3-5 business day delivery.</span>
                         </p>
                         <div className="flex gap-3">
                           <button
@@ -398,15 +382,16 @@ export default function Pricing() {
                   {showWholesaleModal && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                       <div className="bg-white rounded-lg p-6 max-w-sm">
-                        <h3 className="text-lg font-bold text-dark mb-3">📦 Wholesale Orders</h3>
+                        <h3 className="text-lg font-bold text-dark mb-3 flex items-center gap-2"><Package size={20} className="text-blue-600" /> Wholesale Orders</h3>
                         <p className="text-sm text-gray mb-4">
                           Orders over 45kg require pre-booking and 24 hours notice.
                         </p>
                         <p className="text-sm text-gray mb-6">
                           <strong>Perfect for:</strong> Bulk laundry, corporate uniforms, hotel linens, and more
                         </p>
-                        <p className="text-xs text-gray bg-blue-50 border border-blue-200 rounded p-3 mb-6">
-                          ✨ Get a personalized quote and flexible scheduling for your wholesale needs.
+                        <p className="text-xs text-gray bg-blue-50 border border-blue-200 rounded p-3 mb-6 flex gap-2">
+                          <Sparkles size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                          <span>Get a personalized quote and flexible scheduling for your wholesale needs.</span>
                         </p>
                         <div className="flex gap-3">
                           <button
@@ -430,23 +415,14 @@ export default function Pricing() {
                 {/* Slider */}
                 <input
                   type="range"
-                  min="0.5"
+                  min="10"
                   max="45"
                   step="0.5"
                   value={weight}
                   onChange={(e) => {
                     const newWeight = parseFloat(e.target.value)
-                    if (newWeight > 25 && userPlan === 'payPerOrder') {
-                      setShowSubscriptionNotice(true)
-                      return
-                    }
-                    // Cap at 45kg and show wholesale modal
-                    if (newWeight > 45) {
-                      setShowWholesaleModal(true)
-                      return
-                    }
                     setWeight(newWeight)
-                    setBagCount(Math.ceil(newWeight / 2.5))
+                    setBagCount(Math.ceil(newWeight / 10))
                     // Force standard delivery for weights > 27.5kg
                     if (newWeight > 27.5) {
                       setDeliverySpeed('standard')
@@ -458,32 +434,83 @@ export default function Pricing() {
                 {/* Weight Display */}
                 <div className="text-center mb-4">
                   <p className="text-3xl font-bold text-primary">{weight.toFixed(1)} kg</p>
-                  <p className="text-xs text-gray mt-1">= {Math.ceil(weight / 2.5)} bag{Math.ceil(weight / 2.5) !== 1 ? 's' : ''}</p>
+                  <p className="text-xs text-gray mt-1">= {Math.ceil(weight / 10)} bag{Math.ceil(weight / 10) !== 1 ? 's' : ''} (10kg each)</p>
                 </div>
 
-                {/* Bag Counter - Compact */}
-                <div className="flex items-center justify-center gap-3">
+                {/* Bag Counter & Weight Controls */}
+                <div className="flex items-center justify-center gap-3 mb-4">
                   <button
                     onClick={() => {
-                      const newBags = Math.max(1, bagCount - 1)
-                      setBagCount(newBags)
-                      setWeight(newBags * 2.5)
+                      const newWeight = Math.max(10, weight - 1)
+                      setWeight(newWeight)
+                      setBagCount(Math.ceil(newWeight / 10))
+                      setCustomWeight(newWeight.toFixed(1))
                     }}
-                    className="w-8 h-8 rounded-full bg-dark text-white font-bold hover:bg-dark/90 text-sm"
+                    className="w-10 h-10 rounded-full bg-dark text-white font-bold hover:bg-dark/90 text-lg"
                   >
                     −
                   </button>
-                  <span className="text-2xl font-bold text-dark w-8 text-center">{bagCount}</span>
+                  <span className="text-2xl font-bold text-dark w-12 text-center">{weight.toFixed(1)}</span>
                   <button
                     onClick={() => {
-                      const newBags = bagCount + 1
-                      setBagCount(newBags)
-                      setWeight(newBags * 2.5)
+                      const newWeight = weight + 1
+                      setWeight(newWeight)
+                      setBagCount(Math.ceil(newWeight / 10))
+                      setCustomWeight(newWeight.toFixed(1))
                     }}
-                    className="w-8 h-8 rounded-full bg-dark text-white font-bold hover:bg-dark/90 text-sm"
+                    className="w-10 h-10 rounded-full bg-dark text-white font-bold hover:bg-dark/90 text-lg"
                   >
                     +
                   </button>
+                </div>
+
+                {/* Slider */}
+                <input
+                  type="range"
+                  min="10"
+                  max="45"
+                  step="0.5"
+                  value={weight}
+                  onChange={(e) => {
+                    const newWeight = parseFloat(e.target.value)
+                    setWeight(newWeight)
+                    setBagCount(Math.ceil(newWeight / 10))
+                    setCustomWeight(newWeight.toFixed(1))
+                  }}
+                  className="w-full h-2 bg-light rounded-lg appearance-none cursor-pointer accent-primary mb-4"
+                />
+
+                {/* Custom Weight Input */}
+                <div className="mb-4">
+                  <label className="text-xs text-gray font-semibold mb-2 block">Or enter custom weight (kg):</label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="45"
+                    step="0.5"
+                    value={customWeight}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setCustomWeight(val)
+                      if (val) {
+                        const newWeight = Math.max(10, Math.min(45, parseFloat(val)))
+                        setWeight(newWeight)
+                        setBagCount(Math.ceil(newWeight / 10))
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!customWeight || parseFloat(customWeight) < 10) {
+                        setWeight(10)
+                        setCustomWeight('10')
+                      } else if (parseFloat(customWeight) > 45) {
+                        setWeight(45)
+                        setCustomWeight('45')
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray rounded-lg text-sm focus:border-primary focus:outline-none"
+                    placeholder="10"
+                  />
+                  <p className="text-xs text-gray mt-1">Minimum: 10kg | Maximum: 45kg</p>
                 </div>
               </Card>
 
@@ -508,7 +535,7 @@ export default function Pricing() {
 
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between">
-                    <span className="text-gray">{weight.toFixed(1)} kg @ ${deliverySpeed === 'express' ? '6.00' : '3.00'}/kg:</span>
+                    <span className="text-gray">{weight.toFixed(1)} kg @ ${deliverySpeed === 'express' ? '12.50' : '7.50'}/kg:</span>
                     <span className="font-semibold text-dark">${basePrice.toFixed(2)}</span>
                   </div>
                   
@@ -567,7 +594,7 @@ export default function Pricing() {
             },
             {
               q: 'What\'s the difference between standard and express?',
-              a: 'Standard delivery is next day at $3.00/kg. Express is same-day or overnight at $6.00/kg with delivery by 8pm.',
+                    a: 'Standard delivery is next day at $7.50/kg. Express is same-day or overnight at $12.50/kg with delivery by 8pm.',
             },
             {
               q: 'Is there a minimum order?',
@@ -579,7 +606,7 @@ export default function Pricing() {
             },
             {
               q: 'How do add-ons work with pricing?',
-              a: 'Add-ons are optional enhancements like Hang Dry ($16.50) or Delicates Care ($22.00). They\'re added to your total along with the base per-kg charge.',
+                    a: 'Add-ons are optional enhancements like Hang Dry ($16.50) for air-drying your clothes. They\'re added to your total along with the base per-kg charge.',
             },
             {
               q: 'What if my order weighs less than the minimum?',

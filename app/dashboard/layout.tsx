@@ -23,14 +23,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Centralized auth check for the entire dashboard
   useEffect(() => {
     if (hasCheckedAuthRef.current) {
+      console.log('[DashboardLayout] Already checked auth, skipping')
       return
     }
 
-    // Still loading auth state OR user not set - redirect to login
+    // Still loading auth state
     if (loading) {
+      console.log('[DashboardLayout] Auth is still loading...')
       return
     }
 
+    // Auth state loaded, but no user
     if (!user) {
       console.log('[DashboardLayout] Auth check complete - no user, redirecting to login')
       hasCheckedAuthRef.current = true
@@ -38,16 +41,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return
     }
 
-    // User exists but we don't have user data yet - wait
+    // User exists but we don't have user data yet - wait for it to load
     if (!userData) {
+      console.log('[DashboardLayout] User exists but userData not loaded yet, waiting...')
       return
     }
 
     // Mark as checked FIRST before any async operations
     hasCheckedAuthRef.current = true
-    console.log('[DashboardLayout] Auth check starting...')
+    console.log('[DashboardLayout] Auth check complete')
     console.log('[DashboardLayout] Current pathname:', pathname)
     console.log('[DashboardLayout] User type:', userData.user_type)
+    console.log('[DashboardLayout] User email:', userData.email)
 
     // Don't redirect if on settings page (customer settings)
     const isSettingsPage = pathname?.includes('/dashboard/settings')
@@ -113,7 +118,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/orders', label: 'My Orders', icon: Package },
     { href: '/dashboard/addresses', label: 'Addresses', icon: MapPin },
     { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
-    { href: '/dashboard/subscriptions', label: 'Subscriptions', icon: Settings },
+    { href: '/dashboard/subscriptions', label: 'Plans', icon: CreditCard },
     { href: '/dashboard/washclub', label: 'Wash Club', icon: Gift },
     { href: '/dashboard/security', label: 'Security', icon: Lock },
     { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },

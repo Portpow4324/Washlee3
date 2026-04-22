@@ -7,7 +7,7 @@ import Button from '@/components/Button'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect, Suspense } from 'react'
-import { Mail, Lock, User, Phone, MapPin, CheckCircle, ArrowLeft, Upload, Eye, EyeOff, HelpCircle, AlertCircle, X, Info } from 'lucide-react'
+import { Mail, Lock, User, Phone, MapPin, CheckCircle, ArrowLeft, Upload, Eye, EyeOff, HelpCircle, AlertCircle, X, Info, Clock } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AUSTRALIAN_STATES, validateAustralianPhone, formatAustralianPhone, validateEmail, getEmailSuggestions } from '@/lib/australianValidation'
 import { WASHLEE_TERMS } from '@/lib/washleeTerms'
@@ -55,6 +55,9 @@ function ProSignupFormContent() {
     phone: '',
     state: '',
     workAddress: '',
+    workSuburb: '',
+    workPostcode: '',
+    workCountry: 'Australia',
     password: '',
     confirmPassword: '',
     termsAccepted: false,
@@ -187,7 +190,10 @@ function ProSignupFormContent() {
 
       setFormData({
         ...formData,
-        workAddress: addressDetails.formattedAddress
+        workAddress: addressDetails.formattedAddress,
+        workSuburb: addressDetails.suburb || '',
+        workPostcode: addressDetails.postcode || '',
+        workCountry: addressDetails.country || 'Australia'
       })
       
       // Store coordinates for existing customers' work address verification
@@ -276,7 +282,7 @@ function ProSignupFormContent() {
     }
 
     loadCustomerData()
-  }, [authLoading, authUser, initialStep])
+  }, [authUser?.id, initialStep]) // Only re-run when user ID or initialStep changes
 
   // Update test verification code when email or phone changes
   // Only fetch in development/for admins (the endpoint is disabled in production)
@@ -869,6 +875,10 @@ function ProSignupFormContent() {
             state: formData.state,
             userType: 'pro',
             personalUse: false,
+            address: formData.workAddress || null,
+            city: formData.workSuburb || null,
+            postcode: formData.workPostcode || null,
+            country: formData.workCountry || 'Australia',
           })
         })
 
@@ -1227,7 +1237,7 @@ function ProSignupFormContent() {
                   } else {
                     // If not logged in, save form data and redirect to login
                     sessionStorage.setItem('proSignupFormData', JSON.stringify(formData))
-                    router.push('/auth/login?redirect=/auth/pro-signup-form?step=0')
+                    router.push('/auth/login?redirect=/pro?step=0')
                   }
                 }}
                 className="text-primary font-semibold hover:underline"
@@ -1769,11 +1779,25 @@ function ProSignupFormContent() {
             <div className="flex justify-center mb-6">
               <CheckCircle size={64} className="text-primary" />
             </div>
-            <h1 className="text-3xl font-bold text-dark mb-3">Thanks for Applying!</h1>
-            <p className="text-gray mb-2">An Agent will get into contact with you shortly.</p>
-            <p className="text-sm text-gray">Typical response time: 24-48 hours</p>
-            <Link href="/pro-support/help-center" className="inline-block mt-8">
-              <Button>Access Help Center</Button>
+            <h1 className="text-3xl font-bold text-dark mb-3">Application Submitted!</h1>
+            <p className="text-gray mb-2">Thank you for applying to become a Washlee Pro.</p>
+            
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 my-6">
+              <div className="flex items-center gap-2 justify-center mb-2">
+                <Clock size={20} className="text-yellow-600" />
+                <span className="font-semibold text-yellow-900">Application Status: Pending Review</span>
+              </div>
+              <p className="text-sm text-yellow-800">
+                Our team is reviewing your application. You'll hear from us within 24-48 hours.
+              </p>
+            </div>
+            
+            <p className="text-sm text-gray mb-6">
+              In the meantime, check out our Pro Support Help Center to learn more about being a Washlee Pro.
+            </p>
+            
+            <Link href="/pro-support/help-center" className="inline-block">
+              <Button>View Help Center</Button>
             </Link>
           </div>
         </div>

@@ -21,14 +21,15 @@ export default function ProEarningsPage() {
       if (!user) return
 
       try {
-        // Fetch pro earnings from database
+        // Try to fetch from pro_earnings table first
         const { data, error } = await supabase
           .from('pro_earnings')
           .select('*')
           .eq('pro_id', user.id)
           .order('created_at', { ascending: false })
 
-        if (!error && data) {
+        if (data && data.length > 0) {
+          // pro_earnings table exists and has data
           setEarnings(data)
 
           // Calculate stats
@@ -49,6 +50,42 @@ export default function ProEarningsPage() {
             thisMonth,
             pending,
           })
+        } else {
+          // Fall back to calculating from orders table
+          const { data: ordersData, error: ordersError } = await supabase
+            .from('orders')
+            .select('id, total_price, status, created_at')
+            .eq('pro_id', user.id)
+
+          if (ordersData && ordersData.length > 0) {
+            // Transform orders to earnings format (pro gets 80% of order price)
+            const calculatedEarnings = ordersData.map((order: any) => ({
+              id: order.id,
+              order_id: order.id,
+              amount: order.total_price * 0.8, // Pro earns 80%
+              status: order.status === 'completed' ? 'pending' : 'pending',
+              created_at: order.created_at,
+            }))
+
+            setEarnings(calculatedEarnings)
+
+            // Calculate stats
+            const total = calculatedEarnings.reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+            const thisMonth = calculatedEarnings
+              .filter((e: any) => {
+                const date = new Date(e.created_at)
+                const now = new Date()
+                return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
+              })
+              .reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+            const pending = total // All are pending until marked as paid
+
+            setStats({
+              totalEarnings: total,
+              thisMonth,
+              pending,
+            })
+          }
         }
       } catch (err) {
         console.error('Error fetching earnings:', err)
@@ -93,7 +130,7 @@ export default function ProEarningsPage() {
                 <h3 className="font-semibold text-[#6b7b78]">Total Earnings</h3>
                 <DollarSign className="w-5 h-5 text-[#48C9B0]" />
               </div>
-              <p className="text-4xl font-bold text-[#1f2d2b]">${stats.totalEarnings?.toFixed(2) || '0.00'}</p>
+              <p className="text-4xl font-bold text-[#1f2d2b]">{stats.totalEarnings ? '$' + stats.totalEarnings.toFixed(2) : '—'}</p>
             </Card>
 
             <Card hoverable className="p-8">
@@ -101,7 +138,7 @@ export default function ProEarningsPage() {
                 <h3 className="font-semibold text-[#6b7b78]">This Month</h3>
                 <Calendar className="w-5 h-5 text-[#48C9B0]" />
               </div>
-              <p className="text-4xl font-bold text-[#1f2d2b]">${stats.thisMonth?.toFixed(2) || '0.00'}</p>
+              <p className="text-4xl font-bold text-[#1f2d2b]">{stats.thisMonth ? '$' + stats.thisMonth.toFixed(2) : '—'}</p>
             </Card>
 
             <Card hoverable className="p-8">
@@ -109,7 +146,7 @@ export default function ProEarningsPage() {
                 <h3 className="font-semibold text-[#6b7b78]">Pending Payout</h3>
                 <Zap className="w-5 h-5 text-[#48C9B0]" />
               </div>
-              <p className="text-4xl font-bold text-[#1f2d2b]">${stats.pending?.toFixed(2) || '0.00'}</p>
+              <p className="text-4xl font-bold text-[#1f2d2b]">{stats.pending ? '$' + stats.pending.toFixed(2) : '—'}</p>
             </Card>
           </div>
 

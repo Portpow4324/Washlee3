@@ -46,6 +46,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // First, check if there's an existing session
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log('[Auth] Initial session check:', { hasSession: !!session, email: session?.user?.email })
+        
+        if (session?.user) {
+          setUser(session.user)
+          const metadata = session.user.user_metadata || {}
+          const firstName = metadata.first_name || ''
+          const lastName = metadata.last_name || ''
+          const displayName = `${firstName} ${lastName}`.trim() || session.user.email?.split('@')[0] || 'User'
+          
+          setUserData({
+            id: session.user.id,
+            email: session.user.email || metadata.email || '',
+            first_name: firstName,
+            last_name: lastName,
+            name: displayName,
+            phone: metadata.phone || '',
+            address: metadata.address || '',
+            user_type: metadata.user_type || 'customer',
+            is_admin: metadata.is_admin === true,
+            is_employee: metadata.is_employee === true,
+            created_at: metadata.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            subscription: metadata.subscription || undefined
+          } as UserData)
+        }
+      } catch (error) {
+        console.error('[Auth] Error checking initial session:', error)
+      }
+    }
+
+    checkSession()
+
     // Set up Supabase auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       const currentUserIdentifier = session?.user?.email || 'logged out'
@@ -53,6 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (previousUserRef.current !== currentUserIdentifier) {
         if (session?.user?.email) {
           console.log('[Auth] State changed: authenticated as', session.user.email)
+        } else {
+          console.log('[Auth] State changed: logged out')
         }
         previousUserRef.current = currentUserIdentifier
       }
@@ -60,94 +98,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         if (session?.user) {
           setUser(session.user)
-          console.log('[Auth] Looking up customer record for user ID:', session.user.id)
+          console.log('[Auth] User authenticated:', session.user.email)
 
-          // Wrap query in timeout to prevent hanging (increased to 10 seconds)
-          const queryTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Customer query timeout - RLS or database issue')), 10000)
-          )
-
-          try {
-            // Get user data from Supabase (try customers table first, then employees)
-            const customerPromise = supabase
-              .from('customers')
-              .select('*')
-              .eq('id', session.user.id)
-              .limit(1)
-              .single() // Use single() to get one record or error
-
-            const { data: customerData, error: customerError } = await Promise.race([
-              customerPromise,
-              queryTimeout as any
-            ]) as any
-
-            if (!customerError && customerData) {
-              console.log('[Auth] ✓ Found customer profile:', customerData.email)
-              setUserData({
-                ...customerData,
-                name: `${customerData.first_name || ''} ${customerData.last_name || ''}`.trim() || 'User',
-                user_type: 'customer'
-              } as UserData)
-              setLoading(false)
-              return
-            }
-
-            console.log('[Auth] ℹ️ No customer found, trying employees table...')
-            
-            // If not a customer, try employees table
-            const employeePromise = supabase
-              .from('employees')
-              .select('*')
-              .eq('id', session.user.id)
-              .limit(1)
-              .single()
-
-            const { data: employeeData, error: employeeError } = await Promise.race([
-              employeePromise,
-              queryTimeout as any
-            ]) as any
-
-            if (!employeeError && employeeData) {
-              console.log('[Auth] ✓ Found employee profile:', employeeData.email)
-              setUserData({
-                ...employeeData,
-                name: `${employeeData.first_name || employeeData.name || ''} ${employeeData.last_name || ''}`.trim() || 'Pro',
-                user_type: 'pro'
-              } as UserData)
-              setLoading(false)
-              return
-            }
-
-            // Fallback: Create minimal user profile from auth data
-            console.log('[Auth] ⚠️ No profile found, creating fallback from auth data...')
-            const fallbackName = session.user.user_metadata?.firstName || session.user.email?.split('@')[0] || 'User'
-            setUserData({
-              id: session.user.id,
-              email: session.user.email,
-              name: fallbackName,
-              user_type: 'customer',
-              created_at: new Date().toISOString()
-            } as UserData)
-            setLoading(false)
-            return
-          } catch (timeoutError: any) {
-            // Timeout on profile lookup - use fallback profile
-            // This is usually due to RLS or slow queries - not a critical error
-            if (process.env.NODE_ENV === 'development') {
-              console.debug('[Auth] Profile lookup timed out, using fallback:', timeoutError.message)
-            }
-            // Still set fallback user data so app doesn't hang
-            const fallbackName = session.user.user_metadata?.firstName || session.user.email?.split('@')[0] || 'User'
-            setUserData({
-              id: session.user.id,
-              email: session.user.email,
-              name: fallbackName,
-              user_type: 'customer',
-              created_at: new Date().toISOString()
-            } as UserData)
-            setLoading(false)
-            return
-          }
+          // Get all user data from auth user_metadata (set during signup)
+          const metadata = session.user.user_metadata || {}
+          const firstName = metadata.first_name || ''
+          const lastName = metadata.last_name || ''
+          const displayName = `${firstName} ${lastName}`.trim() || session.user.email?.split('@')[0] || 'User'
+          
+          console.log('[Auth] ✓ Display name:', displayName)
+          console.log('[Auth] Metadata keys:', Object.keys(metadata))
+          
+          setUserData({
+            id: session.user.id,
+            email: session.user.email || metadata.email || '',
+            first_name: firstName,
+            last_name: lastName,
+            name: displayName,
+            phone: metadata.phone || '',
+            address: metadata.address || '',
+            user_type: metadata.user_type || 'customer',
+            is_admin: metadata.is_admin === true,
+            is_employee: metadata.is_employee === true,
+            created_at: metadata.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            subscription: metadata.subscription || undefined
+          } as UserData)
+          setLoading(false)
         } else {
           // User logged out
           setUser(null)

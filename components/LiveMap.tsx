@@ -82,32 +82,69 @@ export default function LiveMap({
         })
 
         // Add markers
-        if (pickupLocation) {
-          new window.google.maps.Marker({
-            position: pickupLocation,
-            map: mapRef.current,
-            title: 'Pickup Location',
-            icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
-          })
-        }
+        try {
+          if (pickupLocation) {
+            if (window.google.maps?.marker?.AdvancedMarkerElement) {
+              const pickupMarkerContent = document.createElement('div')
+              pickupMarkerContent.innerHTML = '<div style="width: 32px; height: 32px; background: #22C55E; border: 2px solid #16A34A; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">📍</div>'
+              new window.google.maps.marker.AdvancedMarkerElement({
+                position: pickupLocation,
+                map: mapRef.current,
+                title: 'Pickup Location',
+                content: pickupMarkerContent
+              })
+            } else {
+              new window.google.maps.Marker({
+                position: pickupLocation,
+                map: mapRef.current,
+                title: 'Pickup Location',
+                icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+              })
+            }
+          }
 
-        if (proLocation) {
-          new window.google.maps.Marker({
-            position: proLocation,
-            map: mapRef.current,
-            title: 'Pro Current Location',
-            icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-          })
-        }
+          if (proLocation) {
+            if (window.google.maps?.marker?.AdvancedMarkerElement) {
+              const proMarkerContent = document.createElement('div')
+              proMarkerContent.innerHTML = '<div style="width: 32px; height: 32px; background: #4285F4; border: 2px solid #1967D2; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">👤</div>'
+              new window.google.maps.marker.AdvancedMarkerElement({
+                position: proLocation,
+                map: mapRef.current,
+                title: 'Pro Current Location',
+                content: proMarkerContent
+              })
+            } else {
+              new window.google.maps.Marker({
+                position: proLocation,
+                map: mapRef.current,
+                title: 'Pro Current Location',
+                icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+              })
+            }
+          }
 
-        if (destinationLocation) {
-          new window.google.maps.Marker({
-            position: destinationLocation,
-            map: mapRef.current,
-            title: 'Delivery Location',
-            icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
-          })
-        }
+          if (destinationLocation) {
+            if (window.google.maps?.marker?.AdvancedMarkerElement) {
+              const deliveryMarkerContent = document.createElement('div')
+              deliveryMarkerContent.innerHTML = '<div style="width: 32px; height: 32px; background: #EF4444; border: 2px solid #DC2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">🚗</div>'
+              new window.google.maps.marker.AdvancedMarkerElement({
+                position: destinationLocation,
+                map: mapRef.current,
+                title: 'Delivery Location',
+                content: deliveryMarkerContent
+              })
+            } else {
+              new window.google.maps.Marker({
+                position: destinationLocation,
+                map: mapRef.current,
+                title: 'Delivery Location',
+                icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error adding markers:', error)
+        }        }
 
         // Draw route if requested
         if (showRoute && proLocation && destinationLocation && window.google.maps.geometry) {

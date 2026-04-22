@@ -299,7 +299,7 @@ export default function EmployeeSignIn() {
           </div>
 
           {/* Signup Link */}
-          <Link href="/auth/pro-signup">
+          <Link href="/pro">
             <Button variant="outline" className="w-full py-3 text-lg font-bold">
               Become an Employee
             </Button>

@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import EmployeeHeader from '@/components/EmployeeHeader'
 import Footer from '@/components/Footer'
 import { DollarSign, Package, TrendingUp, Clock, AlertCircle, CheckCircle, Briefcase, Target, Award } from 'lucide-react'
 
@@ -64,37 +63,72 @@ export default function EmployeeDashboard() {
     // Fetch real data from Supabase
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/orders')
-        const result = await response.json()
-        const orders = result.data || []
+        setDataLoading(true)
         
-        const fetchedOrders: Order[] = orders.slice(0, 3).map((order: any) => {
-          const pickupDate = order.pickup_time ? new Date(order.pickup_time) : new Date()
+        // Fetch user's pro_earnings
+        const { data: earningsData } = await supabase
+          .from('pro_earnings')
+          .select('earnings_amount, created_at')
+          .eq('pro_id', user.id)
+        
+        // Get today's earnings (created_at is today)
+        const today = new Date().toDateString()
+        const todayEarnings = (earningsData || [])
+          .filter((e: any) => new Date(e.created_at).toDateString() === today)
+          .reduce((sum: number, e: any) => sum + (e.earnings_amount || 0), 0)
+        
+        // Fetch available jobs (pro_jobs with no pro_id assigned and status='available')
+        const { data: jobsData } = await supabase
+          .from('pro_jobs')
+          .select('id, status')
+          .is('pro_id', null)
+          .eq('status', 'available')
+        
+        const availableJobs = (jobsData || []).length
+        
+        // Fetch user's accepted orders (orders with pro_id = user.id) - both active and recent
+        const { data: ordersData } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            status,
+            created_at,
+            total_price,
+            items,
+            pickup_address,
+            user_id,
+            users:user_id (name)
+          `)
+          .eq('pro_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+        
+        // Count active orders (non-completed)
+        const activeOrders = (ordersData || []).filter((o: any) => o.status !== 'completed').length
+        
+        // Transform recent orders for display (show both active and recent completed)
+        const transformedOrders: Order[] = (ordersData || []).slice(0, 5).map((order: any) => {
+          const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items
+          const weight = items?.weight || '0'
+          
           return {
             id: order.id,
-            customer: order.customer_id || 'Unknown',
-            status: order.status || 'pending-pickup',
-            weight: `${order.weight || 0} kg`,
-            pickup: pickupDate.toLocaleDateString() === new Date().toLocaleDateString() ? 'Today ' + pickupDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : pickupDate.toLocaleDateString(),
-            earnings: `$${((order.weight || 0) * 3).toFixed(2)}`,
-            address: order.delivery_address || 'N/A'
+            customer: order.users?.name || 'Unknown',
+            status: order.status,
+            weight: `${weight} kg`,
+            pickup: new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            earnings: `$${(order.total_price || 0).toFixed(2)}`,
+            address: order.pickup_address || 'N/A',
+            orderId: order.id
           }
         })
         
-        setRecentOrders(fetchedOrders)
-        
-        // Calculate stats
-        const activeCount = fetchedOrders.filter(o => o.status === 'in-progress').length
-        const todayEarnings = fetchedOrders.filter(o => o.status === 'completed').reduce((sum, o) => {
-          const amount = parseFloat(o.earnings.replace('$', ''))
-          return sum + amount
-        }, 0)
-        
+        setRecentOrders(transformedOrders)
         setStats({
           todayEarnings,
-          activeOrders: activeCount,
+          activeOrders,
           totalRating: 4.9,
-          availableJobs: 15
+          availableJobs
         })
       } catch (error) {
         console.error('Error fetching data:', error)
@@ -105,6 +139,11 @@ export default function EmployeeDashboard() {
     }
     
     fetchData()
+    
+    // Auto-refresh dashboard every 10 seconds
+    const refreshInterval = setInterval(fetchData, 10000)
+    
+    return () => clearInterval(refreshInterval)
   }, [user, loading, router, hasCheckedAuth])
 
   if (loading || !hasCheckedAuth) {
@@ -211,7 +250,6 @@ export default function EmployeeDashboard() {
 
   return (
     <div className="min-h-screen bg-light flex flex-col">
-      <EmployeeHeader />
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-8">
         {/* Welcome Section */}
         <div className="space-y-2">
@@ -308,7 +346,7 @@ export default function EmployeeDashboard() {
               <Briefcase size={20} />
               <div className="text-left">
                 <p className="font-semibold">Find Jobs</p>
-                <p className="text-xs opacity-90">15 available nearby</p>
+                <p className="text-xs opacity-90">{stats.availableJobs} available nearby</p>
               </div>
             </Button>
 

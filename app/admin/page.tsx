@@ -18,7 +18,10 @@ import {
   Settings,
   DollarSign,
   Megaphone,
-  Bell
+  Bell,
+  CreditCard,
+  Gift,
+  MessageSquare
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -312,6 +315,56 @@ export default function AdminDashboard() {
                   </a>
                 </div>
               </div>
+
+              {/* Subscriptions */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-cyan-500 to-cyan-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <CreditCard size={24} />
+                    Subscriptions
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Active subscriptions & plans</p>
+                  <a
+                    href="/admin/subscriptions"
+                    className="block px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition text-center font-semibold text-sm"
+                  >
+                    View Subscriptions
+                  </a>
+                  <a
+                    href="/admin/subscriptions?status=active"
+                    className="block px-4 py-2 border-2 border-cyan-500 text-cyan-500 rounded hover:bg-cyan-50 transition text-center font-semibold text-sm"
+                  >
+                    Active Only
+                  </a>
+                </div>
+              </div>
+
+              {/* Wash Club Members */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <Gift size={24} />
+                    Wash Club
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Loyalty program members</p>
+                  <a
+                    href="/admin/wash-club"
+                    className="block px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-center font-semibold text-sm"
+                  >
+                    View Members
+                  </a>
+                  <a
+                    href="/admin/wash-club?tier=gold"
+                    className="block px-4 py-2 border-2 border-yellow-500 text-yellow-500 rounded hover:bg-yellow-50 transition text-center font-semibold text-sm"
+                  >
+                    Premium Members
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -468,6 +521,31 @@ export default function AdminDashboard() {
                     className="block px-4 py-2 border-2 border-indigo-500 text-indigo-500 rounded hover:bg-indigo-50 transition text-center font-semibold text-sm"
                   >
                     Pending Applications
+                  </a>
+                </div>
+              </div>
+
+              {/* Support Tickets */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    <MessageSquare size={24} />
+                    Support Tickets
+                  </h3>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-gray-600 text-sm">Customer inquiries & issues</p>
+                  <a
+                    href="/admin/support-tickets"
+                    className="block px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition text-center font-semibold text-sm"
+                  >
+                    View Tickets
+                  </a>
+                  <a
+                    href="/admin/support-tickets?status=pending"
+                    className="block px-4 py-2 border-2 border-orange-500 text-orange-500 rounded hover:bg-orange-50 transition text-center font-semibold text-sm"
+                  >
+                    Pending
                   </a>
                 </div>
               </div>

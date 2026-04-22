@@ -18,11 +18,10 @@ interface Order {
   status: string
   created_at: string
   total_price: number
-  weight: number
   delivery_address: string
   scheduled_pickup_date?: string
   pro_id?: string
-  employees?: { name: string; rating: number } | null
+  employees?: { name: string } | null
 }
 
 export default function CustomerDashboard() {
@@ -50,11 +49,9 @@ export default function CustomerDashboard() {
             status,
             created_at,
             total_price,
-            weight,
             delivery_address,
             scheduled_pickup_date,
-            pro_id,
-            employees(name, rating)
+            pro_id
           `)
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
@@ -67,16 +64,33 @@ export default function CustomerDashboard() {
           return
         }
 
-        // Transform data to match Order interface
-        const transformedOrders = (data || []).map((order: any) => ({
-          ...order,
-          employees: Array.isArray(order.employees) && order.employees.length > 0 
-            ? order.employees[0] 
-            : null
-        }))
+        // Fetch pro information for orders that have a pro_id
+        let ordersWithProInfo = (data || [])
+        if (data && data.length > 0) {
+          const proIds = [...new Set(data.filter((o: any) => o.pro_id).map((o: any) => o.pro_id))]
+          
+          if (proIds.length > 0) {
+            const { data: proData } = await supabase
+              .from('users')
+              .select('id, first_name, last_name')
+              .in('id', proIds)
+            
+            const proMap = proData?.reduce((acc: any, pro: any) => {
+              acc[pro.id] = pro
+              return acc
+            }, {}) || {}
+            
+            ordersWithProInfo = (data || []).map((order: any) => ({
+              ...order,
+              employees: order.pro_id && proMap[order.pro_id] 
+                ? { name: `${proMap[order.pro_id].first_name} ${proMap[order.pro_id].last_name}` } 
+                : null
+            }))
+          }
+        }
 
-        setOrders(transformedOrders as Order[])
-        console.log('[Dashboard] Loaded orders:', transformedOrders)
+        setOrders(ordersWithProInfo as Order[])
+        console.log('[Dashboard] Loaded orders:', ordersWithProInfo)
         setOrdersLoading(false)
       } catch (err) {
         console.error('[Dashboard] Error:', err)
@@ -231,7 +245,7 @@ export default function CustomerDashboard() {
                           )}
                         </p>
                         <p className="text-sm text-gray mt-1">
-                          {new Date(order.created_at).toLocaleDateString('en-AU')} • {order.weight}kg
+                          {new Date(order.created_at).toLocaleDateString('en-AU')}
                         </p>
                       </div>
                       <div className="text-right">

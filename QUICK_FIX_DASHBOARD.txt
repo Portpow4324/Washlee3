@@ -1,0 +1,71 @@
+═══════════════════════════════════════════════════════════════════════════════
+                        🔧 QUICK FIX - DASHBOARD ERROR
+═══════════════════════════════════════════════════════════════════════════════
+
+ERROR:
+  column orders.price does not exist
+
+ROOT CAUSE:
+  Orders table missing required columns
+
+STATUS:
+  ✅ Code fixed (fallback logic + optional fields)
+  ⏳ Database needs 1 SQL command
+
+═══════════════════════════════════════════════════════════════════════════════
+                              THE FIX (< 1 MIN)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Open:    https://app.supabase.com
+2. Project: Washlee
+3. Section: SQL Editor → New Query
+4. Run:     Copy paste the SQL below
+5. Result:  "Executed successfully" ✅
+
+═══════════════════════════════════════════════════════════════════════════════
+                                THE SQL
+═══════════════════════════════════════════════════════════════════════════════
+
+-- Add missing columns to orders table
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS delivery_address TEXT,
+ADD COLUMN IF NOT EXISTS pickup_address TEXT,
+ADD COLUMN IF NOT EXISTS scheduled_pickup_date TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS pro_id UUID REFERENCES employees(id) ON DELETE SET NULL;
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_pro_id ON orders(pro_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+
+═══════════════════════════════════════════════════════════════════════════════
+                            AFTER YOU RUN IT
+═══════════════════════════════════════════════════════════════════════════════
+
+1. ✅ Refresh browser
+2. ✅ Dashboard loads
+3. ✅ Orders display
+4. ✅ Error gone
+
+═══════════════════════════════════════════════════════════════════════════════
+                          CODE CHANGES MADE
+═══════════════════════════════════════════════════════════════════════════════
+
+File: app/dashboard/page.tsx
+
+✅ Fallback query logic (tries all columns, falls back to basic)
+✅ Optional field types (price?, delivery_address?, etc.)
+✅ Better error handling (detects column-not-found errors)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TIME:       < 1 minute to run SQL
+DIFFICULTY: Copy & paste
+RISK:       Zero (just adding columns)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ READY TO APPLY NOW
+

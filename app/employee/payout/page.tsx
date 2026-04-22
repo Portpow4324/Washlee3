@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import EmployeeHeader from '@/components/EmployeeHeader'
 import Footer from '@/components/Footer'
 import { DollarSign, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react'
 
@@ -56,28 +55,28 @@ export default function EmployeePayout() {
       try {
         setDataLoading(true)
 
-        // Get employee payout info from API
-        const response = await fetch(`/api/payouts?employeeId=${user.id}`)
+        // Get employee balance info from new API
+        const response = await fetch(`/api/employee/balance?employeeId=${user.id}`)
         const result = await response.json()
-        const payoutData = result.data
-
-        if (payoutData) {
-          setPayoutId(payoutData.id)
-          setAvailableBalance(payoutData.total_earned || 0)
-          setPendingPayouts(payoutData.pending_amount || 0)
+        
+        if (result.success) {
+          setAvailableBalance(result.data.availableBalance)
+          setPendingPayouts(0) // No pending payout amount from this API
           
-          // Pre-fill form with stored bank info
-          if (payoutData.account_holder_name) {
+          // Use employee ID as payout ID
+          setPayoutId(user.id)
+          
+          // Pre-fill form with user data
+          if (userData?.name) {
             setFormData(prev => ({
               ...prev,
-              accountHolder: payoutData.account_holder_name,
-              accountNumber: payoutData.bank_account_number || '',
-              bsb: payoutData.bsb || '',
+              accountHolder: userData.name || '',
             }))
           }
         }
       } catch (error) {
-        console.error('Error fetching payout data:', error)
+        console.error('Error fetching balance data:', error)
+        setSubmitError('Failed to load balance information')
       } finally {
         setDataLoading(false)
       }
@@ -128,31 +127,27 @@ export default function EmployeePayout() {
     setIsSubmitting(true)
 
     try {
-      // Update bank account info
-      await fetch('/api/payouts', {
+      // Request payout via new API endpoint
+      const payoutResponse = await fetch('/api/employee/balance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'updateBankAccount',
-          payoutId,
-          bankInfo: {
-            bank_account_number: formData.accountNumber,
+          employeeId: user.id,
+          amount: parseFloat(formData.amount),
+          accountType: formData.accountType,
+          accountDetails: {
+            accountHolder: formData.accountHolder,
+            accountNumber: formData.accountNumber,
             bsb: formData.bsb,
-            account_holder_name: formData.accountHolder,
+            bankName: formData.bankName
           },
         }),
       })
 
-      // Request payout
-      await fetch('/api/payouts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'requestPayout',
-          payoutId,
-          amount: parseFloat(formData.amount),
-        }),
-      })
+      if (!payoutResponse.ok) {
+        const error = await payoutResponse.json()
+        throw new Error(error.error || 'Failed to submit payout request')
+      }
 
       setSubmitSuccess(true)
       setFormData({
@@ -163,7 +158,13 @@ export default function EmployeePayout() {
         bankName: '',
         accountType: 'savings',
       })
-
+      
+      // Refresh balance
+      const balanceResponse = await fetch(`/api/employee/balance?employeeId=${user.id}`)
+      const balanceResult = await balanceResponse.json()
+      if (balanceResult.success) {
+        setAvailableBalance(balanceResult.data.availableBalance)
+      }
       setTimeout(() => {
         router.push('/employee/earnings')
       }, 3000)
@@ -186,7 +187,6 @@ export default function EmployeePayout() {
 
   return (
     <div className="min-h-screen bg-light flex flex-col">
-      <EmployeeHeader />
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12">
         {/* Back Button */}

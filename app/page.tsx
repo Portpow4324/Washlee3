@@ -6,18 +6,12 @@ import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Link from 'next/link'
-import { ArrowRight, CheckCircle, Star, Calendar, Truck, Sparkles, Package, Apple, Play, Lock, Shield, MapPin, Zap, Gift, Leaf, CheckIcon } from 'lucide-react'
+import { ArrowRight, CheckCircle, Star, Calendar, Truck, Package, Apple, Play, Lock, Shield, MapPin, Zap, Gift, Leaf, CheckIcon } from 'lucide-react'
 
 export default function Home() {
   return (
     <>
       <Header />
-
-      {/* Limited Time Offer Banner */}
-      <div className="bg-primary text-white text-center py-3 text-sm font-semibold flex items-center justify-center gap-2">
-        <Sparkles size={18} className="inline" />
-        Limited Time: First pickup FREE on your first order! Use code: WELCOME39
-      </div>
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-mint to-white">
@@ -135,7 +129,7 @@ export default function Home() {
               number: 3,
               title: 'Washed & Folded',
               description: 'Washed, dried, folded, or hung just how you like it.',
-              icon: Sparkles,
+              icon: Zap,
             },
             {
               number: 4,
@@ -261,7 +255,7 @@ export default function Home() {
               
               {/* Value Proposition */}
               <div className="bg-mint/50 rounded-lg p-4 mb-6 text-sm text-dark">
-                <p className="font-semibold mb-2">✓ How we compare:</p>
+                <p className="font-semibold mb-2 flex items-center gap-2"><CheckCircle size={18} className="text-primary" /> How we compare:</p>
                 <p className="mb-3"><span className="font-bold">$3.00/kg</span> = $15 for your average weekly load</p>
                 <p className="mb-3"><span className="font-bold">LESS than 1 hour</span> of your hourly salary (for most professionals)</p>
                 <p><span className="font-bold">Your time</span> is worth way more than that</p>
@@ -367,9 +361,9 @@ export default function Home() {
             </Link>
           </div>
           <div className="flex flex-col sm:flex-row justify-center gap-4 text-white text-sm font-semibold">
-            <span>✓ 4.9★ rated</span>
-            <span>✓ Cancel anytime</span>
-            <span>✓ No card required</span>
+            <span className="flex items-center gap-1"><CheckCircle size={16} /> 4.9★ rated</span>
+            <span className="flex items-center gap-1"><CheckCircle size={16} /> Cancel anytime</span>
+            <span className="flex items-center gap-1"><CheckCircle size={16} /> No card required</span>
           </div>
         </div>
       </section>

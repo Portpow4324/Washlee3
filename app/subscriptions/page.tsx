@@ -114,7 +114,10 @@ function SubscriptionsPageContent() {
           return
         }
 
-        // For Supabase, use the session directly or get token from auth
+        console.log('[Checkout] User authenticated:', user.id)
+        console.log('[Checkout] Creating checkout session for plan:', planId)
+
+        // Create checkout session via API
         const response = await fetch('/api/subscriptions/create-checkout-session', {
           method: 'POST',
           headers: { 
@@ -123,30 +126,48 @@ function SubscriptionsPageContent() {
           body: JSON.stringify({ plan: planId }),
         })
         
+        console.log('[Checkout] API response status:', response.status)
+        
         if (!response.ok) {
-          throw new Error('Failed to create checkout session')
+          const errorData = await response.json()
+          console.error('[Checkout] API error response:', errorData)
+          throw new Error(errorData.error || 'Failed to create checkout session')
         }
         
-        const { sessionId, url } = await response.json()
+        const data = await response.json()
+        console.log('[Checkout] API response data:', data)
+        
+        // Handle "none" plan (pay per order)
+        if (data.plan === 'none') {
+          console.log('[Checkout] Pay per order selected - no subscription')
+          alert('You\'ve selected Pay Per Order. You can start booking services now!')
+          router.push('/booking')
+          return
+        }
+        
+        const { sessionId, url } = data
         
         // Open Stripe checkout in a new tab
         if (url) {
+          console.log('[Checkout] Opening Stripe checkout URL:', url)
           sessionStorage.setItem('lastPlanId', planId)
           window.open(url, '_blank')
           // Show a message to the user
           alert('Payment page opened in a new tab. Complete your payment there and you\'ll receive a confirmation. You can close the payment tab after confirming success.')
         } else if (sessionId) {
           // Fallback to constructing URL from sessionId
+          const checkoutUrl = `https://checkout.stripe.com/pay/${sessionId}`
+          console.log('[Checkout] Opening Stripe checkout with session ID:', checkoutUrl)
           sessionStorage.setItem('lastPlanId', planId)
-          window.open(`https://checkout.stripe.com/pay/${sessionId}`, '_blank')
+          window.open(checkoutUrl, '_blank')
           alert('Payment page opened in a new tab. Complete your payment there and you\'ll receive a confirmation. You can close the payment tab after confirming success.')
         } else {
           throw new Error('No checkout URL or session ID returned from API')
         }
       }
     } catch (error) {
-      console.error('Error selecting plan:', error)
-      alert('Failed to process plan selection. Please try again.')
+      console.error('[Checkout] Error in handleSelectPlan:', error instanceof Error ? error.message : String(error))
+      alert(error instanceof Error ? error.message : 'Failed to process plan selection. Please try again.')
     } finally {
       setLoadingPlan(null)
     }
@@ -244,12 +265,6 @@ function SubscriptionsPageContent() {
                     <div key={idx} className="flex items-start gap-3">
                       <Check size={22} className="text-primary flex-shrink-0 mt-0.5" />
                       <span className="text-base text-dark leading-relaxed">{feature}</span>
-                    </div>
-                  ))}
-                  {plan.notIncluded.map((feature, idx) => (
-                    <div key={`not-${idx}`} className="flex items-start gap-3 opacity-40">
-                      <X size={22} className="text-gray flex-shrink-0 mt-0.5" />
-                      <span className="text-base text-gray leading-relaxed">{feature}</span>
                     </div>
                   ))}
                 </div>

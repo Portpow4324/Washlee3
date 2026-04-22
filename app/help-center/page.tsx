@@ -88,7 +88,7 @@ export default function HelpCenter() {
     },
     {
       question: "How much does Washlee cost?",
-      answer: "Our base price is $3.00 per kilogram. Standard delivery is included. Same-day delivery is available for an additional $5.00. First-time customers get their first pickup free with code WELCOME39!"
+      answer: "Our base price is $3.00 per kilogram. Standard delivery is included. Same-day delivery is available for an additional $5.00."
     },
     {
       question: "How long does it take?",

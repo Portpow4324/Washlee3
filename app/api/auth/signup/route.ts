@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceRoleClient } from '@/lib/supabaseClientFactory'
+import { getClientIP, checkSignupRateLimit, logSignupAttempt, getRateLimitErrorResponse } from '@/lib/rateLimitUtil'
 
 export async function POST(request: NextRequest) {
   console.log('[SIGNUP] ==========================================')
   console.log('[SIGNUP] POST /api/auth/signup called')
+  
+  const clientIP = getClientIP(request)
+  console.log('[SIGNUP] Client IP:', clientIP)
   
   let supabase
   
@@ -31,7 +35,7 @@ export async function POST(request: NextRequest) {
       hasPassword: !!body.password
     })
 
-    const { email, password, name, phone, userType, state, personalUse } = body
+    const { email, password, name, phone, userType, state, personalUse, address, city, postcode, country } = body
 
     // Validate input
     if (!email || !password || !name || !userType) {
@@ -42,6 +46,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // ============================================
+    // RATE LIMITING CHECK
+    // ============================================
+    const rateLimit = await checkSignupRateLimit(clientIP, email)
+    if (!rateLimit.allowed) {
+      console.warn('[SIGNUP] ⚠️ Rate limit exceeded:', rateLimit.reason)
+      await logSignupAttempt(clientIP, email, false)
+      return NextResponse.json(
+        getRateLimitErrorResponse(rateLimit.reason!),
+        { status: 429 }
+      )
+    }
+    console.log('[SIGNUP] ✓ Rate limit check passed')
 
     if (!['customer', 'pro'].includes(userType)) {
       console.error('[SIGNUP] Invalid userType:', userType)
@@ -59,29 +77,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Sign up with Supabase Auth using regular signup (not admin API)
-    // Admin API has been having issues - use regular signup instead
-    console.log('[SIGNUP] Creating user via regular signup...')
+    // Sign up with Supabase Auth using Admin API
+    // Admin API still requires email/password validation but skips client-side rate limits
+    console.log('[SIGNUP] Creating user via auth service...')
     console.log('[SIGNUP] Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'MISSING')
+    console.log('[SIGNUP] Service role key:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'configured' : 'MISSING')
     
     // Parse first and last names
     const [firstName, ...lastNameParts] = name.split(' ')
     const lastName = lastNameParts.join(' ') || ''
     
-    // Try regular signup first
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          name,
-          first_name: firstName,
-          last_name: lastName,
-          phone,
-          user_type: userType,
-        },
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`
-      }
+      user_metadata: {
+        // Core profile info
+        name,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone: phone || null,
+        
+        // Account type info
+        user_type: userType,
+        
+        // Location info (for customers)
+        state: state || null,
+        personal_use: personalUse || false,
+        
+        // Timestamps
+        created_at: new Date().toISOString(),
+        phone_verified: false,
+      },
+      email_confirm: false  // User must confirm email before logging in
     })
 
     console.log('[SIGNUP] Auth response received')
@@ -91,6 +119,9 @@ export async function POST(request: NextRequest) {
     if (authError) {
       console.error('[SIGNUP] Auth error:', authError.message)
       console.error('[SIGNUP] Full auth error:', authError)
+      
+      // Log failed attempt for rate limiting
+      await logSignupAttempt(clientIP, email, false)
       
       // Check for duplicate email error
       if (authError.message && (authError.message.includes('already registered') || authError.message.includes('User already exists'))) {
@@ -102,19 +133,6 @@ export async function POST(request: NextRequest) {
             email
           },
           { status: 409 }
-        )
-      }
-      
-      // Check for rate limit error
-      if (authError.message && authError.message.includes('email rate limit')) {
-        console.warn('[SIGNUP] Rate limit hit - too many signups in short time')
-        return NextResponse.json(
-          { 
-            error: 'Too many signup attempts. Please wait 60 seconds and try again.',
-            code: 'RATE_LIMIT',
-            retryAfter: 60
-          },
-          { status: 429 }
         )
       }
       
@@ -135,6 +153,30 @@ export async function POST(request: NextRequest) {
     const userId = authData.user.id
     console.log('[SIGNUP] Auth user created:', userId)
 
+    // Update auth user metadata to ensure it persists (backup for AuthContext to read from)
+    console.log('[SIGNUP] Updating user metadata...')
+    const { error: metadataError } = await supabase.auth.admin.updateUserById(userId, {
+      user_metadata: {
+        name,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone: phone || null,
+        user_type: userType,
+        state: state || null,
+        personal_use: personalUse || false,
+        created_at: new Date().toISOString(),
+        phone_verified: false,
+      },
+    })
+
+    if (metadataError) {
+      console.warn('[SIGNUP] ⚠️ Warning: Failed to update user metadata:', metadataError.message)
+      // Don't fail signup here - this is just a backup
+    } else {
+      console.log('[SIGNUP] ✓ User metadata updated')
+    }
+
     // Create user record in database (REQUIRED - every auth user must have a users record)
     console.log('[SIGNUP] Inserting user record...')
     
@@ -143,6 +185,8 @@ export async function POST(request: NextRequest) {
       .insert({
         id: userId,
         email,
+        first_name: firstName,
+        last_name: lastName,
         user_type: userType,
         phone: phone || null,
         phone_verified: false,
@@ -153,13 +197,15 @@ export async function POST(request: NextRequest) {
       console.error('[SIGNUP] ❌ CRITICAL: User table insert failed:', userError.message)
       console.error('[SIGNUP] Error code:', userError.code)
       console.error('[SIGNUP] Error details:', userError.details)
+      console.error('[SIGNUP] Full error object:', JSON.stringify(userError, null, 2))
       console.error('[SIGNUP] This is a REQUIRED record - signup cannot continue')
       
       return NextResponse.json(
         { 
           error: 'Failed to create user account in database. Please try again.',
           code: 'USER_CREATION_FAILED',
-          details: userError.message
+          details: userError.message,
+          hint: userError.hint || userError.details
         },
         { status: 500 }
       )
@@ -181,7 +227,7 @@ export async function POST(request: NextRequest) {
           last_name: lastName,
           phone: phone || null,
           state: state || null,
-          personal_use: personalUse || null,
+          personal_use: personalUse || false,
         })
         .select()
 
@@ -203,15 +249,21 @@ export async function POST(request: NextRequest) {
       }
     } else if (userType === 'pro') {
       console.log('[SIGNUP] Creating pro/employee record for user_id:', userId)
-      console.log('[SIGNUP] Employee data:', { email, name, firstName, lastName })
+      console.log('[SIGNUP] Employee data:', { email, firstName, lastName, address, city, state, postcode })
       
       const { data: employeeData, error: employeeError } = await supabase
         .from('employees')
         .insert({
           id: userId,
           email,
-          name,
+          first_name: firstName,
+          last_name: lastName,
           phone: phone || null,
+          state: state || null,
+          address: address || null,
+          city: city || null,
+          postcode: postcode || null,
+          country: country || 'Australia',
         })
         .select()
 
@@ -231,9 +283,53 @@ export async function POST(request: NextRequest) {
       } else {
         console.log('[SIGNUP] ✓ Pro record created:', employeeData)
       }
+
+      // Create customer record for pros so they can also make purchases
+      console.log('[SIGNUP] Creating customer record for pro user_id:', userId)
+      console.log('[SIGNUP] Customer data:', { email, firstName, lastName })
+      
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .insert({
+          id: userId,
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          phone: phone || null,
+          state: state || null,
+          personal_use: true,
+        })
+        .select()
+
+      if (customerError) {
+        console.error('[SIGNUP] ⚠️ Warning: Customer record creation for pro failed:', customerError.message)
+        console.error('[SIGNUP] Error code:', customerError.code)
+        console.error('[SIGNUP] Error details:', customerError.details)
+        // Note: We don't fail signup here - pro account is already created
+      } else {
+        console.log('[SIGNUP] ✓ Customer record created for pro:', customerData)
+      }
     }
 
     console.log(`[SIGNUP] ✓ New ${userType} registered:`, email)
+    
+    // Send welcome email for marketing/engagement (async, don't block signup)
+    if (userType === 'customer') {
+      try {
+        console.log('[SIGNUP] Sending welcome email for engagement...')
+        const { sendWelcomeEmail } = await import('@/lib/emailMarketing')
+        sendWelcomeEmail({
+          to: email,
+          customerName: firstName || 'there',
+          email: email,
+        }).catch(err => {
+          console.error('[SIGNUP] Warning: Failed to send welcome email:', err)
+          // Don't fail signup if welcome email fails
+        })
+      } catch (err) {
+        console.error('[SIGNUP] Error loading email marketing:', err)
+      }
+    }
     
     // Send verification email via SendGrid (bypassing Supabase rate limit)
     console.log('[SIGNUP] Sending verification email via SendGrid...')
@@ -243,24 +339,41 @@ export async function POST(request: NextRequest) {
     try {
       verificationCode = Math.random().toString(36).substring(2, 8).toUpperCase()
       console.log('[SIGNUP] Generated verification code:', verificationCode)
+      console.log('[SIGNUP] Code type:', typeof verificationCode)
+      console.log('[SIGNUP] Code length:', verificationCode.length)
       
       // Store verification code in database
       console.log('[SIGNUP] Storing verification code in database...')
-      const { error: codeError } = await supabase
+      console.log('[SIGNUP] Code insert payload:', {
+        user_id: userId,
+        type: 'email',
+        code: verificationCode,
+        verified: false,
+        used: false,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      })
+      const { error: codeError, data: insertedData } = await supabase
         .from('verification_codes')
         .insert({
-          email,
+          user_id: userId,
+          type: 'email',
           code: verificationCode,
+          verified: false,
+          used: false,
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          used: false
         })
+        .select()
+      
+      console.log('[SIGNUP] Code insert response:', { codeError, insertedData, insertedDataLength: insertedData?.length })
       
       if (codeError) {
-        console.warn('[SIGNUP] Warning: Failed to store verification code:', codeError.message)
-        console.warn('[SIGNUP] Code error details:', codeError.details)
-        // Continue anyway - code is generated, just not stored in this table
+        console.error('[SIGNUP] ❌ ERROR storing verification code:', codeError.message)
+        console.error('[SIGNUP] Error code:', codeError.code)
+        console.error('[SIGNUP] Error details:', codeError.details)
+        console.error('[SIGNUP] Full error:', JSON.stringify(codeError))
       } else {
-        console.log('[SIGNUP] ✓ Verification code stored')
+        console.log('[SIGNUP] ✓ Verification code stored successfully')
+        console.log('[SIGNUP] Inserted code record:', JSON.stringify(insertedData))
       }
       
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
@@ -304,13 +417,8 @@ export async function POST(request: NextRequest) {
         .insert({
           user_id: userId,
           email,
-          user_type: userType,
-          verification_code: verificationCode,
-          email_provider: 'resend',
-          is_confirmed: false,  // NOT confirmed yet - user must click email link
-          confirmation_method: 'pending',
-          confirmed_at: null,
-          email_sent_at: emailSent ? new Date().toISOString() : null
+          code: verificationCode,
+          is_confirmed: false
         })
       
       if (confirmError) {
@@ -324,6 +432,9 @@ export async function POST(request: NextRequest) {
       console.warn('[SIGNUP] Warning: Error logging email confirmation:', logError instanceof Error ? logError.message : String(logError))
       // Don't fail signup
     }
+
+    // Log successful signup attempt
+    await logSignupAttempt(clientIP, email, true)
 
     return NextResponse.json(
       {

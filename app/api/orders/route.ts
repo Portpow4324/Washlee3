@@ -18,12 +18,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    console.log('[API] POST /api/orders - Received payload:', JSON.stringify(body).substring(0, 200))
     
     // Map booking page payload to createOrder format
     const mappedData = {
-      customer_id: body.uid,
+      user_id: body.uid,
       service_type: body.bookingData?.selectedService || 'standard',
-      price: body.orderTotal || 0,
+      total_price: body.orderTotal || 0,
       bagCount: body.bookingData?.bagCount,
       pickupAddress: body.bookingData?.pickupAddress,
       deliveryAddress: body.bookingData?.deliveryAddress,
@@ -33,10 +34,45 @@ export async function POST(request: NextRequest) {
       ...body.bookingData // Include all booking data fields
     }
     
+    console.log('[API] Calling createOrder with:', { user_id: mappedData.user_id, total_price: mappedData.total_price })
     const result = await createOrder(mappedData)
+    console.log('[API] createOrder result:', result)
     
     // Map Supabase response format to expected format
     if (result.data && !result.error) {
+      const orderId = result.data.id
+      
+      // Send order confirmation email asynchronously (don't block the response)
+      try {
+        console.log('[API] Sending order confirmation email for order:', orderId)
+        const { sendOrderConfirmationEmail } = await import('@/lib/emailMarketing')
+        
+        // Get customer email from body or look it up
+        const customerEmail = body.email || body.customerEmail
+        const customerName = body.customerName || 'Valued Customer'
+        
+        if (customerEmail) {
+          sendOrderConfirmationEmail({
+            to: customerEmail,
+            customerName: customerName,
+            orderId: orderId,
+            pickupDate: mappedData.pickupDate || 'Soon',
+            pickupTime: mappedData.pickupTime || 'To be scheduled',
+            pickupAddress: mappedData.pickupAddress || 'As provided',
+            totalPrice: mappedData.total_price,
+            serviceType: mappedData.service_type,
+            weight: mappedData.weight,
+            orderUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/tracking/${orderId}`,
+          }).catch(err => {
+            console.error('[API] Warning: Failed to send order confirmation email:', err)
+            // Don't fail the API response if email fails
+          })
+        }
+      } catch (err) {
+        console.error('[API] Error in order confirmation email:', err)
+        // Don't fail the API response if email fails
+      }
+      
       return NextResponse.json({
         data: {
           ...result.data,
@@ -45,6 +81,7 @@ export async function POST(request: NextRequest) {
       }, { status: 201 })
     }
     
+    console.error('[API] createOrder failed with error:', result.error)
     return NextResponse.json(result, { status: 500 })
   } catch (error) {
     console.error('[API] Create order error:', error)

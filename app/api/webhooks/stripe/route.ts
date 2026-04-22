@@ -45,20 +45,23 @@ export async function POST(request: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session
       console.log('[WEBHOOK] Payment completed for session:', session.id)
       console.log('[WEBHOOK] Session metadata:', session.metadata)
+      console.log('[WEBHOOK] Amount total:', session.amount_total, 'Currency:', session.currency)
 
       // Extract order info from metadata
       const orderId = session.metadata?.orderId
       const customerId = session.metadata?.userId || 'anonymous'
+      const amountPaid = (session.amount_total || 0) / 100 // Convert cents to dollars
 
       if (orderId) {
-        console.log('[WEBHOOK] Updating order status to paid:', orderId)
+        console.log('[WEBHOOK] Updating order status to paid:', orderId, 'Amount:', amountPaid)
         
-        // Update order in database
+        // Update order in database with actual payment amount
         const { error: updateError } = await supabase
           .from('orders')
           .update({
             status: 'confirmed',
             payment_status: 'paid',
+            price: amountPaid, // Update with actual amount from Stripe
             stripe_session_id: session.id,
             stripe_payment_intent_id: session.payment_intent,
             updated_at: new Date().toISOString(),

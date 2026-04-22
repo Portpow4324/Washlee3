@@ -16,12 +16,11 @@ interface Order {
   id: string
   status: string
   created_at: string
-  total_price: number
-  weight: number
-  delivery_address: string
+  total_price?: number
+  delivery_address?: string
   scheduled_pickup_date?: string
   pro_id?: string
-  employees?: { name: string; rating: number } | null
+  employees?: { name: string } | null
 }
 
 export default function CustomerDashboard() {
@@ -57,40 +56,77 @@ export default function CustomerDashboard() {
         setOrdersLoading(true)
         console.log('[Dashboard] Fetching orders for customer:', user.id)
 
-        const { data, error: fetchError } = await supabase
+        // Try to fetch with all columns first
+        let { data, error: fetchError } = await supabase
           .from('orders')
           .select(`
             id,
             status,
             created_at,
             total_price,
-            weight,
             delivery_address,
             scheduled_pickup_date,
-            pro_id,
-            employees(name, rating)
+            pro_id
           `)
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(10)
 
-        if (fetchError) {
+        // If column doesn't exist error, try with basic columns
+        if (fetchError && (fetchError.message?.includes('column') || fetchError.message?.includes('does not exist'))) {
+          console.warn('[Dashboard] Some columns missing, fetching basic columns:', fetchError.message)
+          const { data: basicData, error: basicError } = await supabase
+            .from('orders')
+            .select(`
+              id,
+              status,
+              created_at
+            `)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(10)
+
+          if (basicError) {
+            console.error('[Dashboard] Error fetching basic orders:', basicError)
+            setError('Failed to load orders')
+            setOrdersLoading(false)
+            return
+          }
+          data = basicData
+        } else if (fetchError) {
           console.error('[Dashboard] Error fetching orders:', fetchError)
           setError('Failed to load orders')
           setOrdersLoading(false)
           return
         }
 
-        // Transform data to match Order interface
-        const transformedOrders = (data || []).map((order: any) => ({
-          ...order,
-          employees: Array.isArray(order.employees) && order.employees.length > 0 
-            ? order.employees[0] 
-            : null
-        }))
+        // Fetch pro information for orders that have a pro_id
+        let ordersWithProInfo = (data || [])
+        if (data && data.length > 0 && (data[0] as any).pro_id) {
+          const proIds = [...new Set(data.filter((o: any) => o.pro_id).map((o: any) => o.pro_id))]
+          
+          if (proIds.length > 0) {
+            const { data: proData } = await supabase
+              .from('users')
+              .select('id, first_name, last_name')
+              .in('id', proIds)
+            
+            const proMap = proData?.reduce((acc: any, pro: any) => {
+              acc[pro.id] = pro
+              return acc
+            }, {}) || {}
+            
+            ordersWithProInfo = (data || []).map((order: any) => ({
+              ...order,
+              employees: order.pro_id && proMap[order.pro_id] 
+                ? { name: `${proMap[order.pro_id].first_name} ${proMap[order.pro_id].last_name}` } 
+                : null
+            }))
+          }
+        }
 
-        setOrders(transformedOrders as Order[])
-        console.log('[Dashboard] Loaded orders:', transformedOrders)
+        setOrders(ordersWithProInfo as Order[])
+        console.log('[Dashboard] Loaded orders:', ordersWithProInfo)
         setOrdersLoading(false)
       } catch (err) {
         console.error('[Dashboard] Error:', err)
@@ -221,7 +257,7 @@ export default function CustomerDashboard() {
                           )}
                         </p>
                         <p className="text-sm text-gray mt-1">
-                          {new Date(order.created_at).toLocaleDateString('en-AU')} • {order.weight}kg
+                          {new Date(order.created_at).toLocaleDateString('en-AU')}
                         </p>
                       </div>
                       <div className="text-right">

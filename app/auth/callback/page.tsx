@@ -96,11 +96,11 @@ function AuthCallbackContent() {
         }
 
         setStatus('success')
-        setMessage('Email confirmed! Redirecting to your dashboard...')
+        setMessage('Email confirmed! Completing your profile setup...')
 
         setTimeout(() => {
-          console.log('[AuthCallback] ✓ Redirecting to dashboard')
-          router.push('/dashboard')
+          console.log('[AuthCallback] ✓ Redirecting to profile setup')
+          router.push('/auth/email-confirmed')
         }, 1500)
       } catch (error: any) {
         console.error('[AuthCallback] Session error:', error)

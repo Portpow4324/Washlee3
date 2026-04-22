@@ -8,8 +8,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { CheckCircle, TrendingUp, Clock, Star } from 'lucide-react'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function BecomePro() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -47,9 +49,7 @@ export default function BecomePro() {
                 Become a Washlee Pro and earn flexible income by providing professional laundry services to your community.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/auth/signup?type=pro" onClick={(e) => e.stopPropagation()}>
-                  <Button size="lg">Apply Now</Button>
-                </Link>
+                <Button size="lg" onClick={() => router.push('/auth/pro-signup-form')}>Apply Now</Button>
                 <a href="#learn-more" className="flex items-center justify-center gap-2 px-6 py-3 text-primary font-semibold">
                   Learn More ↓
                 </a>
@@ -225,7 +225,11 @@ export default function BecomePro() {
                   <p className="text-3xl font-bold text-dark">{tier.annual}</p>
                 </div>
               </div>
-              <Link href="/auth/signup?type=pro" className="block" onClick={(e) => e.stopPropagation()}>
+              <Link href="#" className="block" onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                router.push('/auth/pro-signup-form')
+              }}>
                 <Button size="lg" className={`w-full`}>Apply Now</Button>
               </Link>
             </div>

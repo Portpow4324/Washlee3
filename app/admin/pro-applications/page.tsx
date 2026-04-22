@@ -102,18 +102,23 @@ export default function ProApplicationsPage() {
     }
 
     loadApplications()
-  }, [router])
+  }, [router, statusFilter])
 
   const loadApplications = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/inquiries/list')
+      const url = statusFilter !== 'all' 
+        ? `/api/admin/pro-approvals?status=${statusFilter}` 
+        : '/api/admin/pro-approvals'
+      
+      const response = await fetch(url)
       if (!response.ok) throw new Error('Failed to load applications')
 
       const data = await response.json()
-      setApplications(data.inquiries || [])
+      console.log('[ProApplications] Loaded applications:', data)
+      setApplications(data.data || [])
     } catch (error) {
-      console.error('Error loading applications:', error)
+      console.error('[ProApplications] Error loading applications:', error)
     } finally {
       setIsLoading(false)
     }
@@ -163,15 +168,14 @@ export default function ProApplicationsPage() {
     try {
       const employeeId = generatedEmployeeId || `EMP-${Date.now()}`
 
-      const response = await fetch('/api/inquiries/approve', {
-        method: 'POST',
+      const response = await fetch('/api/admin/pro-approvals', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inquiryId: selectedApp.id,
-          adminId: user?.id,
-          adminName: userData?.name || 'Admin',
+          id: selectedApp.id,
+          status: 'approved',
           employeeId: employeeId,
-          verificationChecklist: verificationChecklist,
+          comments: `Approved by admin on ${new Date().toLocaleDateString()}.`
         }),
       })
 
@@ -186,7 +190,7 @@ export default function ProApplicationsPage() {
               ...app,
               status: 'approved' as const,
               reviewedAt: new Date().toISOString(),
-              employeeId: result.employeeId,
+              employeeId: employeeId,
               verificationChecklist: verificationChecklist as {
                 idVerified: boolean
                 contactVerified: boolean
@@ -198,15 +202,15 @@ export default function ProApplicationsPage() {
           : app
       ))
 
-      setSuccessMessage(`✓ Application approved! Employee ID: ${result.employeeId}`)
+      setSuccessMessage(`✓ Application approved! Employee ID: ${employeeId}`)
       setShowApprovalModal(false)
       setTimeout(() => {
         setSuccessMessage('')
         setSelectedApp(null)
       }, 3000)
     } catch (error) {
-      console.error('Error approving application:', error)
-      alert('Failed to approve application')
+      console.error('[ProApplications] Error approving application:', error)
+      alert(`Failed to approve application: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setActionLoading(false)
     }
@@ -221,14 +225,13 @@ export default function ProApplicationsPage() {
 
     setActionLoading(true)
     try {
-      const response = await fetch('/api/inquiries/reject', {
-        method: 'POST',
+      const response = await fetch('/api/admin/pro-approvals', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inquiryId: selectedApp.id,
-          adminId: user?.id,
-          adminName: userData?.name || 'Admin',
-          rejectionReason: rejectionReason,
+          id: selectedApp.id,
+          status: 'rejected',
+          comments: rejectionReason,
         }),
       })
 
@@ -253,8 +256,8 @@ export default function ProApplicationsPage() {
         setSelectedApp(null)
       }, 3000)
     } catch (error) {
-      console.error('Error rejecting application:', error)
-      alert('Failed to reject application')
+      console.error('[ProApplications] Error rejecting application:', error)
+      alert(`Failed to reject application: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setActionLoading(false)
     }
@@ -472,7 +475,7 @@ export default function ProApplicationsPage() {
                         Work Verification
                       </h4>
                       <div className="space-y-2 ml-6">
-                        {Object.entries(app.workVerification).map(([key, value]) => (
+                        {app.workVerification && Object.entries(app.workVerification).map(([key, value]) => (
                           <div key={key} className="flex items-center gap-3">
                             <div
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
@@ -492,6 +495,9 @@ export default function ProApplicationsPage() {
                             </span>
                           </div>
                         ))}
+                        {!app.workVerification && (
+                          <p className="text-sm text-gray italic">No verification data available</p>
+                        )}
                       </div>
                     </div>
 

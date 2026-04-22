@@ -14,11 +14,21 @@ let transporter: nodemailer.Transporter | null = null
 function initializeTransporter() {
   if (transporter) return transporter
 
-  // Check for RESEND_API_KEY first
-  if (process.env.RESEND_API_KEY) {
-    console.log('[Email] Using Resend API')
-    // Using custom nodemailer config for Resend API
-    // Note: Resend has a specific SMTP config
+  // Priority: SendGrid > Resend > SMTP (Gmail) > Fallback
+  // SendGrid is prioritized as it's properly configured with lukaverde045@gmail.com
+  if (process.env.SENDGRID_API_KEY) {
+    console.log('[Email] Using SendGrid SMTP relay (Primary)')
+    transporter = nodemailer.createTransport({
+      host: 'smtp.sendgrid.net',
+      port: 587,
+      secure: false,
+      auth: {
+        user: 'apikey',
+        pass: process.env.SENDGRID_API_KEY,
+      },
+    })
+  } else if (process.env.RESEND_API_KEY) {
+    console.log('[Email] Using Resend SMTP (Backup)')
     transporter = nodemailer.createTransport({
       host: 'smtp.resend.com',
       port: 465,
@@ -29,22 +39,15 @@ function initializeTransporter() {
       },
     })
   } else if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
-    console.log('[Email] Using custom SMTP')
+    console.log('[Email] Using SMTP (Fallback)')
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
+      secure: process.env.SMTP_SECURE === 'true' || false,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
       },
-    })
-  } else if (process.env.SENDGRID_API_KEY) {
-    console.log('[Email] Using test transport (SendGrid not configured)')
-    transporter = nodemailer.createTransport({
-      host: 'localhost',
-      port: 1025,
-      secure: false,
     })
   } else {
     // Development fallback - logs to console
@@ -68,7 +71,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const mailer = initializeTransporter()
 
     const mailOptions = {
-      from: process.env.NEXT_PUBLIC_SENDER_EMAIL || 'noreply@washlee.com',
+      from: process.env.SMTP_FROM_EMAIL || process.env.SENDGRID_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'noreply@washlee.com',
       to: options.to,
       subject: options.subject,
       html: options.html,

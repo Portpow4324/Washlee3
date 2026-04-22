@@ -77,7 +77,7 @@ export default function ProHelpCenter() {
           {/* Top Right Buttons */}
           <div className="flex items-center gap-4">
             <Link
-              href="/auth/pro-signup"
+              href="/pro"
               className="hidden sm:flex items-center gap-2 px-4 py-2 text-dark font-semibold hover:text-primary transition"
             >
               Join The Team

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Delete API Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f7fefe;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1f2d2b;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #48C9B0;
+            border-radius: 4px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #48C9B0;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #48C9B0;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #3a9b84;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Order Delete API Test</h1>
+        
+        <div class="test-section">
+            <h3>📋 Available Orders</h3>
+            <button onclick="fetchAvailableOrders()">Load Orders</button>
+            <div id="ordersList"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🗑️ Delete Order Test</h3>
+            <label>Order ID:</label>
+            <input type="text" id="orderId" placeholder="e.g., bb078faf-e46f-49fc-8295-15ac42ae2eb0" />
+            
+            <label>User ID:</label>
+            <input type="text" id="userId" placeholder="e.g., a0392f42-e63a-4f46-b022-16730081c346" />
+            
+            <button onclick="testDelete()">Delete Order</button>
+            <div id="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>✅ Test Results</h3>
+            <div id="testLog"></div>
+        </div>
+    </div>
+
+    <script>
+        const log = (message, type = 'info') => {
+            const resultDiv = document.getElementById('testLog');
+            const newLog = document.createElement('div');
+            newLog.className = type;
+            newLog.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            resultDiv.appendChild(newLog);
+            console.log(message);
+        };
+
+        const fetchAvailableOrders = async () => {
+            try {
+                log('Fetching available orders...', 'info');
+                const response = await fetch('/api/debug/orders');
+                const data = await response.json();
+                
+                const ordersDiv = document.getElementById('ordersList');
+                ordersDiv.innerHTML = '<p><strong>Orders in Database:</strong></p>';
+                
+                if (data.orders && data.orders.length > 0) {
+                    const html = data.orders.map(order => `
+                        <div style="padding: 10px; background: white; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;" onclick="setOrderFields('${order.id}', '${order.user_id}')">
+                            <strong>${order.id.substring(0, 8)}...</strong> | Status: ${order.status} | Price: $${order.total_price} | User: ${order.user_id.substring(0, 8)}...
+                            <br/>
+                            <small style="color: #999;">Click to fill form</small>
+                        </div>
+                    `).join('');
+                    ordersDiv.innerHTML += html;
+                    log(`✅ Found ${data.count} orders`, 'success');
+                } else {
+                    ordersDiv.innerHTML += '<p>No orders found</p>';
+                }
+            } catch (err) {
+                log(`❌ Error fetching orders: ${err.message}`, 'error');
+            }
+        };
+
+        const setOrderFields = (orderId, userId) => {
+            document.getElementById('orderId').value = orderId;
+            document.getElementById('userId').value = userId;
+            log(`✅ Filled form with Order ID: ${orderId.substring(0, 8)}...`, 'info');
+        };
+
+        const testDelete = async () => {
+            const orderId = document.getElementById('orderId').value;
+            const userId = document.getElementById('userId').value;
+            const resultDiv = document.getElementById('result');
+
+            if (!orderId || !userId) {
+                resultDiv.innerHTML = '<div class="error">❌ Please fill in both Order ID and User ID</div>';
+                return;
+            }
+
+            try {
+                log(`🚀 Attempting to delete order: ${orderId.substring(0, 8)}...`, 'info');
+                
+                const response = await fetch('/api/orders/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId, userId })
+                });
+
+                log(`📡 API Response Status: ${response.status}`, 'info');
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Order Deleted Successfully!`, 'success');
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <strong>✅ Deletion Successful!</strong><br/>
+                            Order ID: ${data.orderId}<br/>
+                            Message: ${data.message}<br/>
+                            Deleted At: ${new Date(data.deletedAt).toLocaleString()}
+                        </div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    log(`❌ Delete failed: ${data.error}`, 'error');
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <strong>❌ Deletion Failed</strong><br/>
+                            Error: ${data.error}
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, 'error');
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${err.message}</div>`;
+            }
+        };
+
+        // Auto-load orders on page load
+        window.addEventListener('load', () => {
+            log('🟢 Test page loaded', 'success');
+            fetchAvailableOrders();
+        });
+    </script>
+</body>
+</html>

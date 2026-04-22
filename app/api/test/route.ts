@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     // Test 3: Can we connect to Stripe?
     try {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-        apiVersion: '2025-12-15.clover'
+        apiVersion: '2026-02-25.clover'
       })
 
       console.log('[TEST-API] Testing Stripe connection...')

@@ -18,10 +18,15 @@ export default function SecurityPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showChangePassword, setShowChangePassword] = useState(false)
+  const [showEditName, setShowEditName] = useState(false)
   const [passwords, setPasswords] = useState({
     current: '',
     new: '',
     confirm: '',
+  })
+  const [nameForm, setNameForm] = useState({
+    firstName: '',
+    lastName: '',
   })
   const [showPassword, setShowPassword] = useState(false)
   const [sessionData, setSessionData] = useState<any>(null)
@@ -29,8 +34,15 @@ export default function SecurityPage() {
   useEffect(() => {
     if (!authLoading && user) {
       loadSessionInfo()
+      // Initialize name form with current userData
+      if (userData) {
+        setNameForm({
+          firstName: userData.first_name || '',
+          lastName: userData.last_name || '',
+        })
+      }
     }
-  }, [user, authLoading])
+  }, [user, authLoading, userData])
 
   const loadSessionInfo = async () => {
     try {
@@ -80,6 +92,50 @@ export default function SecurityPage() {
       router.push('/auth/login')
     } catch (err: any) {
       setError(err.message || 'Failed to logout')
+    }
+  }
+
+  const handleUpdateName = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    setError('')
+    setSuccess('')
+    setIsLoading(true)
+
+    try {
+      // Update users table
+      const { error: userError } = await supabase
+        .from('users')
+        .update({
+          first_name: nameForm.firstName,
+          last_name: nameForm.lastName,
+        })
+        .eq('id', user.id)
+
+      if (userError) throw userError
+
+      // Also update customers table if user is a customer
+      const { error: customerError } = await supabase
+        .from('customers')
+        .update({
+          first_name: nameForm.firstName,
+          last_name: nameForm.lastName,
+        })
+        .eq('id', user.id)
+
+      if (customerError) {
+        console.warn('Warning: Failed to update customers table:', customerError)
+        // Don't fail the operation if customers table update fails
+      }
+
+      setSuccess('Name updated successfully')
+      setShowEditName(false)
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err: any) {
+      setError(err.message || 'Failed to update name')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -150,6 +206,63 @@ export default function SecurityPage() {
           </div>
 
           <div className="space-y-4">
+            {/* Name Fields */}
+            {!showEditName ? (
+              <div className="bg-light p-4 rounded-lg">
+                <label className="text-sm font-semibold text-gray block mb-1">Full Name</label>
+                <p className="text-dark font-medium">
+                  {userData?.first_name || userData?.last_name
+                    ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim()
+                    : 'No name saved'}
+                </p>
+                <button
+                  onClick={() => setShowEditName(true)}
+                  className="text-sm text-primary hover:underline mt-2"
+                >
+                  Edit
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleUpdateName} className="bg-light p-4 rounded-lg space-y-3">
+                <div>
+                  <label className="text-sm font-semibold text-dark block mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={nameForm.firstName}
+                    onChange={(e) => setNameForm({ ...nameForm, firstName: e.target.value })}
+                    placeholder="First name"
+                    className="w-full px-3 py-2 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-dark block mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={nameForm.lastName}
+                    onChange={(e) => setNameForm({ ...nameForm, lastName: e.target.value })}
+                    placeholder="Last name"
+                    className="w-full px-3 py-2 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditName(false)}
+                    className="flex-1 py-2 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-white transition"
+                  >
+                    Cancel
+                  </button>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Updating...' : 'Save Name'}
+                  </Button>
+                </div>
+              </form>
+            )}
+
             <div className="bg-light p-4 rounded-lg">
               <label className="text-sm font-semibold text-gray block mb-1">Email Address</label>
               <p className="text-dark font-medium">{user.email}</p>

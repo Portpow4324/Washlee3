@@ -8,6 +8,7 @@ import Button from '@/components/Button'
 import { CheckCircle, Clock, MapPin, Package, ChevronRight } from 'lucide-react'
 
 interface OrderData {
+  id?: string
   totalPrice?: number | string
   subtotal?: number | string
   weight?: number
@@ -16,6 +17,12 @@ interface OrderData {
   protectionPlan?: string
   deliveryAddressLine1?: string
   deliveryAddressLine2?: string
+  deliveryCity?: string
+  deliveryState?: string
+  deliveryPostcode?: string
+  pickupAddress?: string
+  pickupTime?: string
+  deliverySpeed?: string
   [key: string]: any
 }
 
@@ -28,28 +35,91 @@ function CheckoutSuccessContent() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const sessionId = searchParams.get('session_id')
-    const savedOrderId = sessionStorage.getItem('lastOrderId')
-    const savedOrder = sessionStorage.getItem('lastOrder')
-
-    if (savedOrderId) {
-      setOrderId(savedOrderId)
-    }
-
-    if (savedOrder) {
+    const loadOrderData = async () => {
       try {
-        setOrder(JSON.parse(savedOrder))
-      } catch (e) {
-        console.error('Failed to parse order:', e)
+        setLoading(true)
+        const sessionId = searchParams.get('session_id')
+        const savedOrderId = sessionStorage.getItem('lastOrderId')
+
+        if (!savedOrderId) {
+          setError('Order ID not found')
+          setLoading(false)
+          return
+        }
+
+        setOrderId(savedOrderId)
+
+        // Fetch order details from Supabase
+        console.log('[CheckoutSuccess] Fetching order from Supabase:', savedOrderId)
+        const response = await fetch(`/api/orders/details?orderId=${savedOrderId}`)
+        
+        if (!response.ok) {
+          console.error('[CheckoutSuccess] Failed to fetch order:', response.status)
+          throw new Error('Failed to load order details')
+        }
+
+        const responseData = await response.json()
+        console.log('[CheckoutSuccess] Order fetched from API:', responseData)
+
+        // Parse items JSON if it's a string
+        let items = responseData.items || {}
+        if (typeof items === 'string') {
+          items = JSON.parse(items)
+        }
+
+        // Extract pricing information
+        const weight = items.weight || responseData.weight || 0
+        const deliverySpeed = items.delivery_speed || items.deliverySpeed || 'standard'
+        const protectionPlan = items.protection_plan || items.protectionPlan || 'basic'
+        const totalPrice = responseData.totalPrice || responseData.total_price || 0
+
+        // Calculate protection plan cost based on actual pricing logic
+        let protectionPlanCost = 0
+        if (protectionPlan === 'premium') {
+          protectionPlanCost = 3.50
+        } else if (protectionPlan === 'premium-plus' || protectionPlan === 'premium_plus') {
+          protectionPlanCost = 8.50
+        }
+
+        // Calculate base rate from delivery speed
+        const baseRate = deliverySpeed === 'express' ? 12.5 : 7.5
+        const laundryBase = weight * baseRate
+
+        // Build order display object
+        const orderDisplay: OrderData = {
+          id: savedOrderId,
+          weight,
+          deliverySpeed,
+          protectionPlan: protectionPlan === 'premium_plus' ? 'Premium Plus' : 
+                         protectionPlan === 'premium' ? 'Premium' : 
+                         protectionPlan === 'premium-plus' ? 'Premium Plus' : 'Basic',
+          totalPrice: totalPrice.toFixed(2),
+          subtotal: laundryBase.toFixed(2),
+          protectionPlanCost: protectionPlanCost.toFixed(2),
+          deliveryAddressLine1: responseData.pickupAddress || items.pickup_address || '',
+          deliveryCity: items.delivery_city || '',
+          deliveryState: items.delivery_state || '',
+          deliveryPostcode: items.delivery_postcode || '',
+          pickupAddress: items.pickup_address || responseData.pickupAddress || '',
+          status: responseData.status || 'confirmed',
+        }
+
+        console.log('[CheckoutSuccess] Order display object:', orderDisplay)
+        setOrder(orderDisplay)
+      } catch (err: any) {
+        console.error('[CheckoutSuccess] Error loading order:', err)
+        setError(err.message || 'Failed to load order details')
+      } finally {
+        setLoading(false)
       }
     }
+
+    loadOrderData()
 
     // Clear session storage
     sessionStorage.removeItem('lastOrderId')
     sessionStorage.removeItem('lastOrder')
     sessionStorage.removeItem('lastOrderTotal')
-
-    setLoading(false)
   }, [searchParams])
 
   if (loading) {
@@ -143,13 +213,13 @@ function CheckoutSuccessContent() {
                   <p className="font-semibold text-dark">{order.weight}kg</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray">Service Type</p>
-                  <p className="font-semibold text-dark capitalize">{order.serviceType || 'Standard'}</p>
+                  <p className="text-sm text-gray">Delivery Speed</p>
+                  <p className="font-semibold text-dark capitalize">{order.deliverySpeed === 'express' ? 'Express' : 'Standard'}</p>
                 </div>
-                {order.protectionPlan && (
+                {order.protectionPlan && order.protectionPlan !== 'Basic' && (
                   <div>
                     <p className="text-sm text-gray">Protection Plan</p>
-                    <p className="font-semibold text-dark capitalize">{order.protectionPlan}</p>
+                    <p className="font-semibold text-dark">{order.protectionPlan}</p>
                   </div>
                 )}
               </div>
@@ -159,35 +229,31 @@ function CheckoutSuccessContent() {
             <div className="space-y-3 mb-6">
               <div className="flex justify-between">
                 <span className="text-gray">
-                  {order.weight && order.subtotal ? `${order.weight}kg @ $${((Number(order.subtotal) / order.weight).toFixed(2))}/kg` : 'N/A'}
+                  {order.weight}kg @ ${order.deliverySpeed === 'express' ? '12.50' : '7.50'}/kg
                 </span>
-                <span className="font-semibold text-dark">${order.subtotal || '0.00'}</span>
+                <span className="font-semibold text-dark">${order.subtotal}</span>
               </div>
-              {order.protectionPlan && order.protectionPlan !== 'basic' && (
+              {order.protectionPlan && order.protectionPlan !== 'Basic' && (
                 <div className="flex justify-between">
                   <span className="text-gray">{order.protectionPlan} Protection</span>
-                  <span className="font-semibold text-dark">
-                    ${order.weight && order.subtotal ? (Number(order.totalPrice) - Number(order.subtotal)).toFixed(2) : '0.00'}
-                  </span>
+                  <span className="font-semibold text-dark">${order.protectionPlanCost || '0.00'}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-gray/10 pt-3">
                 <span className="font-bold text-dark">Total</span>
-                <span className="text-lg font-bold text-primary">${order.totalPrice || '0.00'}</span>
+                <span className="text-lg font-bold text-primary">${order.totalPrice}</span>
               </div>
             </div>
 
             {/* Delivery Address */}
-            {order.deliveryAddressLine1 && (
+            {order.pickupAddress && (
               <div className="bg-mint rounded-lg p-4">
                 <p className="text-sm text-gray mb-2 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  Delivery Address
+                  Pickup Address
                 </p>
                 <p className="font-semibold text-dark">
-                  {order.deliveryAddressLine1}
-                  <br />
-                  {order.deliveryCity}, {order.deliveryState} {order.deliveryPostcode}
+                  {order.pickupAddress}
                 </p>
               </div>
             )}

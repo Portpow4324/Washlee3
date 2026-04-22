@@ -17,6 +17,7 @@ interface Transaction {
   payment_method: string
   created_at: string
   order_id?: string
+  type?: string
 }
 
 export default function PaymentsPage() {
@@ -31,17 +32,24 @@ export default function PaymentsPage() {
     const loadTransactions = async () => {
       try {
         setIsLoading(true)
+        setError('')
+
         const { data, error: queryError } = await supabase
           .from('transactions')
-          .select('*')
-          .eq('customer_id', user.id)
+          .select('id, amount, currency, status, payment_method, created_at, order_id, type')
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false })
+          .limit(50)
 
-        if (queryError) throw queryError
+        if (queryError) {
+          console.error('[Payments] Query error:', queryError)
+          throw queryError
+        }
 
+        console.log('[Payments] Loaded transactions:', data?.length || 0)
         setTransactions(data || [])
       } catch (err: any) {
-        console.error('Error loading transactions:', err)
+        console.error('[Payments] Error loading transactions:', err)
         setError(err.message || 'Failed to load payment history')
       } finally {
         setIsLoading(false)
@@ -91,6 +99,13 @@ export default function PaymentsPage() {
     }
   }
 
+  const getTransactionLabel = (type: string, method: string) => {
+    if (type === 'refund') return 'Refund'
+    if (type === 'credit') return 'Credit'
+    if (type === 'adjustment') return 'Adjustment'
+    return `${method ? method.charAt(0).toUpperCase() + method.slice(1) : 'Payment'} Payment`
+  }
+
   return (
     <>
       <main className="min-h-screen bg-gradient-to-b from-[#E8FFFB] to-white py-12 px-4">
@@ -121,14 +136,16 @@ export default function PaymentsPage() {
                     <div className="flex items-start gap-4">
                       {getStatusIcon(transaction.status)}
                       <div>
-                        <p className="font-semibold text-[#1f2d2b] capitalize">
-                          {transaction.payment_method} Payment
+                        <p className="font-semibold text-[#1f2d2b]">
+                          {getTransactionLabel(transaction.type || '', transaction.payment_method || '')}
                         </p>
                         <p className="text-sm text-[#6b7b78]">
                           {new Date(transaction.created_at).toLocaleDateString('en-AU', {
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
                           })}
                         </p>
                       </div>

@@ -3,22 +3,28 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import EmployeeHeader from '@/components/EmployeeHeader'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
+import Toast from '@/components/Toast'
 import { Settings, User, Lock, Bell, FileText, MapPin, Clock, CheckCircle, Upload } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
 interface AvailabilityData {
-  setAvailabilityData: any
+  [day: string]: {
+    available: boolean
+    start: string
+    end: string
+  }
 }
 
 const loadAvailability = async (userId: string, setAvailabilityData: any) => {
   try {
-    const response = await fetch(`/api/availability?employeeId=${userId}`)
+    const response = await fetch(`/api/employee/availability?employeeId=${userId}`)
     const result = await response.json()
-    setAvailabilityData(result.data || [])
+    if (result.data) {
+      setAvailabilityData(result.data)
+    }
   } catch (error) {
     console.error('Error loading availability:', error)
   }
@@ -29,6 +35,8 @@ export default function EmployeeSettings() {
   const router = useRouter()
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -39,7 +47,15 @@ export default function EmployeeSettings() {
     state: '',
     postcode: ''
   })
-  const [availability, setAvailabilityData] = useState<any[]>([])
+  const [availability, setAvailabilityData] = useState<AvailabilityData>({
+    monday: { available: true, start: '09:00', end: '17:00' },
+    tuesday: { available: true, start: '09:00', end: '17:00' },
+    wednesday: { available: true, start: '09:00', end: '17:00' },
+    thursday: { available: true, start: '09:00', end: '17:00' },
+    friday: { available: true, start: '09:00', end: '17:00' },
+    saturday: { available: true, start: '10:00', end: '14:00' },
+    sunday: { available: false, start: '00:00', end: '00:00' }
+  })
 
   useEffect(() => {
     if (hasCheckedAuth) return
@@ -88,11 +104,66 @@ export default function EmployeeSettings() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  const handleAvailabilityChange = (day: string, field: string, value: any) => {
+    setAvailabilityData(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day as keyof AvailabilityData],
+        [field]: value
+      }
+    }))
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Saving settings:', formData)
-    // Mock save
-    alert('Settings saved successfully!')
+    try {
+      const response = await fetch('/api/employee/availability', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: user?.id,
+          availability: availability
+        })
+      })
+      
+      if (response.ok) {
+        setToastMessage('Settings saved successfully!')
+        setToastType('success')
+      } else {
+        setToastMessage('Failed to save settings')
+        setToastType('error')
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      setToastMessage('Error: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      setToastType('error')
+    }
+  }
+
+  const handleSaveAvailability = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const response = await fetch('/api/employee/availability', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: user?.id,
+          availability: availability
+        })
+      })
+      
+      if (response.ok) {
+        setToastMessage('Availability saved successfully!')
+        setToastType('success')
+      } else {
+        setToastMessage('Failed to save availability')
+        setToastType('error')
+      }
+    } catch (error) {
+      console.error('Error saving availability:', error)
+      setToastMessage('Error: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      setToastType('error')
+    }
   }
 
   const tabs = [
@@ -104,7 +175,14 @@ export default function EmployeeSettings() {
 
   return (
     <div className="min-h-screen bg-light flex flex-col">
-      <EmployeeHeader />
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setToastMessage(null)}
+        />
+      )}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-8">
         {/* Header */}
         <div className="space-y-2">
@@ -280,7 +358,7 @@ export default function EmployeeSettings() {
 
         {/* Availability Tab */}
         {activeTab === 'availability' && (
-          <div className="space-y-6">
+          <form onSubmit={handleSaveAvailability} className="space-y-6">
             <Card className="bg-white border border-gray-200 space-y-6">
               <h3 className="text-lg font-bold text-dark flex items-center gap-2">
                 <Clock size={20} className="text-primary" />
@@ -288,24 +366,46 @@ export default function EmployeeSettings() {
               </h3>
 
               <div className="space-y-4">
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                  <div key={day} className="flex items-center justify-between p-4 bg-light rounded-lg border border-gray-200">
-                    <p className="font-semibold text-dark">{day}</p>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <label className="flex items-center gap-2 text-gray hover:text-dark transition cursor-pointer">
-                          <input type="checkbox" className="w-4 h-4" defaultChecked />
-                          <span className="text-sm">Available</span>
-                        </label>
-                      </div>
-                      <div className="flex gap-2">
-                        <input type="time" defaultValue="09:00" className="px-3 py-1.5 bg-white border border-gray-200 text-dark text-sm rounded" />
-                        <span className="text-gray">to</span>
-                        <input type="time" defaultValue="17:00" className="px-3 py-1.5 bg-white border border-gray-200 text-dark text-sm rounded" />
+                {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(dayKey => {
+                  const dayDisplay = dayKey.charAt(0).toUpperCase() + dayKey.slice(1)
+                  const dayData = availability[dayKey as keyof AvailabilityData]
+                  
+                  return (
+                    <div key={dayKey} className="flex items-center justify-between p-4 bg-light rounded-lg border border-gray-200">
+                      <p className="font-semibold text-dark">{dayDisplay}</p>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 text-gray hover:text-dark transition cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4" 
+                              checked={dayData.available}
+                              onChange={(e) => handleAvailabilityChange(dayKey, 'available', e.target.checked)}
+                            />
+                            <span className="text-sm">Available</span>
+                          </label>
+                        </div>
+                        <div className="flex gap-2">
+                          <input 
+                            type="time" 
+                            value={dayData.start}
+                            onChange={(e) => handleAvailabilityChange(dayKey, 'start', e.target.value)}
+                            className="px-3 py-1.5 bg-white border border-gray-200 text-dark text-sm rounded" 
+                            disabled={!dayData.available}
+                          />
+                          <span className="text-gray">to</span>
+                          <input 
+                            type="time" 
+                            value={dayData.end}
+                            onChange={(e) => handleAvailabilityChange(dayKey, 'end', e.target.value)}
+                            className="px-3 py-1.5 bg-white border border-gray-200 text-dark text-sm rounded"
+                            disabled={!dayData.available}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               <div className="border-t border-gray-200 pt-6 space-y-3">
@@ -327,11 +427,11 @@ export default function EmployeeSettings() {
                 </div>
               </div>
 
-              <Button className="w-full bg-gradient-to-r from-primary to-accent mt-4" size="lg">
+              <Button type="submit" className="w-full bg-gradient-to-r from-primary to-accent mt-4" size="lg">
                 Save Availability
               </Button>
             </Card>
-          </div>
+          </form>
         )}
 
         {/* Documents Tab */}

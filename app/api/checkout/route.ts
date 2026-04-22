@@ -80,9 +80,33 @@ export async function POST(request: NextRequest) {
 
     console.log('[CHECKOUT] 5. Stripe initialized')
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
-    console.log('[CHECKOUT] 6. SKIPPING database update - going straight to Stripe')
+    
+    // Get the actual host from the request to handle localhost:3000, localhost:3001, or production URL
+    const forwardedProto = request.headers.get('x-forwarded-proto') || request.headers.get('scheme')
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const requestHost = request.headers.get('host')
+    
+    // For localhost development, use the actual request host (which will be localhost:3000 or localhost:3001)
+    // For production, prefer x-forwarded-* headers from reverse proxy
+    let baseUrl: string
+    
+    if (forwardedProto && forwardedHost) {
+      // Production: behind reverse proxy
+      const cleanHost = forwardedHost.split(',')[0].trim()
+      baseUrl = `${forwardedProto}://${cleanHost}`
+    } else if (requestHost) {
+      // Development: direct request
+      baseUrl = `http://${requestHost}`
+    } else {
+      // Fallback
+      baseUrl = 'http://localhost:3000'
+    }
+    
+    console.log('[CHECKOUT] 6. Base URL determined:')
+    console.log('[CHECKOUT]   - x-forwarded-proto:', forwardedProto)
+    console.log('[CHECKOUT]   - x-forwarded-host:', forwardedHost)
+    console.log('[CHECKOUT]   - request host:', requestHost)
+    console.log('[CHECKOUT]   - final URL:', baseUrl)
     
     // Skip database update for now - focus on getting Stripe working
 
@@ -92,7 +116,7 @@ export async function POST(request: NextRequest) {
 
     // Base laundry service
     const estimatedWeight = bookingDetails.estimatedWeight || (bookingDetails.bagCount * 2.5) || 0
-    const baseRate = bookingDetails.deliverySpeed === 'express' ? 10.0 : 5.0
+    const baseRate = bookingDetails.deliverySpeed === 'express' ? 12.50 : 7.50
     const baseCost = estimatedWeight * baseRate
 
     if (baseCost > 0) {

@@ -57,7 +57,7 @@ export default function SettingsPage() {
       setSuccess('')
 
       const { error: updateError } = await supabase
-        .from('customers')
+        .from('users')
         .update({
           first_name: formData.firstName,
           last_name: formData.lastName,

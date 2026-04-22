@@ -70,7 +70,7 @@ export default function ProDashboard() {
             scheduled_pickup_date,
             delivery_address,
             weight,
-            users(name, phone, email)
+            user_id
           `)
           .eq('pro_id', user.id)
           .in('status', ['confirmed', 'in-transit', 'in_washing', 'pending-pickup'])
@@ -87,13 +87,13 @@ export default function ProDashboard() {
         const transformedJobs: Job[] = (jobsData || []).map((job: any) => ({
           id: job.id,
           status: job.status,
-          customer_name: job.users?.name || 'Unknown Customer',
+          customer_name: 'Customer',
           total_price: job.total_price || 0,
           created_at: job.created_at,
           scheduled_pickup_date: job.scheduled_pickup_date,
           delivery_address: job.delivery_address,
           weight: job.weight,
-          users: job.users
+          users: null
         }))
 
         setJobs(transformedJobs)
@@ -316,15 +316,15 @@ export default function ProDashboard() {
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-gray uppercase mb-1">Jobs Completed</p>
-                  <p className="text-2xl font-bold text-dark">12</p>
+                  <p className="text-2xl font-bold text-dark">—</p>
                 </div>
                 <div className="border-t border-primary/20 pt-3">
                   <p className="text-xs text-gray uppercase mb-1">Weekly Earnings</p>
-                  <p className="text-2xl font-bold text-primary">$840</p>
+                  <p className="text-2xl font-bold text-primary">—</p>
                 </div>
                 <div className="border-t border-primary/20 pt-3">
                   <p className="text-xs text-gray uppercase mb-1">Acceptance Rate</p>
-                  <p className="text-2xl font-bold text-dark">{stats.acceptanceRate}%</p>
+                  <p className="text-2xl font-bold text-dark">—</p>
                 </div>
               </div>
             </div>

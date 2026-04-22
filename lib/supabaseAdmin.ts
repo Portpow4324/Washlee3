@@ -287,13 +287,78 @@ export async function updateWholesaleInquiryStatus(inquiryId: string, status: st
 }
 
 /**
+ * Ensure user profile exists in users table
+ * Creates a basic profile if user doesn't exist
+ */
+export async function ensureUserProfile(userId: string, customerData?: { name?: string; email?: string; phone?: string }) {
+  try {
+    // Check if user exists
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('id, name, email, phone')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (existingUser) {
+      console.log('[AdminClient] User profile already exists:', userId)
+      // If profile exists but has no name/email/phone, update it with provided data
+      if (customerData && (!existingUser.name || existingUser.name === 'Customer')) {
+        const { error: updateError } = await supabaseAdmin
+          .from('users')
+          .update({
+            ...(customerData.name && { name: customerData.name }),
+            ...(customerData.email && { email: customerData.email }),
+            ...(customerData.phone && { phone: customerData.phone }),
+          })
+          .eq('id', userId)
+        
+        if (updateError) {
+          console.warn('[AdminClient] Error updating user profile:', updateError)
+        } else {
+          console.log('[AdminClient] ✓ Updated user profile with customer data:', userId)
+        }
+      }
+      return existingUser
+    }
+
+    // User doesn't exist, create a basic profile with customer data if provided
+    console.log('[AdminClient] Creating user profile for:', userId)
+    const { data: newUser, error } = await supabaseAdmin
+      .from('users')
+      .insert({
+        id: userId,
+        name: customerData?.name || 'Customer',
+        email: customerData?.email || '',
+        phone: customerData?.phone || '',
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.warn('[AdminClient] Error creating user profile:', error)
+      return null
+    }
+
+    console.log('[AdminClient] ✓ Created user profile:', userId)
+    return newUser
+  } catch (err) {
+    console.error('[AdminClient] Exception in ensureUserProfile:', err)
+    return null
+  }
+}
+
+/**
  * Create order in database
  */
 export async function createOrder(orderData: {
-  customer_id: string
+  user_id: string
+  customerName?: string
+  customerEmail?: string
+  customerPhone?: string
   weight?: number | string
   service_type: string
-  price: number
+  total_price: number
   status?: string
   pickup_date?: string
   delivery_date?: string
@@ -304,6 +369,14 @@ export async function createOrder(orderData: {
   protection_plan?: string
   bagCount?: number
   oversizedItems?: number
+  pickupSpot?: string
+  pickupInstructions?: string
+  detergent?: string
+  delicateCycle?: boolean
+  returnsOnHangers?: boolean
+  additionalRequests?: string
+  deliveryInstructions?: string
+  hangDry?: boolean
   addOns?: {
     hangDry?: boolean
     delicatesCare?: boolean
@@ -313,34 +386,84 @@ export async function createOrder(orderData: {
 }) {
   try {
     const {
-      customer_id,
+      user_id,
       service_type,
-      price,
+      total_price,
+      weight,
       bagCount,
       pickupAddress,
       deliveryAddress,
       delivery_speed,
       protection_plan,
       notes,
+      pickupSpot,
+      pickupInstructions,
+      detergent,
+      delicateCycle,
+      returnsOnHangers,
+      additionalRequests,
+      deliveryInstructions,
+      hangDry,
       addOns,
+      customerName,
+      customerEmail,
+      customerPhone,
     } = orderData
+
+    // Ensure user profile exists with customer data (create if missing, update if incomplete)
+    await ensureUserProfile(user_id, {
+      name: customerName,
+      email: customerEmail,
+      phone: customerPhone,
+    })
+
+    // Calculate weight from bagCount if not provided
+    const calculatedWeight = weight ? parseFloat(weight.toString()) : (bagCount || 0) * 10
 
     // Prepare the order data for the orders table
     const orderRecord: any = {
-      customer_id,
-      service_type,
-      price: parseFloat(price.toString()),
-      status: 'pending_payment',
-      created_at: new Date().toISOString(),
+      user_id,
+      total_price: parseFloat(total_price.toString()),
+      status: 'confirmed',
+      // created_at and updated_at will be set by database defaults
     }
 
-    // Add optional fields if they exist
-    if (bagCount) orderRecord.weight = (bagCount * 2.5).toFixed(2)
+    // Add optional fields if they exist (only columns that exist in schema)
     if (pickupAddress) orderRecord.pickup_address = pickupAddress
     if (deliveryAddress) orderRecord.delivery_address = deliveryAddress
-    if (delivery_speed) orderRecord.delivery_speed = delivery_speed
-    if (protection_plan) orderRecord.protection_plan = protection_plan
     if (notes) orderRecord.notes = notes
+    
+    // Add booking preference fields
+    if (pickupSpot) orderRecord.pickup_spot = pickupSpot
+    if (pickupInstructions) orderRecord.pickup_instructions = pickupInstructions
+    if (detergent) orderRecord.detergent = detergent
+    if (delicateCycle !== undefined) orderRecord.delicate_cycle = delicateCycle
+    if (returnsOnHangers !== undefined) orderRecord.returns_on_hangers = returnsOnHangers
+    if (additionalRequests) orderRecord.additional_requests = additionalRequests
+    if (deliveryInstructions) orderRecord.delivery_instructions = deliveryInstructions
+    if (hangDry !== undefined) orderRecord.hang_dry = hangDry
+    
+    // Store booking details in items JSON column
+    const bookingDetails = {
+      weight: calculatedWeight,
+      bagCount: bagCount || Math.ceil(calculatedWeight / 10),
+      service_type,
+      delivery_speed,
+      protection_plan,
+      addOns
+    }
+    
+    orderRecord.items = JSON.stringify(bookingDetails)
+
+    console.log('[AdminClient] Creating order:', {
+      user_id,
+      total_price,
+      weight: calculatedWeight,
+      bagCount,
+      service_type,
+      delivery_speed,
+      protection_plan,
+    })
 
     // Create the order
     const { data, error } = await supabaseAdmin
@@ -351,7 +474,27 @@ export async function createOrder(orderData: {
 
     if (error) throw error
     
-    console.log(`[AdminClient] ✓ Created order for customer ${customer_id}`)
+    console.log(`[AdminClient] ✓ Created order ${data.id} for user ${user_id}`)
+    console.log(`[AdminClient] Order details - Weight: ${calculatedWeight}kg, Price: $${total_price}`)
+    
+    // Create a pro_job record so pros can see this as an available job
+    if (data && data.id) {
+      const { error: jobError } = await supabaseAdmin
+        .from('pro_jobs')
+        .insert({
+          order_id: data.id,
+          status: 'available',
+          posted_at: new Date().toISOString()
+        })
+      
+      if (jobError) {
+        console.error('[AdminClient] Failed to create pro_job for order:', jobError)
+        // Don't throw - the order was created successfully, job creation is secondary
+      } else {
+        console.log(`[AdminClient] ✓ Created available job for order ${data.id}`)
+      }
+    }
+    
     return { data, error: null }
   } catch (err) {
     console.error('[AdminClient] Failed to create order:', err)

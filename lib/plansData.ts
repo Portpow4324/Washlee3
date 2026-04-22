@@ -50,7 +50,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     popular: true,
   },
   {
-    id: 'yearly',
+    id: 'annual',
     name: 'Annual Plan',
     price: '$199',
     period: '/year',

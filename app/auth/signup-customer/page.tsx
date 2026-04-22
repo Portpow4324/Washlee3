@@ -16,6 +16,7 @@ export default function SignupCustomer() {
   const [currentStep, setCurrentStep] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [showWashClubModal, setShowWashClubModal] = useState(false)
@@ -232,13 +233,16 @@ export default function SignupCustomer() {
                     })
                     if (response.ok) {
                       setError('')
-                      alert('New verification code sent! Check your email.')
+                      setSuccessMessage('✓ New verification code sent! Check your email.')
+                      setTimeout(() => setSuccessMessage(''), 5000)
                     } else {
-                      alert('Failed to resend code. Please try again.')
+                      setSuccessMessage('')
+                      setError('Failed to resend code. Please try again.')
                     }
                   } catch (err) {
                     console.error('[Resend Error]', err)
-                    alert('Error resending code')
+                    setSuccessMessage('')
+                    setError('Error resending code')
                   }
                 }}
                 className="text-primary font-semibold hover:underline text-sm"
@@ -563,49 +567,10 @@ export default function SignupCustomer() {
       // Save user ID for later profile creation
       setNewUserId(uid)
       
-      // Send verification email
-      console.log('[Signup] ==========================================')
-      console.log('[Signup] SENDING VERIFICATION EMAIL!')
-      console.log('[Signup] Email:', formData.email)
-      console.log('[Signup] FirstName:', formData.firstName)
-      console.log('[Signup] ==========================================')
-      
-      const emailStartTime = performance.now()
-      try {
-        // Generate a verification code to include in the email
-        const verificationCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-        console.log('[Signup] VerificationCode:', verificationCode)
-        
-        console.log('[Signup] Calling /api/auth/send-confirmation...')
-        const verificationResponse = await fetch('/api/auth/send-confirmation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email,
-            firstName: formData.firstName,
-            verificationCode: verificationCode
-          })
-        })
-        
-        console.log('[Signup] Response status:', verificationResponse.status)
-        console.log('[Signup] Response ok:', verificationResponse.ok)
-        
-        if (!verificationResponse.ok) {
-          const errorData = await verificationResponse.json()
-          console.warn('[Signup] ❌ FAILED to send verification email:', errorData.error)
-          console.warn('[Signup] Full error:', errorData)
-        } else {
-          const emailDuration = performance.now() - emailStartTime
-          console.log(`[Signup] ✅ Email sent successfully (${Math.round(emailDuration)}ms)`)
-          const successData = await verificationResponse.json()
-          console.log('[Signup] Email response data:', successData)
-        }
-      } catch (emailError) {
-        console.warn('[Signup] ❌ Exception calling email endpoint:', emailError)
-      }
-      
+      // The signup backend already sends a verification code via /api/auth/send-confirmation.
+      // Avoid sending a second, mismatched code from the client to ensure verification consistency.
       const totalTime = performance.now() - signupStartTime
-      console.log(`[Signup] ✓ Account created and email sent. (${Math.round(totalTime)}ms)`)
+      console.log(`[Signup] ✓ Account created. Backend initiation completed. (${Math.round(totalTime)}ms)`)
 
       // Move to email verification step (step 2 = "Check Your Email")
       setIsLoading(false)
@@ -714,6 +679,12 @@ export default function SignupCustomer() {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
               {error}
+            </div>
+          )}
+          {/* Success */}
+          {successMessage && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm">
+              {successMessage}
             </div>
           )}
 

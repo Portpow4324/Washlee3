@@ -7,11 +7,12 @@ import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabaseClient'
 import { syncBookingAddresses } from '@/lib/addressSync'
 import { getCustomerPresets, trackPresetUsage, createDefaultPresetFromFirstOrder } from '@/lib/orderPresets'
+import { getDeliveryMetrics, calculateDeliveryWindows, suggestDeliverySpeed, type DeliveryMetrics, type DeliveryWindow } from '@/lib/deliveryService'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { Clock, MapPin, Droplet, Wind, Truck, CheckCircle, ChevronRight, AlertCircle, Mail, Phone, X } from 'lucide-react'
+import { Clock, MapPin, Droplet, Wind, Truck, CheckCircle, ChevronRight, AlertCircle, Mail, Phone, X, Info, Zap, FileText, Check, AlertTriangle, ListTodo, Zap as Lightning, DollarSign } from 'lucide-react'
 import Spinner from '@/components/Spinner'
 import { AddressParts } from '@/lib/googlePlaces'
 
@@ -27,10 +28,18 @@ export default function BookingHybrid() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [orderConfirmed, setOrderConfirmed] = useState(false)
+  const [paymentWindowClosed, setPaymentWindowClosed] = useState(false)
+  const [paymentWindow, setPaymentWindow] = useState<Window | null>(null)
   const [orderId, setOrderId] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [presets, setPresets] = useState<any[]>([])
   const [showPresetsModal, setShowPresetsModal] = useState(false)
+
+  // Delivery metrics states
+  const [deliveryMetrics, setDeliveryMetrics] = useState<DeliveryMetrics | null>(null)
+  const [deliveryWindows, setDeliveryWindows] = useState<{ standard: DeliveryWindow; express: DeliveryWindow } | null>(null)
+  const [metricsLoading, setMetricsLoading] = useState(true)
+  const [suggestedDeliverySpeed, setSuggestedDeliverySpeed] = useState<'standard' | 'express'>('standard')
 
   // Modal states
   const [showPickupSpotModal, setShowPickupSpotModal] = useState(false)
@@ -43,6 +52,7 @@ export default function BookingHybrid() {
   const [showDeliverySpeedInfo, setShowDeliverySpeedInfo] = useState(false)
   const [showProtectionPlanInfo, setShowProtectionPlanInfo] = useState(false)
   const [showStepInfo, setShowStepInfo] = useState(false)
+  const [showExpressWarning, setShowExpressWarning] = useState(false)
   
   // Address autocomplete states
   const [addressInput, setAddressInput] = useState('')
@@ -64,18 +74,16 @@ export default function BookingHybrid() {
 
     // Step 3: Laundry Care
     detergent: 'classic-scented',
+    detergentCustom: '',
     delicateCycle: false,
     hangDry: false,
     returnsOnHangers: false,
-    delicatesCare: false,
-    comforterService: false,
-    stainTreatment: false,
-    ironing: false,
     additionalRequests: false,
     additionalRequestsText: '',
 
-    // Step 4: Bag Count
-    bagCount: 4,
+    // Step 4: Bag Count & Custom Weight
+    bagCount: 1,
+    customWeight: 10,
     oversizedItems: 0,
 
     // Step 5: Delivery Speed
@@ -92,20 +100,19 @@ export default function BookingHybrid() {
   const steps = [
     { number: 1, title: 'Select Service', description: 'Choose your laundry service type' },
     { number: 2, title: 'Pickup Location', description: 'Where should we pick up your laundry?' },
-    { number: 3, title: 'Laundry Care', description: 'Detergent & special care instructions' },
-    { number: 4, title: 'Bag Count', description: 'How many bags are you sending?' },
-    { number: 5, title: 'Delivery Speed', description: 'Choose your desired delivery speed' },
+    { number: 3, title: 'Delivery Speed', description: 'Choose your desired delivery speed' },
+    { number: 4, title: 'Laundry Care', description: 'Detergent & special care instructions' },
+    { number: 5, title: 'Bag Count', description: 'How many bags are you sending?' },
     { number: 6, title: 'Protection Plan', description: 'Washlee\'s Protection Plan covers damage & loss' },
     { number: 7, title: 'Review & Confirm', description: 'Review your order and complete checkout' },
   ]
 
   const services = [
-    { id: 'standard', name: 'Standard Wash', price: '$5.00/kg', icon: '👕', desc: 'Regular washing for everyday clothes' },
-    { id: 'delicate', name: 'Delicate Fabrics', price: '$5.00/kg', icon: '✨', desc: 'Gentle care for silk, satin & linen' },
-    { id: 'express', name: 'Express Service', price: '$10.00/kg', icon: '⚡', desc: 'Same-day turnaround available' },
+    { id: 'standard', name: 'Standard Wash', price: '$7.50/kg', icon: '👕', desc: 'Regular washing for everyday clothes' },
+    { id: 'delicate', name: 'Delicate Fabrics', price: '$7.50/kg', icon: '✨', desc: 'Gentle care for silk, satin & linen' },
+    { id: 'express', name: 'Express Service', price: '$12.50/kg', icon: '⚡', desc: 'Same-day turnaround available' },
     { id: 'comforter', name: 'Comforter & Bedding', price: '$6.00/item', icon: '☁️', desc: 'For large items like comforters' },
-    { id: 'handwash', name: 'Hand Wash Premium', price: '$5.00/kg', icon: '🧤', desc: 'Ultimate care for precious items' },
-    { id: 'stain', name: 'Stain Treatment', price: '+$2.00/item', icon: '🧼', desc: 'Expert stain removal service' },
+    { id: 'handwash', name: 'Hand Wash Premium', price: '$7.50/kg', icon: '🧤', desc: 'Ultimate care for precious items' },
   ]
 
   const pickupSpots = [
@@ -238,6 +245,60 @@ export default function BookingHybrid() {
     loadPresets()
   }, [user])
 
+  // Load delivery metrics and calculate windows
+  useEffect(() => {
+    const loadDeliveryMetrics = async () => {
+      try {
+        setMetricsLoading(true)
+        const metrics = await getDeliveryMetrics()
+        
+        if (metrics) {
+          setDeliveryMetrics(metrics)
+          
+          // Calculate delivery windows based on current weight
+          const estimatedWeight = bookingData.customWeight || bookingData.bagCount * 10
+          const windows = calculateDeliveryWindows(metrics, estimatedWeight)
+          setDeliveryWindows(windows)
+          
+          // Suggest delivery speed
+          const suggested = suggestDeliverySpeed(metrics, estimatedWeight)
+          setSuggestedDeliverySpeed(suggested)
+          
+          console.log('[BOOKING] Delivery metrics loaded:', {
+            activeMembers: metrics.activeMembers,
+            capacityUsage: metrics.capacityUsage,
+            suggested,
+          })
+        }
+      } catch (err) {
+        console.error('[BOOKING] Error loading delivery metrics:', err)
+      } finally {
+        setMetricsLoading(false)
+      }
+    }
+
+    loadDeliveryMetrics()
+    
+    // Refresh metrics every 5 minutes
+    const interval = setInterval(loadDeliveryMetrics, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Monitor if payment window is closed
+  useEffect(() => {
+    if (!paymentWindow || paymentWindowClosed) return
+
+    const checkInterval = setInterval(() => {
+      if (paymentWindow.closed) {
+        setPaymentWindowClosed(true)
+        setOrderConfirmed(false)
+        clearInterval(checkInterval)
+      }
+    }, 500)
+
+    return () => clearInterval(checkInterval)
+  }, [paymentWindow, paymentWindowClosed])
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -250,18 +311,15 @@ export default function BookingHybrid() {
 
   const calculateTotal = () => {
     let total = 0
-    const estimatedWeight = bookingData.bagCount * 2.5 // ~2.5kg per bag
+    // Use custom weight if provided, otherwise calculate from bag count (10kg per bag)
+    const estimatedWeight = (bookingData as any).customWeight || bookingData.bagCount * 10
     
-    // Base laundry cost: $5/kg standard, $10/kg express
-    const baseRate = bookingData.deliverySpeed === 'express' ? 10.0 : 5.0
+    // Base laundry cost: $7.50/kg standard, $12.50/kg express
+    const baseRate = bookingData.deliverySpeed === 'express' ? 12.5 : 7.5
     total += estimatedWeight * baseRate
     
     // Add-ons
     if (bookingData.hangDry) total += 16.50
-    if (bookingData.delicatesCare) total += 22.00
-    if (bookingData.comforterService) total += 25.00
-    if (bookingData.stainTreatment) total += 0.50 // Note: per item, but simplified here
-    // Ironing is included in delicates care
     
     // Protection plan
     if (bookingData.protectionPlan === 'premium') total += 3.50
@@ -270,8 +328,60 @@ export default function BookingHybrid() {
     // Oversized items ($8 each)
     total += bookingData.oversizedItems * 8.0
     
-    // Enforce minimum $50 AUD
-    return Math.max(total, 50.0)
+    // Enforce minimum $75 AUD
+    return Math.max(total, 75.0)
+  }
+
+  // Detailed pricing breakdown for display
+  const getDetailedPricing = () => {
+    const estimatedWeight = (bookingData as any).customWeight || bookingData.bagCount * 10
+    const baseRate = bookingData.deliverySpeed === 'express' ? 12.5 : 7.5
+    
+    const breakdown = {
+      weight: estimatedWeight,
+      baseRate: baseRate,
+      laundryBase: estimatedWeight * baseRate,
+      hangDry: bookingData.hangDry ? 16.50 : 0,
+      protectionPlan: 0,
+      protectionPlanName: 'None',
+      oversizedItems: bookingData.oversizedItems * 8.0,
+      subtotal: 0,
+      total: 0,
+    }
+
+    // Add protection plan cost
+    if (bookingData.protectionPlan === 'premium') {
+      breakdown.protectionPlan = 3.50
+      breakdown.protectionPlanName = 'Premium'
+    } else if (bookingData.protectionPlan === 'premium-plus') {
+      breakdown.protectionPlan = 8.50
+      breakdown.protectionPlanName = 'Premium Plus'
+    }
+
+    // Calculate subtotal
+    breakdown.subtotal = breakdown.laundryBase + breakdown.hangDry + breakdown.protectionPlan + breakdown.oversizedItems
+    
+    // Apply minimum
+    breakdown.total = Math.max(breakdown.subtotal, 75.0)
+
+    // Debug logging
+    if (currentStep === 7) {
+      console.log('[Booking] Pricing Breakdown on Review Step:', {
+        weight: estimatedWeight,
+        deliverySpeed: bookingData.deliverySpeed,
+        baseRate: baseRate,
+        laundryBase: breakdown.laundryBase,
+        protectionPlan: bookingData.protectionPlan,
+        protectionPlanCost: breakdown.protectionPlan,
+        protectionPlanName: breakdown.protectionPlanName,
+        hangDry: breakdown.hangDry,
+        oversizedItems: breakdown.oversizedItems,
+        subtotal: breakdown.subtotal,
+        total: breakdown.total,
+      })
+    }
+
+    return breakdown
   }
 
   const applyPreset = async (preset: any) => {
@@ -287,10 +397,6 @@ export default function BookingHybrid() {
         delicateCycle: preset.delicateCycle || false,
         hangDry: preset.hangDry || false,
         returnsOnHangers: preset.returnsOnHangers || false,
-        delicatesCare: preset.delicatesCare || false,
-        comforterService: preset.comforterService || false,
-        stainTreatment: preset.stainTreatment || false,
-        ironing: preset.ironing || false,
       })
 
       // Track usage
@@ -308,6 +414,12 @@ export default function BookingHybrid() {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
+      // Show express warning before proceeding from step 3 with express delivery
+      if (currentStep === 3 && bookingData.deliverySpeed === 'express') {
+        setShowExpressWarning(true)
+        return
+      }
+      
       if (currentStep < 7) {
         setCurrentStep(currentStep + 1)
       } else {
@@ -318,7 +430,7 @@ export default function BookingHybrid() {
   }
 
   const validateStep = (step: number) => {
-    const estimatedWeight = bookingData.bagCount * 2.5
+    const estimatedWeight = (bookingData as any).customWeight || bookingData.bagCount * 10
     const userPlan = userData?.subscription?.plan || 'free'
     
     switch (step) {
@@ -337,8 +449,8 @@ export default function BookingHybrid() {
       case 3:
         return true
       case 4:
-        if (bookingData.bagCount < 4) {
-          setError('Minimum order is 4 bags (10kg) for $50')
+        if (bookingData.bagCount < 1) {
+          setError('Minimum order is 1 bag (10kg) for $75')
           return false
         }
         // Check weight restrictions for free plan (max 25kg per load)
@@ -376,7 +488,11 @@ export default function BookingHybrid() {
       if (!user) throw new Error('User not found')
 
       const orderTotal = calculateTotal()
-      const estimatedWeight = bookingData.bagCount * 2.5
+      const estimatedWeight = (bookingData as any).customWeight || bookingData.bagCount * 10
+      
+      // Get detailed pricing to extract subtotal
+      const pricing = getDetailedPricing()
+      const subtotal = pricing.subtotal
 
       // Extract delivery address components from AddressParts object
       const deliveryAddressLine1 = bookingData.deliveryAddressDetails?.streetAddress || ''
@@ -392,6 +508,10 @@ export default function BookingHybrid() {
         customerPhone: userData?.phone || '',
         bookingData: {
           ...bookingData,
+          // Use custom detergent if selected, otherwise use the preset choice
+          detergent: bookingData.detergent === 'i-will-provide' 
+            ? bookingData.detergentCustom || 'I Will Provide' 
+            : bookingData.detergent,
           estimatedWeight,
           deliveryAddressLine1,
           deliveryAddressLine2: '',
@@ -410,15 +530,15 @@ export default function BookingHybrid() {
         orderTotal,
       })
 
-      console.log('[BOOKING] Step 2: Calling /api/orders-simple (no auth)...')
-      const orderResponse = await fetch('/api/orders-simple', {
+      console.log('[BOOKING] Step 2: Calling /api/orders to create real order...')
+      const orderResponse = await fetch('/api/orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(orderPayload),
       })
-      console.log('[BOOKING] Step 3: Got response from /api/orders-simple:', orderResponse.status)
+      console.log('[BOOKING] Step 3: Got response from /api/orders:', orderResponse.status)
 
       if (!orderResponse.ok) {
         const errorData = await orderResponse.json()
@@ -467,6 +587,7 @@ export default function BookingHybrid() {
         email: user.email,
         name: userData?.name || 'Customer',
         orderId: createdOrderId,
+        protectionPlan: bookingData.protectionPlan,
         bookingDetails: {
           ...bookingData,
           estimatedWeight,
@@ -543,17 +664,43 @@ export default function BookingHybrid() {
       // Redirect to Stripe checkout in a new tab
       if (checkoutData.url) {
         console.log('[BOOKING] Opening Stripe checkout in new tab:', checkoutData.url)
-        // Save orderId to session storage so success page can access it
+        // Save order details to session storage so success page can access it
         sessionStorage.setItem('lastOrderId', orderId || createdOrderId)
         sessionStorage.setItem('lastOrderTotal', orderTotal.toString())
-        // Open Stripe checkout in a new tab
-        window.open(checkoutData.url, '_blank')
+        sessionStorage.setItem('lastOrder', JSON.stringify({
+          totalPrice: orderTotal,
+          subtotal: subtotal,
+          weight: estimatedWeight,
+          serviceType: bookingData.selectedService,
+          protectionPlan: bookingData.protectionPlan,
+          deliveryAddressLine1,
+          deliveryAddressLine2: '',
+          deliveryCity,
+          deliveryState,
+          deliveryPostcode,
+        }))
+        // Open Stripe checkout in a new tab and store reference
+        const stripeWindow = window.open(checkoutData.url, '_blank')
+        setPaymentWindow(stripeWindow)
       } else if (checkoutData.sessionId) {
         console.log('[BOOKING] Got session ID, opening in new tab:', checkoutData.sessionId)
         const stripeUrl = `https://checkout.stripe.com/pay/${checkoutData.sessionId}`
         sessionStorage.setItem('lastOrderId', orderId || createdOrderId)
         sessionStorage.setItem('lastOrderTotal', orderTotal.toString())
-        window.open(stripeUrl, '_blank')
+        sessionStorage.setItem('lastOrder', JSON.stringify({
+          totalPrice: orderTotal,
+          subtotal: subtotal,
+          weight: estimatedWeight,
+          serviceType: bookingData.selectedService,
+          protectionPlan: bookingData.protectionPlan,
+          deliveryAddressLine1,
+          deliveryAddressLine2: '',
+          deliveryCity,
+          deliveryState,
+          deliveryPostcode,
+        }))
+        const stripeWindow = window.open(stripeUrl, '_blank')
+        setPaymentWindow(stripeWindow)
       } else {
         // Fallback: show order confirmed if no session
         console.warn('[BOOKING] No checkout URL or sessionId found in response')
@@ -570,6 +717,60 @@ export default function BookingHybrid() {
     }
   }
 
+  if (paymentWindowClosed) {
+    return (
+      <div className="min-h-screen bg-light flex flex-col">
+        <Header />
+        <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12">
+          <Card className="text-center p-12 border-red-200 bg-red-50">
+            <div className="mb-6 relative">
+              <AlertTriangle size={60} className="mx-auto text-red-600" />
+              <button
+                onClick={() => {
+                  setPaymentWindowClosed(false)
+                  setOrderConfirmed(false)
+                  setError('')
+                }}
+                className="absolute top-0 right-0 p-2 hover:bg-red-200 rounded-full transition"
+              >
+                <X size={24} className="text-red-600" />
+              </button>
+            </div>
+            <h1 className="text-3xl font-bold text-red-600 mb-2">Payment Not Completed</h1>
+            <p className="text-gray mb-6">It looks like you closed the payment window or didn't complete payment.</p>
+            <p className="text-gray mb-8">Your order <span className="font-semibold text-dark">{orderId}</span> has been created, but payment wasn't processed. Would you like to try again?</p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                onClick={() => {
+                  setPaymentWindowClosed(false)
+                  setOrderConfirmed(false)
+                  setError('')
+                  // Optionally can retry payment here if needed
+                }}
+                className="bg-primary hover:bg-primary/90"
+              >
+                Try Again
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  setPaymentWindowClosed(false)
+                  setOrderConfirmed(false)
+                  setError('')
+                  router.push('/')
+                }}
+              >
+                Return Home
+              </Button>
+            </div>
+          </Card>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
   if (orderConfirmed) {
     return (
       <div className="min-h-screen bg-light flex flex-col">
@@ -583,10 +784,10 @@ export default function BookingHybrid() {
             <p className="text-gray mb-2">Order ID: {orderId}</p>
             <p className="text-gray mb-8">A payment page has opened in a new tab. Complete your payment there to confirm your booking.</p>
             <div className="bg-mint p-4 rounded-lg mb-8">
-              <p className="text-sm text-dark font-semibold mb-2">📋 Payment Tab Instructions:</p>
-              <p className="text-xs text-gray mb-3">✓ Complete payment in the new tab that opened</p>
-              <p className="text-xs text-gray mb-3">✓ You will see a success message in that tab after payment</p>
-              <p className="text-xs text-gray">✓ You can safely close the payment tab after confirming success</p>
+              <p className="text-sm text-dark font-semibold mb-2 flex items-center gap-2"><FileText size={18} /> Payment Tab Instructions:</p>
+              <p className="text-xs text-gray mb-3 flex items-center gap-2"><Check size={16} className="text-primary" /> Complete payment in the new tab that opened</p>
+              <p className="text-xs text-gray mb-3 flex items-center gap-2"><Check size={16} className="text-primary" /> You will see a success message in that tab after payment</p>
+              <p className="text-xs text-gray flex items-center gap-2"><Check size={16} className="text-primary" /> You can safely close the payment tab after confirming success</p>
             </div>
             <Button onClick={() => router.push('/')} className="mx-auto">Return to Home</Button>
           </Card>
@@ -599,15 +800,6 @@ export default function BookingHybrid() {
   return (
     <div className="min-h-screen bg-light flex flex-col">
       <Header />
-
-      {isLoading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 shadow-lg text-center">
-            <Spinner />
-            <p className="mt-4 text-dark font-semibold">Processing your order...</p>
-          </div>
-        </div>
-      )}
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-12">
         {/* Top Navigation - Back to Home */}
@@ -682,7 +874,7 @@ export default function BookingHybrid() {
                     onClick={() => setShowPresetsModal(true)}
                     className="text-sm px-3 py-1 bg-primary/10 text-primary rounded-full font-semibold hover:bg-primary/20 transition"
                   >
-                    ⚡ Quick Reorder ({presets.length})
+                    <Zap size={18} className="inline mr-1 text-orange-500" /> Quick Reorder ({presets.length})
                   </button>
                 )}
               </div>
@@ -696,14 +888,14 @@ export default function BookingHybrid() {
                       <p className="text-sm text-gray mt-2">Wash • Dry • Fold • Deliver</p>
                     </div>
                   </div>
-                  <p className="text-lg font-bold text-primary mt-4">$5.00/kg (Standard)</p>
-                  <p className="text-sm text-gray mt-1">$10.00/kg (Express same-day)</p>
+                  <p className="text-lg font-bold text-primary mt-4">$7.50/kg (Standard)</p>
+                  <p className="text-sm text-gray mt-1">$12.50/kg (Express same-day)</p>
                   
                   <div className="mt-4 pt-4 border-t border-primary/30 space-y-2">
-                    <p className="text-sm text-dark">✓ Professional washing & folding</p>
-                    <p className="text-sm text-dark">✓ Free pickup & delivery (next day or express)</p>
-                    <p className="text-sm text-dark">✓ Choice of detergent & care options</p>
-                    <p className="text-sm text-dark">✓ Poplin's Protection Plan available</p>
+                    <p className="text-sm text-dark flex items-center gap-2"><Check size={16} className="text-primary" /> Professional washing & folding</p>
+                    <p className="text-sm text-dark flex items-center gap-2"><Check size={16} className="text-primary" /> Free pickup & delivery (next day or express)</p>
+                    <p className="text-sm text-dark flex items-center gap-2"><Check size={16} className="text-primary" /> Choice of detergent & care options</p>
+                    <p className="text-sm text-dark flex items-center gap-2"><Check size={16} className="text-primary" /> Poplin's Protection Plan available</p>
                   </div>
                 </div>
               </div>
@@ -768,7 +960,7 @@ export default function BookingHybrid() {
                 
                 {bookingData.pickupAddressDetails && (
                   <div className="mt-3 p-3 bg-mint rounded-lg">
-                    <p className="text-sm text-dark font-semibold">✓ Address confirmed: {bookingData.pickupAddress}</p>
+                    <p className="text-sm text-dark font-semibold flex items-center gap-2"><Check size={16} className="text-primary" /> Address confirmed: {bookingData.pickupAddress}</p>
                   </div>
                 )}
               </div>
@@ -791,7 +983,7 @@ export default function BookingHybrid() {
                   className="w-5 h-5"
                 />
                 <span className="text-dark font-semibold">Add pickup instructions</span>
-                <button onClick={() => setShowPickupInstructionsInfo(true)} className="text-primary text-sm">ℹ️</button>
+                <button onClick={() => setShowPickupInstructionsInfo(true)} className="text-primary text-sm"><Info size={16} className="inline" /></button>
               </label>
 
               {bookingData.addPickupInstructions && (
@@ -807,8 +999,105 @@ export default function BookingHybrid() {
           </div>
         )}
 
-        {/* STEP 3: Laundry Care */}
+        {/* STEP 3: Delivery Speed */}
         {currentStep === 3 && (
+          <div className="max-w-2xl mx-auto">
+            <Card className="p-8 mb-8">
+              <h3 className="font-bold text-lg text-dark mb-6">DELIVERY SPEED</h3>
+
+              {/* System Status - Real Data */}
+              {deliveryMetrics && !metricsLoading && (
+                <div className="mb-8 p-6 bg-mint rounded-xl border-2 border-primary/20">
+                  <div className="grid grid-cols-2 gap-6 text-center">
+                    <div>
+                      <p className="text-gray text-sm mb-2">Active Team</p>
+                      <p className="font-bold text-dark text-3xl">{deliveryMetrics.activeMembers}</p>
+                      <p className="text-xs text-gray mt-1">team members</p>
+                    </div>
+                    <div>
+                      <p className="text-gray text-sm mb-2">System Capacity</p>
+                      <p className="font-bold text-dark text-3xl">{deliveryMetrics.capacityUsage.toFixed(0)}%</p>
+                      <p className="text-xs text-gray mt-1">utilization</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {metricsLoading ? (
+                <div className="text-center py-12">
+                  <p className="text-gray text-sm">Checking team availability...</p>
+                </div>
+              ) : deliveryMetrics && deliveryMetrics.capacityUsage > 85 ? (
+                // TEAM IS FULL
+                <div className="space-y-4">
+                  <div className="p-6 bg-red-50 border-2 border-red-200 rounded-xl text-center">
+                    <p className="text-red-700 font-bold text-lg mb-2 flex items-center justify-center gap-2"><AlertTriangle size={24} className="text-red-600" /> Our team is at full capacity</p>
+                    <p className="text-red-600 text-sm mb-4">We're currently receiving high demand. Please try booking again in a few minutes.</p>
+                    <p className="text-xs text-red-500">Capacity: {deliveryMetrics.capacityUsage.toFixed(0)}% • Active orders: {deliveryMetrics.activeOrders}</p>
+                  </div>
+                </div>
+              ) : (
+                // NORMAL - SHOW DELIVERY OPTIONS
+                <div className="space-y-4">
+                  {/* Standard Delivery */}
+                  <div
+                    onClick={() => setBookingData({ ...bookingData, deliverySpeed: 'standard' })}
+                    className={`border-2 rounded-xl p-6 cursor-pointer transition ${
+                      bookingData.deliverySpeed === 'standard'
+                        ? 'border-primary bg-mint'
+                        : 'border-gray hover:border-primary bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-4 mb-3">
+                      <div className="flex-1">
+                        <p className="font-bold text-dark text-lg flex items-center gap-2"><Truck size={20} className="text-primary" /> Standard Delivery</p>
+                        <p className="text-gray text-sm mt-1">Next-day delivery (by 5pm)</p>
+                        <p className="text-xs text-gray mt-2">
+                          {new Date(Date.now() + 86400000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </p>
+                      </div>
+                      <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">$7.50/kg</span>
+                    </div>
+                    {bookingData.deliverySpeed === 'standard' && (
+                      <div className="mt-4 pt-4 border-t border-primary space-y-2">
+                        <p className="text-xs text-primary font-semibold flex items-center gap-2"><Check size={14} className="text-primary" /> Next-day delivery by 5pm</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Express Delivery */}
+                  <div
+                    onClick={() => setBookingData({ ...bookingData, deliverySpeed: 'express' })}
+                    className={`border-2 rounded-xl p-6 cursor-pointer transition ${
+                      bookingData.deliverySpeed === 'express'
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-gray hover:border-orange-500 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-4 mb-3">
+                      <div className="flex-1">
+                        <p className="font-bold text-dark text-lg flex items-center gap-2"><Zap size={20} className="text-orange-500" /> Express Delivery</p>
+                        <p className="text-gray text-sm mt-1">Same-day delivery (by 7pm)</p>
+                        <p className="text-xs text-gray mt-2">
+                          {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </p>
+                      </div>
+                      <span className="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">$12.50/kg</span>
+                    </div>
+                    {bookingData.deliverySpeed === 'express' && (
+                      <div className="mt-4 pt-4 border-t border-orange-500 space-y-2">
+                        <p className="text-xs text-orange-600 font-semibold flex items-center gap-2"><Check size={14} className="text-orange-600" /> Same-day delivery by 7pm (max 25kg)</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* STEP 4: Laundry Care */}
+        {currentStep === 4 && (
           <div className="max-w-2xl mx-auto">
             <Card className="p-8 mb-8">
               <h3 className="font-bold text-dark mb-6">LAUNDRY CARE & PREFERENCES</h3>
@@ -817,7 +1106,7 @@ export default function BookingHybrid() {
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-3">
                   <label className="block text-sm font-semibold text-dark">Select Detergent</label>
-                  <button onClick={() => setShowDetergentInfo(true)} className="text-primary hover:text-primary/80">ℹ️</button>
+                  <button onClick={() => setShowDetergentInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
                 </div>
                 <button
                   onClick={() => setShowDetergentModal(true)}
@@ -825,15 +1114,27 @@ export default function BookingHybrid() {
                 >
                   <p className="text-dark font-semibold">{detergents.find(d => d.id === bookingData.detergent)?.label}</p>
                 </button>
+
+                {bookingData.detergent === 'i-will-provide' && (
+                  <div className="mt-4">
+                    <label className="text-xs font-semibold text-gray mb-2 block">Detergent Brand & Details</label>
+                    <textarea
+                      value={bookingData.detergentCustom}
+                      onChange={(e) => setBookingData({ ...bookingData, detergentCustom: e.target.value })}
+                      placeholder="e.g., Woolite Delicates, or any other specific instructions..."
+                      className="w-full p-3 border-2 border-gray rounded-lg focus:border-primary outline-none text-sm"
+                      rows={2}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Care Instructions */}
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <h4 className="text-sm font-semibold text-dark">Special Care Instructions</h4>
-                  <button onClick={() => setShowSpecialCareInfo(true)} className="text-primary hover:text-primary/80">ℹ️</button>
+                  <button onClick={() => setShowSpecialCareInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
                 </div>
-                <p className="text-sm font-semibold text-dark mb-4">Special Care Instructions</p>
                 <div className="space-y-3">
                   <label className="flex items-start gap-3 cursor-pointer p-4 border-2 border-gray rounded-lg hover:border-primary transition"
                     onClick={() => setBookingData({ ...bookingData, delicateCycle: !bookingData.delicateCycle })}
@@ -861,7 +1162,7 @@ export default function BookingHybrid() {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <p className="text-sm font-semibold text-dark">ADD-ONS (OPTIONAL)</p>
-                  <button onClick={() => setShowAddOnsInfo(true)} className="text-primary hover:text-primary/80">ℹ️</button>
+                  <button onClick={() => setShowAddOnsInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
                 </div>
                 <div className="space-y-3">
                   <label className="flex items-start gap-3 cursor-pointer p-4 border-2 border-gray rounded-lg hover:border-primary transition"
@@ -874,73 +1175,29 @@ export default function BookingHybrid() {
                     </div>
                     <span className="text-sm font-bold text-primary whitespace-nowrap">+$16.50</span>
                   </label>
-
-                  <label className="flex items-start gap-3 cursor-pointer p-4 border-2 border-gray rounded-lg hover:border-primary transition"
-                    onClick={() => setBookingData({ ...bookingData, delicatesCare: !bookingData.delicatesCare })}
-                  >
-                    <input type="checkbox" checked={bookingData.delicatesCare} onChange={() => {}} className="w-5 h-5 mt-1" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-dark">Delicates Care</p>
-                      <p className="text-xs text-gray">Premium care for silk, satin, and delicate fabrics.</p>
-                    </div>
-                    <span className="text-sm font-bold text-primary whitespace-nowrap">+$22.00</span>
-                  </label>
-
-                  <label className="flex items-start gap-3 cursor-pointer p-4 border-2 border-gray rounded-lg hover:border-primary transition"
-                    onClick={() => setBookingData({ ...bookingData, comforterService: !bookingData.comforterService })}
-                  >
-                    <input type="checkbox" checked={bookingData.comforterService} onChange={() => {}} className="w-5 h-5 mt-1" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-dark">Comforter Service</p>
-                      <p className="text-xs text-gray">For comforters, quilts, and large bedding items.</p>
-                    </div>
-                    <span className="text-sm font-bold text-primary whitespace-nowrap">+$25.00</span>
-                  </label>
-
-                  <label className="flex items-start gap-3 cursor-pointer p-4 border-2 border-gray rounded-lg hover:border-primary transition"
-                    onClick={() => setBookingData({ ...bookingData, stainTreatment: !bookingData.stainTreatment })}
-                  >
-                    <input type="checkbox" checked={bookingData.stainTreatment} onChange={() => {}} className="w-5 h-5 mt-1" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-dark">Stain Treatment</p>
-                      <p className="text-xs text-gray">Expert stain removal service.</p>
-                    </div>
-                    <span className="text-sm font-bold text-primary whitespace-nowrap">+$0.50/item</span>
-                  </label>
-
-                  <label className="flex items-start gap-3 cursor-pointer p-4 border-2 border-gray rounded-lg hover:border-primary transition"
-                    onClick={() => setBookingData({ ...bookingData, ironing: !bookingData.ironing })}
-                  >
-                    <input type="checkbox" checked={bookingData.ironing} onChange={() => {}} className="w-5 h-5 mt-1" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-dark">Ironing</p>
-                      <p className="text-xs text-gray">Professional ironing service.</p>
-                    </div>
-                    <span className="text-sm font-bold text-primary whitespace-nowrap">Included</span>
-                  </label>
                 </div>
               </div>
             </Card>
           </div>
         )}
 
-        {/* STEP 4: Bag Count */}
-        {currentStep === 4 && (
+        {/* STEP 5: Bag Count */}
+        {currentStep === 5 && (
           <div className="max-w-2xl mx-auto">
             <Card className="p-8 mb-8">
               <div className="flex items-center gap-2 mb-6">
                 <h3 className="font-bold text-dark">LAUNDRY WEIGHT</h3>
-                <button onClick={() => setShowWeightInfo(true)} className="text-primary hover:text-primary/80">ℹ️</button>
+                <button onClick={() => setShowWeightInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
               </div>
-              <p className="text-sm text-gray mb-6">Select the number of bags/hampers. Each bag ≈ 2.5kg. Charged at $5/kg (standard) or $10/kg (express).</p>
+              <p className="text-sm text-gray mb-6">Select weight or number of bags. Minimum 10kg (1 bag). Charged at $7.50/kg (standard) or $12.50/kg (express).</p>
 
               <div className="space-y-6">
                 <div>
                   <p className="font-semibold text-dark mb-2">How many bags?</p>
-                  <p className="text-xs text-gray mb-3">Minimum 4 bags (10kg) | Each bag ≈ 2.5kg</p>
+                  <p className="text-xs text-gray mb-3">Minimum 10kg (1 bag) | Each bag = 10kg</p>
                   <div className="flex items-center gap-4">
                     <button
-                      onClick={() => setBookingData({ ...bookingData, bagCount: Math.max(4, bookingData.bagCount - 1) })}
+                      onClick={() => setBookingData({ ...bookingData, bagCount: Math.max(1, bookingData.bagCount - 1) })}
                       className="w-10 h-10 rounded-full bg-dark text-white font-bold hover:bg-dark/90"
                     >
                       −
@@ -949,7 +1206,7 @@ export default function BookingHybrid() {
                     <button
                       onClick={() => {
                         const newCount = bookingData.bagCount + 1
-                        const newWeight = newCount * 2.5
+                        const newWeight = newCount * 10
                         if (newWeight > 25 && (userData?.subscription?.plan || 'free') === 'free') {
                           setError('Loads over 25kg require a Professional or Washlee Premium plan. Upgrade to unlock larger loads.')
                         } else {
@@ -962,9 +1219,62 @@ export default function BookingHybrid() {
                       +
                     </button>
                   </div>
-                  <p className={`text-sm font-semibold mt-2 ${(bookingData.bagCount * 2.5) > 25 && (userData?.subscription?.plan || 'free') === 'free' ? 'text-red-600' : 'text-primary'}`}>
-                    ≈ {(bookingData.bagCount * 2.5).toFixed(1)} kg {(userData?.subscription?.plan || 'free') === 'free' && '(max 25kg)'}
+                  <p className={`text-sm font-semibold mt-2 ${(bookingData.bagCount * 10) > 25 && (userData?.subscription?.plan || 'free') === 'free' ? 'text-red-600' : 'text-primary'}`}>
+                    ≈ {(bookingData.bagCount * 10).toFixed(1)} kg {(userData?.subscription?.plan || 'free') === 'free' && '(max 25kg)'}
                   </p>
+
+                  {/* Slider */}
+                  <div className="mt-4 mb-4">
+                    <input
+                      type="range"
+                      min="10"
+                      max="45"
+                      step="0.5"
+                      value={(bookingData as any).customWeight || bookingData.bagCount * 10}
+                      onChange={(e) => {
+                        const newWeight = parseFloat(e.target.value)
+                        setBookingData({ ...bookingData, customWeight: newWeight })
+                        if (newWeight > 25 && (userData?.subscription?.plan || 'free') === 'free') {
+                          setError('Loads over 25kg require a Professional or Washlee Premium plan.')
+                        } else {
+                          setError('')
+                        }
+                      }}
+                      className="w-full h-2 bg-light rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                  </div>
+
+                  {/* Custom Weight Input */}
+                  <div className="mt-4">
+                    <label className="text-xs text-gray font-semibold mb-2 block">Or enter custom weight (kg):</label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="45"
+                      step="0.5"
+                      value={(bookingData as any).customWeight || ''}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val) {
+                          const newWeight = Math.max(10, Math.min(45, parseFloat(val)))
+                          setBookingData({ ...bookingData, customWeight: newWeight })
+                          if (newWeight > 25 && (userData?.subscription?.plan || 'free') === 'free') {
+                            setError('Loads over 25kg require a Professional or Washlee Premium plan.')
+                          } else {
+                            setError('')
+                          }
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!(bookingData as any).customWeight) {
+                          setBookingData({ ...bookingData, customWeight: bookingData.bagCount * 10 })
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray rounded-lg text-sm focus:border-primary focus:outline-none"
+                      placeholder="10"
+                    />
+                    <p className="text-xs text-gray mt-1">Minimum: 10kg | Maximum: 45kg</p>
+                  </div>
                 </div>
 
                 <div>
@@ -988,13 +1298,14 @@ export default function BookingHybrid() {
                 </div>
               </div>
 
-              {calculateTotal() < 30 && (
-                <div className="mt-6 bg-blue-100 border border-blue-300 text-blue-700 p-4 rounded-lg text-sm">
-                  💰 $50 MINIMUM ORDER - Add more laundry to meet minimum!
+              {calculateTotal() < 75 && (
+                <div className="mt-6 bg-blue-100 border border-blue-300 text-blue-700 p-4 rounded-lg text-sm flex items-center gap-2">
+                  <DollarSign size={18} className="text-blue-700 flex-shrink-0" />
+                  <span>$75 MINIMUM ORDER - Add more laundry to meet minimum!</span>
                 </div>
               )}
 
-              {(bookingData.bagCount * 2.5) > 25 && (userData?.subscription?.plan || 'free') === 'free' && (
+              {(bookingData.bagCount * 10) > 25 && (userData?.subscription?.plan || 'free') === 'free' && (
                 <div className="mt-6 bg-amber-100 border border-amber-300 text-amber-700 p-4 rounded-lg text-sm">
                   ⚠️ <strong>Weight limit reached:</strong> Loads over 25kg require a Professional or Washlee Premium plan.
                   <Link href="/pricing" className="block mt-2 text-amber-700 underline hover:text-amber-800 font-semibold">
@@ -1006,86 +1317,13 @@ export default function BookingHybrid() {
           </div>
         )}
 
-        {/* STEP 5: Delivery Speed */}
-        {currentStep === 5 && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="p-8 mb-8">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-bold text-lg text-dark">DELIVERY SPEED</h3>
-                <button onClick={() => setShowDeliverySpeedInfo(true)} className="text-primary hover:text-primary/80">ℹ️</button>
-              </div>
-              <p className="text-sm text-gray mb-8">Choose when you'd like your laundry back.</p>
-
-              <div className="space-y-4">
-                {/* Standard Delivery Box */}
-                <div
-                  onClick={() => setBookingData({ ...bookingData, deliverySpeed: 'standard' })}
-                  className={`border-2 rounded-xl p-6 cursor-pointer transition ${
-                    bookingData.deliverySpeed === 'standard'
-                      ? 'border-primary bg-mint'
-                      : 'border-gray hover:border-primary bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="font-bold text-dark">Standard Delivery</p>
-                      <p className="text-sm text-gray">Next-day delivery (by 5pm)</p>
-                    </div>
-                    <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">$5.00/kg</span>
-                  </div>
-                  {bookingData.deliverySpeed === 'standard' && (
-                    <div className="mt-4 pt-4 border-t border-primary space-y-2">
-                      <p className="text-xs text-primary font-semibold">✓ Selected</p>
-                      <p className="text-xs text-primary">⏰ Orders accepted until 11:00pm</p>
-                      <p className="text-xs text-primary">🚚 Delivered by 5:00pm next business day</p>
-                      <p className="text-xs text-primary">📦 No weight limit</p>
-                      <p className="text-xs text-primary">👕 All wash types included</p>
-                      <p className="text-xs text-primary">🔄 Turnaround: 18-24 hours</p>
-                      <p className="text-xs text-primary">💵 No minimum order</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Express Delivery Box */}
-                <div
-                  onClick={() => setBookingData({ ...bookingData, deliverySpeed: 'express' })}
-                  className={`border-2 rounded-xl p-6 cursor-pointer transition ${
-                    bookingData.deliverySpeed === 'express'
-                      ? 'border-primary bg-mint'
-                      : 'border-gray hover:border-primary bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="font-bold text-dark">Express Delivery</p>
-                      <p className="text-sm text-gray">Same-day delivery (by 7pm)</p>
-                    </div>
-                    <span className="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">$10.00/kg</span>
-                  </div>
-                  {bookingData.deliverySpeed === 'express' && (
-                    <div className="mt-4 pt-4 border-t border-primary space-y-2">
-                      <p className="text-xs text-primary font-semibold">✓ Selected</p>
-                      <p className="text-xs text-primary">⏰ Orders accepted until 12:00pm</p>
-                      <p className="text-xs text-primary">🚚 Guaranteed delivery by 7:00pm same day</p>
-                      <p className="text-xs text-primary">📦 Maximum 25kg per order</p>
-                      <p className="text-xs text-primary">👕 Standard wash only (no dry cleaning)</p>
-                      <p className="text-xs text-primary">🔄 Turnaround: 6-7 hours</p>
-                      <p className="text-xs text-primary">💵 Minimum order: $50</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
-
         {/* STEP 6: Protection Plan */}
         {currentStep === 6 && (
           <div className="max-w-2xl mx-auto">
             <Card className="p-6 mb-8">
               <div className="flex items-center gap-2 mb-2">
                 <h3 className="font-bold text-dark">COVERAGE</h3>
-                <button onClick={() => setShowProtectionPlanInfo(true)} className="text-primary hover:text-primary/80">ℹ️</button>
+                <button onClick={() => setShowProtectionPlanInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
               </div>
               <p className="text-xs text-gray mb-4">Washlee's Protection Plan covers you in the rare instance of damage or loss.</p>
 
@@ -1125,30 +1363,71 @@ export default function BookingHybrid() {
             <Card className="p-8 mb-8">
               <h3 className="font-bold text-dark mb-6">Order Summary</h3>
 
+              {/* Order Details */}
               <div className="space-y-4 border-b border-gray pb-6 mb-6">
                 <div className="flex justify-between">
                   <span className="text-gray">Service:</span>
                   <span className="font-semibold text-dark">{services.find(s => s.id === bookingData.selectedService)?.name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray">Bags:</span>
-                  <span className="font-semibold text-dark">{bookingData.bagCount}</span>
+                  <span className="text-gray">Weight:</span>
+                  <span className="font-semibold text-dark">{getDetailedPricing().weight}kg</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray">Delivery:</span>
                   <span className="font-semibold text-dark">{bookingData.deliverySpeed === 'standard' ? 'Standard' : 'Express'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray">Protection:</span>
-                  <span className="font-semibold text-dark">{protectionPlans.find(p => p.id === bookingData.protectionPlan)?.name}</span>
+                  <span className="text-gray">Protection Plan:</span>
+                  <span className="font-semibold text-dark">{getDetailedPricing().protectionPlanName}</span>
                 </div>
               </div>
 
+              {/* Pricing Breakdown */}
+              <div className="space-y-3 mb-6 pb-6 border-b border-gray">
+                <h4 className="font-semibold text-dark text-sm uppercase tracking-wide">Pricing Breakdown</h4>
+                
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray">{getDetailedPricing().weight}kg @ ${getDetailedPricing().baseRate.toFixed(2)}/kg</span>
+                  <span className="font-medium text-dark">${getDetailedPricing().laundryBase.toFixed(2)}</span>
+                </div>
+
+                {bookingData.hangDry && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray">Hang Dry Service</span>
+                    <span className="font-medium text-dark">${getDetailedPricing().hangDry.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {getDetailedPricing().protectionPlan > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray">{getDetailedPricing().protectionPlanName} Protection</span>
+                    <span className="font-medium text-dark">${getDetailedPricing().protectionPlan.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {bookingData.oversizedItems > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray">Oversized Items ({bookingData.oversizedItems}x)</span>
+                    <span className="font-medium text-dark">${getDetailedPricing().oversizedItems.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {getDetailedPricing().subtotal < 75 && (
+                  <div className="flex justify-between text-xs text-[#6b7b78] bg-[#E8FFFB] p-2 rounded">
+                    <span>Minimum booking amount applied</span>
+                    <span>($75.00)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Total */}
               <div className="mb-6 pt-4 border-t border-gray">
                 <div className="flex justify-between mb-2">
                   <span className="font-bold text-dark">Total:</span>
-                  <span className="text-2xl font-bold text-primary">${calculateTotal().toFixed(2)} (inc. GST)</span>
+                  <span className="text-2xl font-bold text-primary">${calculateTotal().toFixed(2)}</span>
                 </div>
+                <p className="text-xs text-gray">(includes 10% GST)</p>
               </div>
 
               <label className="flex items-start gap-3 mb-6 p-4 border border-gray rounded-lg hover:bg-light transition cursor-pointer">
@@ -1360,10 +1639,6 @@ export default function BookingHybrid() {
                 <p>Enhance your laundry service with premium add-ons:</p>
                 <ul className="list-disc list-inside space-y-2 ml-2">
                   <li><strong>Hang Dry:</strong> Air-dry your clothes instead of machine drying</li>
-                  <li><strong>Delicates Care:</strong> Premium care for silk, satin, and delicate fabrics</li>
-                  <li><strong>Comforter Service:</strong> Specialized cleaning for large bedding items</li>
-                  <li><strong>Stain Treatment:</strong> Expert stain removal service</li>
-                  <li><strong>Ironing:</strong> Professional pressing and folding</li>
                 </ul>
               </div>
               <button
@@ -1389,11 +1664,11 @@ export default function BookingHybrid() {
               <div className="space-y-4 text-sm text-gray mb-6">
                 <p className="font-semibold text-dark">Quick reference:</p>
                 <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>1 bag ≈ 2.5kg (small laundry hamper)</li>
-                  <li>2 bags ≈ 5kg (medium load)</li>
-                  <li>4 bags ≈ 10kg (large load)</li>
+                  <li>1 bag = 10kg (standard load)</li>
+                  <li>2 bags = 20kg (medium load)</li>
+                  <li>3 bags = 30kg (large load)</li>
                 </ul>
-                <p className="text-xs">Pricing: <strong>$5.00/kg</strong> (Standard) or <strong>$10.00/kg</strong> (Express)</p>
+                <p className="text-xs">Pricing: <strong>$7.50/kg</strong> (Standard) or <strong>$12.50/kg</strong> (Express)</p>
               </div>
               <button
                 onClick={() => setShowWeightInfo(false)}
@@ -1416,8 +1691,8 @@ export default function BookingHybrid() {
                 </button>
               </div>
               <div className="space-y-4 text-sm text-gray mb-6">
-                <p><strong className="text-dark">Standard Delivery:</strong> Next-day delivery at $5.00/kg. Perfect for regular weekly laundry.</p>
-                <p><strong className="text-dark">Express Delivery:</strong> Same-day or overnight service at $10.00/kg. Ideal for urgent needs.</p>
+                <p><strong className="text-dark">Standard Delivery:</strong> Next-day delivery at $7.50/kg. Perfect for regular weekly laundry.</p>
+                <p><strong className="text-dark">Express Delivery:</strong> Same-day or overnight service at $12.50/kg. Ideal for urgent needs.</p>
                 <p className="text-xs">Choose based on your schedule and budget.</p>
               </div>
               <button
@@ -1481,7 +1756,7 @@ export default function BookingHybrid() {
                       <li>Choice of detergent & care options</li>
                       <li>Washlee's Protection Plan available</li>
                     </ul>
-                    <p className="text-xs italic">Pricing starts at $5.00/kg for standard service.</p>
+                    <p className="text-xs italic">Pricing starts at $7.50/kg for standard service.</p>
                   </>
                 )}
 
@@ -1501,39 +1776,39 @@ export default function BookingHybrid() {
 
                 {currentStep === 3 && (
                   <>
-                    <p className="font-semibold text-dark">Customize your care:</p>
-                    <p>Select your preferred detergent and add special care options to protect your clothes.</p>
+                    <p className="font-semibold text-dark">Choose your delivery speed:</p>
+                    <p>Select how quickly you need your laundry back. Standard or Express delivery available.</p>
                     <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li>Choose detergent type (scented, hypoallergenic, eco-friendly)</li>
-                      <li>Add special care instructions for delicates</li>
-                      <li>Select premium add-ons (stain treatment, hang dry, etc.)</li>
+                      <li><strong>Standard ($7.50/kg):</strong> Next-day delivery</li>
+                      <li><strong>Express ($12.50/kg):</strong> Same-day delivery available</li>
                     </ul>
-                    <p className="text-xs italic">Washlee treats your clothes with the same care you would at home.</p>
+                    <p className="text-xs italic">Choose the option that works best for your schedule.</p>
                   </>
                 )}
 
                 {currentStep === 4 && (
                   <>
-                    <p className="font-semibold text-dark">Estimate your laundry weight:</p>
-                    <p>Select how many bags or hampers you're sending. We'll charge by actual weight.</p>
+                    <p className="font-semibold text-dark">Customize your laundry care:</p>
+                    <p>Select your preferred detergent, add special care instructions, and choose premium add-ons.</p>
                     <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li>1 bag ≈ 2.5kg (small hamper)</li>
-                      <li>2 bags ≈ 5kg (medium load)</li>
-                      <li>4 bags ≈ 10kg (large load)</li>
+                      <li>Choose detergent type (classic, hypoallergenic, or provide your own)</li>
+                      <li>Add special care instructions for delicates</li>
+                      <li>Select add-ons like hang dry ($16.50)</li>
                     </ul>
-                    <p className="text-xs italic">Price is calculated at $5/kg (Standard) or $10/kg (Express).</p>
+                    <p className="text-xs italic">Washlee treats your clothes with the same care you would at home.</p>
                   </>
                 )}
 
                 {currentStep === 5 && (
                   <>
-                    <p className="font-semibold text-dark">Choose your delivery speed:</p>
-                    <p>Pick the timing that works best for you.</p>
+                    <p className="font-semibold text-dark">Specify your laundry weight:</p>
+                    <p>Tell us how much laundry you're sending. We charge by actual weight (minimum 10kg).</p>
                     <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li><strong>Standard:</strong> Next-day delivery at $5.00/kg</li>
-                      <li><strong>Express:</strong> Same-day/overnight at $10.00/kg</li>
+                      <li>Use the slider for quick selection (10-45kg)</li>
+                      <li>Or enter a custom weight in the text box</li>
+                      <li>We calculate 10kg per bag for reference</li>
                     </ul>
-                    <p className="text-xs italic">Express orders are delivered by 8pm the next day.</p>
+                    <p className="text-xs italic">Your final price will be based on actual weight measured at our facility.</p>
                   </>
                 )}
 
@@ -1580,7 +1855,7 @@ export default function BookingHybrid() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-dark">⚡ Quick Reorder</h3>
+                <h3 className="text-xl font-bold text-dark flex items-center gap-2"><Zap size={20} className="text-orange-500" /> Quick Reorder</h3>
                 <button onClick={() => setShowPresetsModal(false)} className="text-gray hover:text-dark">
                   <X size={24} />
                 </button>
@@ -1647,7 +1922,7 @@ export default function BookingHybrid() {
               )}
             </Button>
           ) : currentStep === 7 ? (
-            // Step 7: Back and Confirm & Pay button
+            // Step 6: Back and Confirm & Pay button
             <div className="flex gap-4">
               <button
                 onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
@@ -1702,6 +1977,56 @@ export default function BookingHybrid() {
             </div>
           )}
         </div>
+
+        {/* Express Delivery Warning Modal */}
+        {showExpressWarning && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-dark flex items-center gap-2"><Zap size={24} className="text-orange-500" /> Express Delivery</h3>
+                <button onClick={() => setShowExpressWarning(false)} className="text-gray hover:text-dark">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="space-y-4 mb-8">
+                <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded">
+                  <p className="font-semibold text-orange-900 mb-3 flex items-center gap-2"><AlertTriangle size={18} className="text-orange-600" /> Please Note:</p>
+                  <ul className="space-y-2 text-sm text-orange-800">
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-600 font-bold mt-0.5">•</span>
+                      <span><strong>Weight Limit:</strong> Maximum 25kg per order</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-600 font-bold mt-0.5">•</span>
+                      <span><strong>Pickup Time:</strong> You'll need to set up a specific pickup time after the order is completed and a team member is assigned</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-600 font-bold mt-0.5">•</span>
+                      <span><strong>Standard Wash Only:</strong> No dry cleaning or special treatments available for express service</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowExpressWarning(false)}
+                  className="flex-1 py-2 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExpressWarning(false)
+                    setCurrentStep(currentStep + 1)
+                  }}
+                  className="flex-1 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition"
+                >
+                  Understand & Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       <Footer />

@@ -26,6 +26,32 @@ function LoginContent() {
   const [successMessage, setSuccessMessage] = useState('')
   const [resetSuccessMessage, setResetSuccessMessage] = useState('')
   const [emailNotConfirmedError, setEmailNotConfirmedError] = useState('')
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          console.log('[Login] User already authenticated, redirecting to dashboard')
+          // User is already logged in, redirect to dashboard
+          if (redirectTo) {
+            router.push(redirectTo)
+          } else {
+            router.push('/dashboard')
+          }
+          return
+        }
+      } catch (error) {
+        console.error('[Login] Error checking auth:', error)
+      } finally {
+        setIsCheckingAuth(false)
+      }
+    }
+    
+    checkAuth()
+  }, [router, redirectTo])
 
   // Load remember me credentials on mount
   useEffect(() => {
@@ -104,6 +130,17 @@ function LoginContent() {
           status: error.status,
           type: error.name
         })
+        
+        // Check if error is due to email not confirmed
+        if (error.message && error.message.includes('Email not confirmed')) {
+          console.log('[Login] Email not confirmed:', email)
+          // Store email for the code verification page
+          localStorage.setItem('pendingVerificationEmail', email)
+          setEmailNotConfirmedError(email)
+          setIsLoading(false)
+          return
+        }
+        
         throw error
       }
 
@@ -121,7 +158,7 @@ function LoginContent() {
       // Check if user needs phone verification
       const { data: userData } = await supabase
         .from('users')
-        .select('phone_verified, phone')
+        .select('phone_verified, phone, user_type')
         .eq('id', data.user.id)
         .single()
 
@@ -138,8 +175,8 @@ function LoginContent() {
         localStorage.removeItem('rememberMeExpiry')
       }
 
-      // Check if phone verification is needed
-      if (userData && !userData.phone_verified) {
+      // Check if phone verification is needed (only for non-customer accounts like pro/employee)
+      if (userData && !userData.phone_verified && userData.user_type !== 'customer') {
         console.log('[Login] Phone verification needed for:', email)
         setTimeout(() => {
           router.push(`/auth/phone-verification?email=${encodeURIComponent(email)}`)
@@ -149,7 +186,8 @@ function LoginContent() {
           if (redirectTo) {
             router.push(redirectTo)
           } else {
-            router.push('/')
+            // Redirect to dashboard for customers by default
+            router.push('/dashboard')
           }
         }, 1500)
       }
@@ -229,65 +267,50 @@ function LoginContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
-      <button
-        onClick={() => router.back()}
-        className="absolute top-6 left-6 p-2 hover:bg-white rounded-full transition"
-        title="Go back"
-      >
-        <ArrowLeft size={24} className="text-primary" />
-      </button>
-      <Link href="/" className="absolute top-6 right-6 px-4 py-2 bg-white text-primary rounded-full font-semibold hover:shadow-lg transition">
-        Home
-      </Link>
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-8">
-            <Image
-              src="/logo-washlee.png"
-              alt="Washlee Logo"
-              width={48}
-              height={48}
-              className="rounded-full"
-            />
-            <span className="font-bold text-2xl text-dark">Washlee</span>
-          </Link>
-          <h1 className="text-3xl font-bold text-dark">Sign In</h1>
-          <p className="text-gray mt-2">Welcome back! Let's get your laundry done.</p>
+      {/* Show loading state while checking authentication */}
+      {isCheckingAuth && (
+        <div className="flex flex-col items-center justify-center gap-4">
+          <Spinner />
+          <p className="text-gray font-semibold">Checking your login status...</p>
         </div>
+      )}
+      
+      {!isCheckingAuth && (
+        <>
+          <button
+            onClick={() => router.back()}
+            className="absolute top-6 left-6 p-2 hover:bg-white rounded-full transition"
+            title="Go back"
+          >
+            <ArrowLeft size={24} className="text-primary" />
+          </button>
+          <Link href="/" className="absolute top-6 right-6 px-4 py-2 bg-white text-primary rounded-full font-semibold hover:shadow-lg transition">
+            Home
+          </Link>
+          <div className="w-full max-w-md">
+            {/* Logo */}
+            <div className="text-center mb-8">
+              <Link href="/" className="inline-flex items-center gap-2 mb-8">
+                <Image
+                  src="/logo-washlee.png"
+                  alt="Washlee Logo"
+                  width={48}
+                  height={48}
+                  className="rounded-full object-cover"
+                  priority
+                />
+                <span className="font-bold text-2xl text-dark">Washlee</span>
+              </Link>
+              <h1 className="text-3xl font-bold text-dark">Sign In</h1>
+              <p className="text-gray mt-2">Welcome back! Let's get your laundry done.</p>
+            </div>
 
-        {/* Form */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+            {/* Form */}
+            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
           {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
               {error}
-            </div>
-          )}
-
-          {/* Email Not Confirmed Message */}
-          {emailNotConfirmedError && (
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 px-4 py-4 rounded-lg mb-6">
-              <p className="font-semibold mb-3">📧 Email Not Confirmed</p>
-              <p className="text-sm mb-4">Your email address hasn't been verified yet. We've sent you a confirmation email at <span className="font-semibold">{emailNotConfirmedError}</span></p>
-              <p className="text-sm mb-4">Check your inbox for the confirmation link, or <button
-                type="button"
-                onClick={handleResendConfirmationEmail}
-                className="text-primary font-semibold underline hover:opacity-75 transition"
-              >
-                click here to resend the email
-              </button>.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmailNotConfirmedError('')
-                  setEmail('')
-                  setPassword('')
-                }}
-                className="px-4 py-2 border border-yellow-200 text-yellow-900 rounded-lg font-semibold hover:bg-yellow-100 transition text-sm"
-              >
-                Back
-              </button>
             </div>
           )}
 
@@ -298,7 +321,7 @@ function LoginContent() {
             </div>
           )}
 
-          {/* Forgot Password Section */}
+          {/* Forgot Password / Login / Email Not Confirmed Section */}
           {successMessage ? (
             <div className="text-center py-8">
               <div className="flex justify-center mb-4">
@@ -306,8 +329,50 @@ function LoginContent() {
               </div>
             </div>
           ) : emailNotConfirmedError ? (
-            // Don't show login form when email is not confirmed
-            null
+            // Email Not Confirmed Message
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 px-4 py-4 rounded-lg">
+              <p className="font-semibold mb-3">📧 Email Not Confirmed</p>
+              <p className="text-sm mb-4">Your email address hasn't been verified yet. We sent a <strong>verification code</strong> to:</p>
+              <p className="font-mono bg-white border border-yellow-300 px-3 py-2 rounded text-center font-semibold text-sm mb-4">{emailNotConfirmedError}</p>
+              <p className="text-sm mb-4">
+                <strong>Next Steps:</strong>
+              </p>
+              <ol className="text-sm mb-6 ml-4 list-decimal space-y-1">
+                <li>Check your inbox for the email with the verification code</li>
+                <li>Copy the code (it looks like: Q7ZGM2)</li>
+                <li>Click the button below to enter your code</li>
+                <li>Complete your profile setup 🎉</li>
+              </ol>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(`/auth/verify-email-code?email=${encodeURIComponent(emailNotConfirmedError)}`)
+                }}
+                className="w-full px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:opacity-90 transition mb-3"
+              >
+                Verify with Code
+              </button>
+
+              <p className="text-sm mb-3 border-t border-yellow-300 pt-3">Didn't receive the email? <button
+                type="button"
+                onClick={handleResendConfirmationEmail}
+                className="text-primary font-semibold underline hover:opacity-75 transition"
+              >
+                Click here to resend it
+              </button>.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailNotConfirmedError('')
+                  setEmail('')
+                  setPassword('')
+                }}
+                className="w-full px-4 py-2 border border-yellow-200 text-yellow-900 rounded-lg font-semibold hover:bg-yellow-100 transition text-sm"
+              >
+                Try Another Email
+              </button>
+            </div>
           ) : showForgotPassword ? (
             <form onSubmit={handlePasswordReset} className="space-y-4">
               {/* Reset Success Message */}
@@ -488,7 +553,9 @@ function LoginContent() {
             Sign up for free
           </Link>
         </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

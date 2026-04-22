@@ -3,8 +3,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { useState } from 'react'
-import { Menu, X, ArrowLeft, LogOut, User, Droplets, Shield, Briefcase, Settings, ChevronDown, Home, Package, DollarSign, AlertCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Menu, X, ArrowLeft, LogOut, User, Droplets, Shield, Briefcase, Settings, ChevronDown, Home, Package, DollarSign, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { createClient } from '@supabase/supabase-js'
 
@@ -13,14 +13,79 @@ export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showRoleSwitch, setShowRoleSwitch] = useState(false)
   const [showProModal, setShowProModal] = useState(false)
+  const [showPendingModal, setShowPendingModal] = useState(false)
+  const [proInquiryStatus, setProInquiryStatus] = useState<'pending' | 'approved' | null>(null)
+  const [proInquiryLoading, setProInquiryLoading] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const { user, userData, isAuthenticated, loading } = useAuth()
+
+  // Fetch pro inquiry status for user
+  useEffect(() => {
+    if (isAuthenticated && user?.id && !loading) {
+      const fetchProInquiryStatus = async () => {
+        try {
+          setProInquiryLoading(true)
+          
+          console.log('[Header] Fetching pro inquiry for user:', user.id)
+          
+          // Use API endpoint to fetch pro inquiry status (API uses service role)
+          const response = await fetch('/api/auth/check-pro-inquiry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+          })
+
+          if (!response.ok) {
+            throw new Error(`API error: ${response.statusText}`)
+          }
+
+          const data = await response.json()
+          
+          console.log('[Header] Pro inquiry API result:', data)
+          
+          if (data.proInquiry) {
+            console.log('[Header] Pro inquiry status found:', data.proInquiry.status)
+            setProInquiryStatus(data.proInquiry.status as 'pending' | 'approved')
+          } else {
+            console.log('[Header] No pro inquiry found for user')
+          }
+        } catch (err) {
+          console.error('[Header] Error fetching pro inquiry status:', err)
+        } finally {
+          setProInquiryLoading(false)
+        }
+      }
+
+      fetchProInquiryStatus()
+    }
+  }, [isAuthenticated, user?.id, loading])
+
+  // Log role switch state for debugging
+  useEffect(() => {
+    if (showRoleSwitch) {
+      console.log('[Header] Role switch logic:', {
+        isEmployee: userData?.is_employee,
+        userType: userData?.user_type,
+        proStatus: proInquiryStatus
+      })
+    }
+  }, [showRoleSwitch, userData?.is_employee, userData?.user_type, proInquiryStatus])
   
-  // Show back button if not on homepage
+  // Show back button if not on homepage, auth page, or specific excluded pages
   const isHomepage = pathname === '/'
   const isAuthPage = pathname.includes('/auth/')
-  const showBackButton = !isHomepage && !isAuthPage
+  const pagesWithoutBackButton = [
+    '/how-it-works',
+    '/pricing',
+    '/subscriptions',
+    '/wholesale',
+    '/faq',
+    '/wash-club',
+    '/pro',
+  ]
+  const isPageWithoutBackButton = pagesWithoutBackButton.some(page => pathname.startsWith(page))
+  const showBackButton = !isHomepage && !isAuthPage && !isPageWithoutBackButton
   
   // Handle back button click - try browser back first, fallback to home
   const handleBackClick = () => {
@@ -93,29 +158,29 @@ export default function Header() {
           </div>
 
           {/* Desktop Menu */}
-          <div className="hidden md:flex items-center gap-0 flex-1 justify-center">
-            <Link href="/" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
+          <div className="hidden md:flex items-center gap-1 flex-1 justify-center">
+            <Link href="/" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Home
             </Link>
-            <Link href="/how-it-works" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
+            <Link href="/how-it-works" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               How It Works
             </Link>
-            <Link href="/pricing" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
+            <Link href="/pricing" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Pricing
             </Link>
-            <Link href="/subscriptions" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
+            <Link href="/subscriptions" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Plans
             </Link>
-            <Link href="/wholesale" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
+            <Link href="/wholesale" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Wholesale
             </Link>
-            <Link href="/faq" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
+            <Link href="/faq" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               FAQ
             </Link>
-            <Link href="/wash-club" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
+            <Link href="/wash-club" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               WASH Club
             </Link>
-            <Link href="/pro" className="px-3 py-2 text-base lg:text-lg text-primary hover:bg-mint rounded-full transition font-semibold">
+            <Link href="/pro" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Pro
             </Link>
           </div>
@@ -148,16 +213,26 @@ export default function Header() {
                   {showUserMenu && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl z-50 overflow-hidden border-2 border-primary">
                       <div className="p-4 bg-mint border-b-2 border-primary">
-                        <p className="font-bold text-dark text-base">{userData?.name || 'User'}</p>
+                        <p className="font-bold text-dark text-base">
+                          {userData?.first_name && userData?.last_name 
+                            ? `${userData.first_name} ${userData.last_name}` 
+                            : userData?.name || userData?.email?.split('@')[0] || 'User'}
+                        </p>
                         <p className="text-xs text-gray mt-1">{userData?.email || ''}</p>
+                        {proInquiryStatus === 'pending' && (
+                          <div className="flex items-center gap-1 mt-2 text-yellow-600 bg-yellow-50 px-2 py-1 rounded text-xs font-semibold">
+                            <Clock size={12} />
+                            Application Pending
+                          </div>
+                        )}
                       </div>
                       <Link
                         href="/dashboard"
                         className="block w-full px-4 py-3 text-dark hover:bg-mint transition font-semibold border-b border-gray/20 flex items-center gap-2"
                         onClick={() => setShowUserMenu(false)}
                       >
-                        <Droplets size={18} className="text-primary" />
-                        Dashboard
+                        <Package size={18} className="text-primary" />
+                        My Dashboard
                       </Link>
                       <div className="relative border-b border-gray/20">
                         <button
@@ -179,7 +254,20 @@ export default function Header() {
                                 Employee Dashboard
                               </button>
                             )}
-                            {userData?.user_type === 'pro' && (
+                            {proInquiryStatus === 'pending' && userData?.is_employee && (
+                              <button
+                                onClick={() => {
+                                  setShowRoleSwitch(false)
+                                  setShowUserMenu(false)
+                                  setShowPendingModal(true)
+                                }}
+                                className="w-full px-4 py-2 text-dark hover:bg-mint transition text-sm text-left flex items-center gap-2 border-b border-gray/20"
+                              >
+                                <Clock size={16} className="text-yellow-600" />
+                                Pro Dashboard
+                              </button>
+                            )}
+                            {userData?.user_type === 'pro' && proInquiryStatus === 'approved' && (
                               <button
                                 onClick={switchToProMode}
                                 className="w-full px-4 py-2 text-dark hover:bg-mint transition text-sm text-left flex items-center gap-2 border-b border-gray/20"
@@ -188,7 +276,29 @@ export default function Header() {
                                 Pro Dashboard
                               </button>
                             )}
-                            {userData?.user_type !== 'pro' && !userData?.is_employee && (
+                            {proInquiryStatus === 'approved' && userData?.user_type !== 'pro' && (
+                              <button
+                                onClick={switchToProMode}
+                                className="w-full px-4 py-2 text-dark hover:bg-mint transition text-sm text-left flex items-center gap-2 border-b border-gray/20"
+                              >
+                                <Briefcase size={16} className="text-primary" />
+                                Pro Dashboard (Approved)
+                              </button>
+                            )}
+                            {userData?.user_type !== 'pro' && !userData?.is_employee && proInquiryStatus === 'pending' && (
+                              <button
+                                onClick={() => {
+                                  setShowRoleSwitch(false)
+                                  setShowUserMenu(false)
+                                  setShowPendingModal(true)
+                                }}
+                                className="w-full px-4 py-2 text-dark hover:bg-mint transition text-sm text-left flex items-center gap-2 border-b border-gray/20"
+                              >
+                                <Clock size={16} className="text-yellow-600" />
+                                Pro Dashboard (Pending)
+                              </button>
+                            )}
+                            {userData?.user_type !== 'pro' && !userData?.is_employee && (!proInquiryStatus || proInquiryStatus !== 'pending' && proInquiryStatus !== 'approved') && (
                               <button
                                 onClick={() => {
                                   setShowRoleSwitch(false)
@@ -320,7 +430,7 @@ export default function Header() {
                     Employee Dashboard
                   </button>
                 )}
-                {userData?.user_type === 'pro' && (
+                {userData?.user_type === 'pro' && proInquiryStatus === 'approved' && (
                   <button
                     onClick={() => {
                       switchToProMode()
@@ -330,6 +440,18 @@ export default function Header() {
                   >
                     <Briefcase size={18} className="text-primary" />
                     Pro Dashboard
+                  </button>
+                )}
+                {proInquiryStatus === 'pending' && userData?.is_employee && (
+                  <button
+                    onClick={() => {
+                      setIsOpen(false)
+                      setShowPendingModal(true)
+                    }}
+                    className="w-full block px-4 py-3 text-dark bg-yellow-50 hover:bg-yellow-100 rounded-full transition font-semibold border-2 border-yellow-300 flex items-center gap-2 text-base"
+                  >
+                    <Clock size={18} className="text-yellow-600" />
+                    Pro Dashboard (Pending)
                   </button>
                 )}
                 {userData?.is_admin && (
@@ -406,6 +528,51 @@ export default function Header() {
                 className="flex-1 px-4 py-3 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold"
               >
                 Learn More
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Application Modal */}
+      {showPendingModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[999] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <Clock size={24} className="text-yellow-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-dark">Application Pending</h2>
+            </div>
+            
+            <p className="text-gray mb-6">
+              While waiting for approval of your Washlee Pro application, enjoy our Pro help center for more additional information about being a Pro and being the best!
+            </p>
+            
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-yellow-900 font-semibold mb-2">In the meantime:</p>
+              <ul className="text-sm text-yellow-900 space-y-1">
+                <li>✓ Learn about Pro features & benefits</li>
+                <li>✓ Explore earning opportunities</li>
+                <li>✓ Get ready to accept your first jobs</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPendingModal(false)}
+                className="flex-1 px-4 py-3 bg-gray/20 text-dark rounded-lg hover:bg-gray/30 transition font-semibold"
+              >
+                I'll Wait
+              </button>
+              <button
+                onClick={() => {
+                  setShowPendingModal(false)
+                  router.push('/pro-support/help-center')
+                }}
+                className="flex-1 px-4 py-3 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold"
+              >
+                I'm Interested
               </button>
             </div>
           </div>

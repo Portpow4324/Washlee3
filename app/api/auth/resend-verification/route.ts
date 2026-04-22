@@ -20,6 +20,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Resolve user_id for the provided email so the verification_codes table is consistent
+    const { data: users, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .limit(1)
+
+    if (userError || !users || users.length === 0) {
+      console.warn('[ResendVerification] User lookup failed:', userError?.message)
+      return NextResponse.json({ error: 'Email not found' }, { status: 404 })
+    }
+
+    const userId = users[0].id
+
     // Generate new verification code
     const verificationCode = Math.random().toString(36).substring(2, 8).toUpperCase()
     console.log('[ResendVerification] Generated new verification code:', verificationCode)
@@ -28,8 +42,9 @@ export async function POST(request: NextRequest) {
     console.log('[ResendVerification] Marking old codes as used...')
     const { error: markError } = await supabase
       .from('verification_codes')
-      .update({ used: true })
-      .eq('email', email)
+      .update({ used: true, verified: false, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('type', 'email')
       .eq('used', false)
     
     if (markError) {
@@ -41,10 +56,12 @@ export async function POST(request: NextRequest) {
     const { error: codeError } = await supabase
       .from('verification_codes')
       .insert({
-        email,
+        user_id: userId,
+        type: 'email',
         code: verificationCode,
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        used: false
+        used: false,
+        verified: false,
       })
     
     if (codeError) {
@@ -52,6 +69,21 @@ export async function POST(request: NextRequest) {
       // Continue anyway - code is generated, just not stored
     } else {
       console.log('[ResendVerification] ✓ Verification code stored')
+    }
+
+    // Record / refresh email confirmation metadata for admin and status checks
+    const { error: emailConfirmError } = await supabase
+      .from('email_confirmations')
+      .upsert({
+        user_id: userId,
+        email,
+        code: verificationCode,
+        is_confirmed: false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+
+    if (emailConfirmError) {
+      console.warn('[ResendVerification] Failed to upsert email_confirmations:', emailConfirmError.message)
     }
 
     // Get email template

@@ -16,7 +16,8 @@ export default function Footer() {
               alt="Washlee Logo"
               width={80}
               height={80}
-              className="rounded-full mb-2"
+              className="rounded-full mb-2 object-cover"
+              priority
             />
             <h3 className="font-bold text-lg mb-4">Washlee</h3>
             <p className="text-gray text-sm">

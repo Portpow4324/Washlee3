@@ -79,14 +79,14 @@ export async function getCustomerPresets(customerId: string): Promise<BookingPre
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('[Presets] Error fetching presets:', error)
-      // Table might not exist yet
+      // Table might not exist yet or permission denied - silently fail for graceful fallback
+      console.debug('[Presets] Could not fetch presets (table may not exist yet)')
       return []
     }
 
     return data || []
   } catch (err) {
-    console.error('[Presets] Error in getCustomerPresets:', err)
+    // Silently handle errors - feature is optional
     return []
   }
 }

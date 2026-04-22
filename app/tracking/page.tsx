@@ -7,6 +7,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import LiveTracking from '@/components/LiveTracking'
 import Spinner from '@/components/Spinner'
+import { MapPin, Navigation } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
 interface Order {
@@ -16,6 +17,7 @@ interface Order {
   pro_name?: string
   pro_phone?: string
   pro_rating?: number
+  pro_service_area?: string
   pickup_address?: string
   delivery_address?: string
   weight?: number
@@ -46,43 +48,125 @@ function TrackingPageContent() {
         setLoading(true)
         console.log('[Tracking] Fetching order:', orderId)
 
-        const { data, error: fetchError } = await supabase
+        // First try with full columns
+        let { data, error: fetchError } = await supabase
           .from('orders')
           .select(`
             id,
             status,
-            users(name),
-            employees(name, phone, rating),
+            user_id,
+            pro_id,
             delivery_address,
             pickup_address,
-            weight,
             scheduled_pickup_date
           `)
           .eq('id', orderId)
           .single()
 
+        // Fallback if columns don't exist
+        if (fetchError && fetchError.message?.includes('column')) {
+          console.warn('[Tracking] Some columns missing, trying basic select:', fetchError.message)
+          const basicResult = await supabase
+            .from('orders')
+            .select(`
+              id,
+              status,
+              user_id,
+              pro_id
+            `)
+            .eq('id', orderId)
+            .single()
+          
+          data = basicResult.data
+          fetchError = basicResult.error
+        }
+
         if (fetchError) {
           console.error('[Tracking] Error fetching order:', fetchError)
-          setError('Order not found')
+          setError('Order not found - ' + (fetchError?.message || 'Unknown error'))
           setLoading(false)
           return
         }
 
-        // Transform Supabase array responses to single objects
-        const userData = Array.isArray(data.users) && data.users.length > 0 ? data.users[0] : null
-        const employeeData = Array.isArray(data.employees) && data.employees.length > 0 ? data.employees[0] : null
+        // Fetch customer name
+        let customerName = 'Customer'
+        if (data.user_id) {
+          try {
+            console.log('[Tracking] Fetching customer for user_id:', data.user_id)
+            // Use maybeSingle() to return null instead of error when no rows found
+            const { data: customerData, error: customerError } = await supabase
+              .from('users')
+              .select('name, phone')
+              .eq('id', data.user_id)
+              .maybeSingle()
+            if (customerError) {
+              console.warn('[Tracking] ⚠️ Error fetching customer:', customerError.code, customerError.message, 'for user_id:', data.user_id)
+            }
+            if (customerData && !customerError) {
+              customerName = customerData.name || 'Customer'
+              console.log('[Tracking] ✅ Got customer name:', customerName)
+            } else if (!customerError) {
+              console.warn('[Tracking] ⚠️ No customer profile found for user_id:', data.user_id, '- profile may not have been created')
+            }
+          } catch (err) {
+            console.warn('[Tracking] ⚠️ Exception fetching customer name:', err)
+          }
+        } else {
+          console.warn('[Tracking] ⚠️ Order has NO user_id')
+        }
+
+        // Fetch pro details if assigned
+        let proName: string | undefined
+        let proPhone: string | undefined
+        let proServiceArea: string | undefined
+        if (data.pro_id) {
+          try {
+            // Use maybeSingle() to handle missing pro profile gracefully
+            const { data: proData, error: proError } = await supabase
+              .from('users')
+              .select('name, phone')
+              .eq('id', data.pro_id)
+              .maybeSingle()
+            if (proData && !proError) {
+              proName = proData.name || 'Pro'
+              proPhone = proData.phone
+              console.log('[Tracking] ✅ Got pro name:', proName)
+            } else if (!proError) {
+              console.warn('[Tracking] ⚠️ No pro profile found for pro_id:', data.pro_id)
+            }
+          } catch (err) {
+            console.warn('[Tracking] ⚠️ Could not fetch pro name:', err)
+          }
+          
+          // Get service area from pro_inquiries
+          try {
+            const { data: proInquiry, error: inquiryError } = await supabase
+              .from('pro_inquiries')
+              .select('service_area')
+              .eq('user_id', data.pro_id)
+              .maybeSingle()
+            if (proInquiry && !inquiryError && proInquiry.service_area) {
+              proServiceArea = proInquiry.service_area
+              console.log('[Tracking] ✅ Got pro service area:', proServiceArea)
+            } else if (!inquiryError) {
+              console.warn('[Tracking] ⚠️ No pro inquiry found for pro_id:', data.pro_id)
+            }
+          } catch (err) {
+            console.warn('[Tracking] ⚠️ Could not fetch pro service area:', err)
+          }
+        }
 
         const transformedOrder: Order = {
           id: data.id,
           status: data.status,
-          customer_name: userData?.name || 'Unknown',
-          pro_name: employeeData?.name,
-          pro_phone: employeeData?.phone,
-          pro_rating: employeeData?.rating,
-          pickup_address: data.pickup_address,
-          delivery_address: data.delivery_address,
-          weight: data.weight,
-          scheduled_pickup_date: data.scheduled_pickup_date
+          customer_name: customerName,
+          pro_name: proName,
+          pro_phone: proPhone,
+          pro_service_area: proServiceArea,
+          pickup_address: data.pickup_address || undefined,
+          delivery_address: data.delivery_address || undefined,
+          weight: data.weight || undefined,
+          scheduled_pickup_date: data.scheduled_pickup_date || undefined
         }
 
         setOrder(transformedOrder)
@@ -214,24 +298,72 @@ function TrackingPageContent() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main tracking map */}
             <div className="lg:col-span-2">
-              <LiveTracking
-                orderId={orderId || ''}
-                proLocation={proLocation}
-                customerLocation={customerLocation}
-                orderStatus={order?.status}
-              />
+              {order?.status === 'cancelled' ? (
+                <div className="bg-white rounded-lg p-12 border border-red-200 text-center">
+                  <div className="text-5xl mb-4">❌</div>
+                  <h2 className="text-2xl font-bold text-red-700 mb-2">Order Cancelled</h2>
+                  <p className="text-gray mb-6">This order is no longer active and will be removed from your dashboard in 24 hours.</p>
+                  <div className="bg-red-50 rounded-lg p-6 text-left max-w-sm mx-auto">
+                    <p className="text-sm font-semibold text-red-700 mb-3">What happens next:</p>
+                    <ul className="text-sm text-gray space-y-2">
+                      <li>✓ Cancellation confirmation sent to your email</li>
+                      <li>✓ Refund will be processed within 24 hours</li>
+                      <li>✓ Order will be removed from dashboard in 24 hours</li>
+                      <li>✓ You can request details via support@washlee.com.au</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <LiveTracking
+                  orderId={orderId || ''}
+                  proLocation={proLocation}
+                  customerLocation={customerLocation}
+                  orderStatus={order?.status}
+                />
+              )}
             </div>
 
             {/* Order Details Sidebar */}
             <div className="space-y-6">
+              {/* Cancelled Order Alert */}
+              {order?.status === 'cancelled' && (
+                <div className="bg-red-50 rounded-lg p-6 border border-red-200">
+                  <div className="flex gap-3">
+                    <div className="text-2xl">⚠️</div>
+                    <div>
+                      <h3 className="font-bold text-red-700 mb-2">Order Cancelled</h3>
+                      <p className="text-sm text-red-600 mb-3">
+                        This order has been cancelled. It will be automatically removed from your dashboard in 24 hours.
+                      </p>
+                      <div className="bg-white rounded px-3 py-2 text-xs text-gray">
+                        <p className="font-semibold text-dark mb-1">Next Steps:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                          <li>Check your email for cancellation confirmation</li>
+                          <li>Refund will be processed within 24 hours</li>
+                          <li>Contact support@washlee.com.au for questions</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Order Summary */}
               <div className="bg-white rounded-lg p-6 border border-gray/10">
                 <h3 className="font-bold text-dark mb-4">Order Details</h3>
                 <div className="space-y-3">
                   <div>
                     <p className="text-xs text-gray uppercase mb-1">Status</p>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${
+                      order?.status === 'cancelled' 
+                        ? 'bg-red-100 text-red-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${
+                        order?.status === 'cancelled' 
+                          ? 'bg-red-500' 
+                          : 'bg-blue-500 animate-pulse'
+                      }`} />
                       {order?.status?.replace(/-/g, ' ')}
                     </div>
                   </div>
@@ -260,15 +392,40 @@ function TrackingPageContent() {
                 <h3 className="font-bold text-dark mb-4">Addresses</h3>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs text-gray uppercase mb-1">📍 Pickup</p>
+                    <p className="text-xs text-gray uppercase mb-1 flex items-center gap-1"><MapPin size={14} /> Pickup</p>
                     <p className="text-sm text-dark">{order?.pickup_address || 'Not provided'}</p>
                   </div>
                   <div className="border-t border-gray/10 pt-4">
-                    <p className="text-xs text-gray uppercase mb-1">🎯 Delivery</p>
+                    <p className="text-xs text-gray uppercase mb-1 flex items-center gap-1"><Navigation size={14} /> Delivery</p>
                     <p className="text-sm text-dark">{order?.delivery_address || 'Not provided'}</p>
                   </div>
                 </div>
               </div>
+
+              {/* Pro Information */}
+              {order?.pro_name && (
+                <div className="bg-white rounded-lg p-6 border border-gray/10">
+                  <h3 className="font-bold text-dark mb-4">Your Washlee Pro</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-gray uppercase mb-1">Name</p>
+                      <p className="font-semibold text-dark">{order.pro_name}</p>
+                    </div>
+                    {order.pro_phone && (
+                      <div>
+                        <p className="text-xs text-gray uppercase mb-1">Contact</p>
+                        <p className="font-semibold text-dark">{order.pro_phone}</p>
+                      </div>
+                    )}
+                    {order.pro_service_area && (
+                      <div>
+                        <p className="text-xs text-gray uppercase mb-1">Service Area</p>
+                        <p className="font-semibold text-dark">{order.pro_service_area}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Support */}
               <div className="bg-mint rounded-lg p-6">

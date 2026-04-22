@@ -3,17 +3,33 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
-import EmployeeHeader from '@/components/EmployeeHeader'
 import Footer from '@/components/Footer'
-import { DollarSign, TrendingUp, Calendar, CreditCard, ArrowUp, ArrowDown, Download } from 'lucide-react'
+import { DollarSign, TrendingUp, Calendar, CreditCard, Download } from 'lucide-react'
+
+interface ProEarningsRecord {
+  id: string
+  pro_id: string
+  order_id: string
+  earnings_amount: number
+  status: string
+  created_at: string
+  order?: {
+    id: string
+    total_price: number
+    created_at: string
+  }
+}
 
 export default function EmployeeEarnings() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
   const [timeframe, setTimeframe] = useState('week')
+  const [earnings, setEarnings] = useState<ProEarningsRecord[]>([])
+  const [earningsLoading, setEarningsLoading] = useState(true)
 
   useEffect(() => {
     if (hasCheckedAuth) return
@@ -25,6 +41,34 @@ export default function EmployeeEarnings() {
       router.push('/auth/employee-signin')
     }
   }, [user, loading, router, hasCheckedAuth])
+
+  // Fetch real earnings data
+  useEffect(() => {
+    if (!user?.id) return
+
+    const fetchEarnings = async () => {
+      try {
+        setEarningsLoading(true)
+        const { data, error } = await supabase
+          .from('pro_earnings')
+          .select('*, orders(id, total_price, created_at)')
+          .eq('pro_id', user.id)
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('Error fetching earnings:', error)
+        } else {
+          setEarnings(data || [])
+        }
+      } catch (err) {
+        console.error('Error:', err)
+      } finally {
+        setEarningsLoading(false)
+      }
+    }
+
+    fetchEarnings()
+  }, [user?.id])
 
   if (loading || !hasCheckedAuth) {
     return (
@@ -39,47 +83,47 @@ export default function EmployeeEarnings() {
 
   if (!user) return null
 
-  // Mock earnings data
-  const earningsData = {
-    week: {
-      total: '$486.50',
-      orders: 12,
-      jobs: 3,
-      pending: '$156.00',
-      paid: '$330.50'
-    },
-    month: {
-      total: '$2,145.75',
-      orders: 52,
-      jobs: 8,
-      pending: '$245.00',
-      paid: '$1,900.75'
-    },
-    all: {
-      total: '$8,932.25',
-      orders: 189,
-      jobs: 42,
-      pending: '$456.00',
-      paid: '$8,476.25'
+  // Calculate earnings by timeframe
+  const now = new Date()
+  const getEarningsForTimeframe = (tf: string) => {
+    let startDate = new Date()
+    
+    if (tf === 'week') {
+      startDate.setDate(now.getDate() - 7)
+    } else if (tf === 'month') {
+      startDate.setMonth(now.getMonth() - 1)
+    } else {
+      startDate = new Date(0)
+    }
+
+    const filtered = earnings.filter(e => new Date(e.created_at) >= startDate)
+    const total = filtered.reduce((sum, e) => sum + (e.earnings_amount || 0), 0)
+    const pending = filtered.filter(e => e.status === 'pending').reduce((sum, e) => sum + (e.earnings_amount || 0), 0)
+    const paid = filtered.filter(e => e.status === 'completed').reduce((sum, e) => sum + (e.earnings_amount || 0), 0)
+
+    return {
+      total: total.toFixed(2),
+      orders: filtered.length,
+      pending: pending.toFixed(2),
+      paid: paid.toFixed(2)
     }
   }
 
-  const currentData = earningsData[timeframe as keyof typeof earningsData]
+  const currentData = getEarningsForTimeframe(timeframe)
 
-  const transactions = [
-    { id: 'TXN-001', date: 'Today', description: 'Order ORD-1001 (Sarah Mitchell)', amount: '+$18.00', type: 'credit', status: 'pending' },
-    { id: 'TXN-002', date: 'Today', description: 'Order ORD-1002 (John Davis)', amount: '+$24.00', type: 'credit', status: 'pending' },
-    { id: 'TXN-003', date: 'Mar 11', description: 'Payout - Direct Deposit', amount: '+$500.00', type: 'payout', status: 'completed' },
-    { id: 'TXN-004', date: 'Mar 10', description: 'Order ORD-998 (Emma Johnson)', amount: '+$15.00', type: 'credit', status: 'completed' },
-    { id: 'TXN-005', date: 'Mar 09', description: 'Order ORD-997 (Michael Chen)', amount: '+$21.00', type: 'credit', status: 'completed' },
-    { id: 'TXN-006', date: 'Mar 08', description: 'Payout - Direct Deposit', amount: '+$450.00', type: 'payout', status: 'completed' },
-    { id: 'TXN-007', date: 'Mar 07', description: 'Service Fee', amount: '-$5.00', type: 'debit', status: 'completed' },
-  ]
+  const transactions = earnings.slice(0, 7).map(e => ({
+    id: e.id,
+    date: new Date(e.created_at).toLocaleDateString(),
+    description: `Order ${e.order_id}`,
+    amount: `+$${e.earnings_amount.toFixed(2)}`,
+    type: 'credit',
+    status: e.status
+  }))
 
   const stats = [
     {
       label: 'Total Earnings (This Week)',
-      value: currentData.total,
+      value: `$${currentData.total}`,
       icon: DollarSign,
       color: 'from-green-500 to-emerald-500',
       change: 'Gross earnings'
@@ -93,23 +137,57 @@ export default function EmployeeEarnings() {
     },
     {
       label: 'Pending Payments',
-      value: currentData.pending,
+      value: `$${currentData.pending}`,
       icon: Calendar,
       color: 'from-yellow-500 to-orange-500',
       change: 'Processing'
     },
     {
       label: 'Paid Out',
-      value: currentData.paid,
+      value: `$${currentData.paid}`,
       icon: CreditCard,
       color: 'from-purple-500 to-pink-500',
       change: 'Direct deposit'
-    }
+    },
   ]
+
+  const handleDownloadStatement = async () => {
+    try {
+      const response = await fetch(`/api/employee/earnings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: user?.id,
+          startDate: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString(),
+          endDate: new Date().toISOString()
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        // Create CSV
+        const csv = 'Date,Description,Amount,Status\n' + data.data
+          .map((row: any) => `${row.created_at},${row.order_id},+$${row.earnings},${row.status}`)
+          .join('\n')
+        
+        const blob = new Blob([csv], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `earnings-statement-${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+      } else {
+        alert('Failed to download statement')
+      }
+    } catch (error) {
+      console.error('Error downloading statement:', error)
+      alert('Error: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    }
+  }
 
   return (
     <div className="min-h-screen bg-light flex flex-col">
-      <EmployeeHeader />
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-8">
       {/* Header */}
       <div className="space-y-4">
@@ -236,7 +314,12 @@ export default function EmployeeEarnings() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-dark">Transactions</h2>
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button 
+              onClick={handleDownloadStatement}
+              variant="ghost" 
+              size="sm" 
+              className="gap-2"
+            >
               <Download size={16} />
               Export
             </Button>

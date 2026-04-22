@@ -9,7 +9,8 @@
 
 -- Main users table (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS public.users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  auth_id UUID UNIQUE,
   email TEXT NOT NULL UNIQUE,
   name TEXT,
   phone TEXT UNIQUE,
@@ -38,6 +39,9 @@ CREATE TABLE IF NOT EXISTS public.customers (
 -- Employees/Pros collection
 CREATE TABLE IF NOT EXISTS public.employees (
   id UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT,
+  phone TEXT UNIQUE,
   rating FLOAT DEFAULT 0,
   total_reviews INTEGER DEFAULT 0,
   completed_orders INTEGER DEFAULT 0,

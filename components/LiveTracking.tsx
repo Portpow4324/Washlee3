@@ -63,23 +63,47 @@ export default function LiveTracking({
 
     // Remove old marker
     if (proMarkerRef.current) {
-      proMarkerRef.current.setMap(null)
+      if (proMarkerRef.current.setMap) {
+        proMarkerRef.current.setMap(null)
+      } else {
+        proMarkerRef.current.map = null
+      }
     }
 
-    // Create new marker for pro
-    proMarkerRef.current = new window.google.maps.Marker({
-      position: { lat: proLocation.lat, lng: proLocation.lng },
-      map,
-      title: proLocation.name,
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 12,
-        fillColor: '#48C9B0',
-        fillOpacity: 1,
-        strokeColor: '#fff',
-        strokeWeight: 2
+    try {
+      // Try to use AdvancedMarkerElement if available
+      if (window.google.maps?.marker?.AdvancedMarkerElement) {
+        // Create marker content for pro
+        const proMarkerContent = document.createElement('div')
+        proMarkerContent.innerHTML = '<div style="width: 40px; height: 40px; background: #48C9B0; border: 3px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">👤</div>'
+
+        // Create new marker for pro
+        proMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
+          position: { lat: proLocation.lat, lng: proLocation.lng },
+          map,
+          title: proLocation.name,
+          content: proMarkerContent
+        })
+      } else {
+        // Fall back to standard Marker
+        proMarkerRef.current = new window.google.maps.Marker({
+          position: { lat: proLocation.lat, lng: proLocation.lng },
+          map,
+          title: proLocation.name,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 12,
+            fillColor: '#48C9B0',
+            fillOpacity: 1,
+            strokeColor: '#fff',
+            strokeWeight: 2
+          }
+        })
       }
-    })
+    } catch (error) {
+      console.error('Error creating pro marker:', error)
+      return
+    }
 
     // Add info window
     const infoWindow = new window.google.maps.InfoWindow({
@@ -111,23 +135,47 @@ export default function LiveTracking({
 
     // Remove old marker
     if (customerMarkerRef.current) {
-      customerMarkerRef.current.setMap(null)
+      if (customerMarkerRef.current.setMap) {
+        customerMarkerRef.current.setMap(null)
+      } else {
+        customerMarkerRef.current.map = null
+      }
     }
 
-    // Create new marker for customer
-    customerMarkerRef.current = new window.google.maps.Marker({
-      position: customerLocation,
-      map,
-      title: 'Delivery Address',
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 10,
-        fillColor: '#F97316',
-        fillOpacity: 1,
-        strokeColor: '#fff',
-        strokeWeight: 2
+    try {
+      // Try to use AdvancedMarkerElement if available
+      if (window.google.maps?.marker?.AdvancedMarkerElement) {
+        // Create marker content for customer
+        const customerMarkerContent = document.createElement('div')
+        customerMarkerContent.innerHTML = '<div style="width: 36px; height: 36px; background: #F97316; border: 3px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">📍</div>'
+
+        // Create new marker for customer
+        customerMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
+          position: customerLocation,
+          map,
+          title: 'Delivery Address',
+          content: customerMarkerContent
+        })
+      } else {
+        // Fall back to standard Marker
+        customerMarkerRef.current = new window.google.maps.Marker({
+          position: customerLocation,
+          map,
+          title: 'Delivery Address',
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: '#F97316',
+            fillOpacity: 1,
+            strokeColor: '#fff',
+            strokeWeight: 2
+          }
+        })
       }
-    })
+    } catch (error) {
+      console.error('Error creating customer marker:', error)
+      return
+    }
 
     // Add info window
     const infoWindow = new window.google.maps.InfoWindow({
@@ -181,12 +229,23 @@ export default function LiveTracking({
   return (
     <div className="space-y-6">
       {/* Map */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray/10">
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray/10 h-96 flex items-center justify-center">
         <div ref={mapRef} style={{ width: '100%', height: '400px' }} />
+        {!window.google && (
+          <div className="absolute inset-0 bg-white flex flex-col items-center justify-center text-center">
+            <div className="animate-pulse mb-4">
+              <div className="w-12 h-12 bg-primary/20 rounded-full mx-auto flex items-center justify-center">
+                <MapPin size={24} className="text-primary" />
+              </div>
+            </div>
+            <p className="text-gray font-semibold">Waiting for pro assignment and approval</p>
+            <p className="text-xs text-gray/70 mt-2">You'll see real-time tracking here once a Washlee Pro accepts your order</p>
+          </div>
+        )}
       </div>
 
       {/* Pro Info Card */}
-      {proLocation && (
+      {proLocation ? (
         <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-6 border border-primary/20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Left - Pro Info */}
@@ -251,29 +310,46 @@ export default function LiveTracking({
             </div>
           </div>
         </div>
+      ) : (
+        <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-6 border border-primary/20">
+          <h3 className="font-bold text-dark mb-2">Real-time Tracking</h3>
+          <p className="text-gray mb-4">
+            A Washlee Pro will be assigned to your order soon. Once assigned, you'll be able to track them in real-time on the map above and contact them directly.
+          </p>
+          <p className="text-sm text-gray">
+            ✓ Map is ready • ✓ Google Maps API connected • ⏳ Waiting for pro assignment
+          </p>
+        </div>
       )}
 
       {/* Status Timeline */}
       <div className="bg-white rounded-lg p-6 border border-gray/10">
         <h3 className="font-bold text-dark mb-4">Order Status</h3>
         <div className="space-y-4">
-          {['Confirmed', 'In Transit', 'Arriving Soon', 'Picked Up', 'In Washing', 'Delivering', 'Completed'].map(
+          {[
+            'Payment Confirmed & Assignment in Progress',
+            'Order Confirmed',
+            'Picked Up',
+            'In Washing',
+            'Out for Delivery',
+            'Completed'
+          ].map(
             (status, index) => (
               <div key={status} className="flex gap-4">
                 <div className="flex flex-col items-center">
                   <div
                     className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold text-sm ${
-                      orderStatus === status.toLowerCase().replace(' ', '-')
+                      orderStatus === status.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
                         ? 'bg-primary border-primary text-white'
                         : 'bg-light border-gray/20 text-gray'
                     }`}
                   >
                     {index === 0 ? <MapPin className="w-5 h-5" /> : index + 1}
                   </div>
-                  {index < 6 && (
+                  {index < 5 && (
                     <div
                       className={`w-1 h-8 ${
-                        orderStatus === status.toLowerCase().replace(' ', '-')
+                        orderStatus === status.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
                           ? 'bg-primary'
                           : 'bg-gray/20'
                       }`}
@@ -283,7 +359,12 @@ export default function LiveTracking({
                 <div className="pt-2">
                   <p className="font-semibold text-dark">{status}</p>
                   <p className="text-sm text-gray">
-                    {status === 'Confirmed' && 'Order confirmed and assigned to pro'}
+                    {status === 'Payment Confirmed & Assignment in Progress' && 'Your payment has been successfully processed. We are currently assigning a professional to your order.'}
+                    {status === 'Order Confirmed' && 'A professional has accepted your job. You\'ll be able to view their details, along with real-time tracking as they head to your location.'}
+                    {status === 'Picked Up' && 'Your items have been collected. A weight check will be completed—if the weight exceeds your order limit, an additional charge may apply.'}
+                    {status === 'In Washing' && 'Your items are currently being cleaned.'}
+                    {status === 'Out for Delivery' && 'Once cleaning is complete, your professional will notify you and provide a delivery time slot that suits your availability.'}
+                    {status === 'Completed' && 'Your order has been successfully delivered and completed.'}
                   </p>
                 </div>
               </div>

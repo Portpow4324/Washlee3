@@ -2,230 +2,182 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { CheckCircle, XCircle, Clock, Mail, User, Trash2, Check } from 'lucide-react'
+import { ChevronLeft, Search, MoreVertical } from 'lucide-react'
+import Link from 'next/link'
 
-interface EmailConfirmation {
+interface User {
   id: string
-  user_id: string
   email: string
-  user_type: 'customer' | 'pro'
-  is_confirmed: boolean
-  confirmation_method: string
-  confirmed_at: string | null
-  email_sent_at: string | null
+  name: string
+  phone: string
+  user_type: string
+  is_admin: boolean
+  is_employee: boolean
+  profile_picture_url: string
   created_at: string
-  updated_at: string
 }
 
-export default function UsersPage() {
-  const [confirmations, setConfirmations] = useState<EmailConfirmation[]>([])
+export default function UsersAdminPage() {
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterType, setFilterType] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'date' | 'name'>('date')
 
-  const fetchConfirmations = async () => {
+  const fetchUsers = async () => {
     try {
       setLoading(true)
       setError(null)
       
       const { data, error: fetchError } = await supabase
-        .from('email_confirmations')
+        .from('users')
         .select('*')
         .order('created_at', { ascending: false })
 
       if (fetchError) {
         setError(`Failed to load users: ${fetchError.message}`)
-        console.error('Fetch error:', fetchError)
         return
       }
 
-      setConfirmations(data || [])
+      const transformed: User[] = (data || []).map((item: any) => ({
+        id: item.id,
+        email: item.email,
+        name: item.name || 'N/A',
+        phone: item.phone || 'N/A',
+        user_type: item.user_type || 'customer',
+        is_admin: item.is_admin || false,
+        is_employee: item.is_employee || false,
+        profile_picture_url: item.profile_picture_url || '',
+        created_at: item.created_at
+      }))
+
+      setUsers(transformed)
     } catch (err: any) {
       setError(`Error: ${err.message}`)
-      console.error('Error fetching confirmations:', err)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchConfirmations()
+    fetchUsers()
   }, [])
 
-  const handleManualConfirm = async (id: string) => {
-    try {
-      setRefreshing(true)
-      const { error: updateError } = await supabase
-        .from('email_confirmations')
-        .update({
-          is_confirmed: true,
-          confirmation_method: 'manual_admin',
-          confirmed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
+  const filtered = users
+    .filter(user => {
+      const matchesSearch =
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesType =
+        filterType === 'all' ||
+        (filterType === 'admin' && user.is_admin) ||
+        (filterType === 'employee' && user.is_employee) ||
+        (filterType === 'customer' && user.user_type === 'customer')
+      return matchesSearch && matchesType
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
 
-      if (updateError) {
-        alert(`Error: ${updateError.message}`)
-        return
-      }
-
-      setConfirmations(prev =>
-        prev.map(c =>
-          c.id === id
-            ? {
-                ...c,
-                is_confirmed: true,
-                confirmation_method: 'manual_admin',
-                confirmed_at: new Date().toISOString()
-              }
-            : c
-        )
-      )
-    } catch (err: any) {
-      alert(`Error: ${err.message}`)
-    } finally {
-      setRefreshing(false)
-    }
+  const getUserTypeColor = (user: User) => {
+    if (user.is_admin) return 'bg-red-100 text-red-700'
+    if (user.is_employee) return 'bg-purple-100 text-purple-700'
+    return 'bg-blue-100 text-blue-700'
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this record?')) return
-
-    try {
-      setRefreshing(true)
-      const { error: deleteError } = await supabase
-        .from('email_confirmations')
-        .delete()
-        .eq('id', id)
-
-      if (deleteError) {
-        alert(`Error: ${deleteError.message}`)
-        return
-      }
-
-      setConfirmations(prev => prev.filter(c => c.id !== id))
-    } catch (err: any) {
-      alert(`Error: ${err.message}`)
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A'
-    const date = new Date(dateString)
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const getUserTypeLabel = (user: User) => {
+    if (user.is_admin) return 'Admin'
+    if (user.is_employee) return 'Pro'
+    return 'Customer'
   }
 
   return (
-    <div className="min-h-screen bg-light p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-dark">Users & Email Confirmations</h1>
-          <button
-            onClick={fetchConfirmations}
-            disabled={refreshing}
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 disabled:opacity-50"
-          >
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
+    <div className="min-h-screen bg-light">
+      <div className="bg-white border-b border-gray/10">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center gap-4 mb-4">
+            <Link href="/admin" className="p-2 hover:bg-light rounded-lg transition">
+              <ChevronLeft size={24} className="text-dark" />
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-dark">User Management</h1>
+              <p className="text-gray text-sm">View and manage all users</p>
+            </div>
+          </div>
         </div>
+      </div>
 
+      <div className="max-w-7xl mx-auto px-4 py-8">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-red-700">
             {error}
           </div>
         )}
 
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-gray text-lg">Loading users...</p>
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex gap-4 flex-wrap">
+          <div className="flex-1 min-w-64 relative">
+            <Search size={18} className="absolute left-3 top-3 text-gray" />
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            />
           </div>
-        ) : confirmations.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray text-lg">No users found</p>
+
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="px-4 py-2 border border-gray/20 rounded-lg"
+          >
+            <option value="all">All Users</option>
+            <option value="customer">Customers</option>
+            <option value="employee">Pros</option>
+            <option value="admin">Admins</option>
+          </select>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'date' | 'name')}
+            className="px-4 py-2 border border-gray/20 rounded-lg"
+          >
+            <option value="date">Sort: Join Date</option>
+            <option value="name">Sort: Name</option>
+          </select>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div className="overflow-x-auto bg-white rounded-lg shadow">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-light border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left font-semibold text-dark">Email</th>
-                  <th className="px-6 py-3 text-left font-semibold text-dark">Type</th>
-                  <th className="px-6 py-3 text-left font-semibold text-dark">Status</th>
-                  <th className="px-6 py-3 text-left font-semibold text-dark">Confirmed At</th>
-                  <th className="px-6 py-3 text-left font-semibold text-dark">Email Sent</th>
-                  <th className="px-6 py-3 text-left font-semibold text-dark">Method</th>
-                  <th className="px-6 py-3 text-left font-semibold text-dark">Created</th>
-                  <th className="px-6 py-3 text-center font-semibold text-dark">Actions</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-dark">Name</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-dark">Email</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-dark">Phone</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-dark">Role</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-dark">Joined</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
-                {confirmations.map(confirmation => (
-                  <tr key={confirmation.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray" />
-                        <span className="font-medium text-dark">{confirmation.email}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
-                        {confirmation.user_type === 'customer' ? 'Customer' : 'Pro'}
+              <tbody>
+                {filtered.map((user) => (
+                  <tr key={user.id} className="border-b hover:bg-light">
+                    <td className="px-6 py-4 text-sm font-medium text-dark">{user.name}</td>
+                    <td className="px-6 py-4 text-sm text-dark">{user.email}</td>
+                    <td className="px-6 py-4 text-sm text-gray">{user.phone}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getUserTypeColor(user)}`}>
+                        {getUserTypeLabel(user)}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        {confirmation.is_confirmed ? (
-                          <>
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                            <span className="text-green-600 font-semibold">Confirmed</span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-5 h-5 text-yellow-600" />
-                            <span className="text-yellow-600 font-semibold">Pending</span>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray text-xs">
-                      {formatDate(confirmation.confirmed_at)}
-                    </td>
-                    <td className="px-6 py-4 text-gray text-xs">
-                      {formatDate(confirmation.email_sent_at)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-block px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
-                        {confirmation.confirmation_method || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray text-xs">
-                      {formatDate(confirmation.created_at)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2 justify-center">
-                        {!confirmation.is_confirmed && (
-                          <button
-                            onClick={() => handleManualConfirm(confirmation.id)}
-                            disabled={refreshing}
-                            className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded text-xs font-semibold disabled:opacity-50"
-                            title="Manually confirm this email"
-                          >
-                            <Check className="w-4 h-4" />
-                            Confirm
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(confirmation.id)}
-                          disabled={refreshing}
-                          className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-semibold disabled:opacity-50"
-                          title="Delete this record"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                    <td className="px-6 py-4 text-sm text-gray">
+                      {new Date(user.created_at).toLocaleDateString()}
                     </td>
                   </tr>
                 ))}
@@ -234,15 +186,25 @@ export default function UsersPage() {
           </div>
         )}
 
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-blue-900 text-sm">
-            <span className="font-semibold">Total Users:</span> {confirmations.length} | 
-            <span className="font-semibold ml-3">Confirmed:</span> {confirmations.filter(c => c.is_confirmed).length} | 
-            <span className="font-semibold ml-3">Pending:</span> {confirmations.filter(c => !c.is_confirmed).length}
-          </p>
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <p className="text-gray text-sm font-semibold mb-2">Total Users</p>
+            <p className="text-3xl font-bold text-dark">{users.length}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <p className="text-gray text-sm font-semibold mb-2">Customers</p>
+            <p className="text-3xl font-bold">{users.filter(u => !u.is_admin && !u.is_employee).length}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <p className="text-gray text-sm font-semibold mb-2">Pros</p>
+            <p className="text-3xl font-bold">{users.filter(u => u.is_employee).length}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <p className="text-gray text-sm font-semibold mb-2">Admins</p>
+            <p className="text-3xl font-bold">{users.filter(u => u.is_admin).length}</p>
+          </div>
         </div>
       </div>
     </div>
   )
 }
-

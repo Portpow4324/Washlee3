@@ -19,7 +19,7 @@ function SignupChoiceContent() {
     // Check for type parameter first and redirect accordingly
     const type = searchParams?.get('type')
     if (type === 'pro') {
-      router.push('/auth/pro-signup')
+      router.push('/pro')
       return
     }
     
@@ -82,7 +82,7 @@ function SignupChoiceContent() {
             </Link>
 
             {/* Washlee Pro Signup */}
-            <Link href="/auth/pro-signup">
+            <Link href="/pro">
               <div className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 h-full flex flex-col items-center justify-center cursor-pointer hover:-translate-y-2">
                 <div className="bg-accent rounded-2xl p-6 mb-6 group-hover:bg-mint transition-colors duration-300">
                   <Briefcase size={48} className="text-primary" />

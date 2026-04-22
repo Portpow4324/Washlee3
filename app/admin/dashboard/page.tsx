@@ -3,6 +3,7 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { getDashboardMetrics } from '@/lib/supabaseAdminSync'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
@@ -16,7 +17,8 @@ import {
   AlertCircle,
   Settings,
   Activity,
-  BarChart3
+  BarChart3,
+  RefreshCw
 } from 'lucide-react'
 
 interface AdminStats {
@@ -24,15 +26,19 @@ interface AdminStats {
   totalOrders: number
   totalRevenue: number
   activeOrders: number
-  avgRating: number
-  completionRate: number
+  newUsersThisMonth: number
+  averageOrderValue: number
+  activeUsers: number
+  averageRating: number
+  completedOrders: number
+  refundRate: number
 }
 
 interface RecentOrder {
   id: string
   customer_name: string
   status: string
-  total_price: number
+  price: number
   created_at: string
 }
 
@@ -43,11 +49,17 @@ export default function AdminDashboard() {
     totalOrders: 0,
     totalRevenue: 0,
     activeOrders: 0,
-    avgRating: 0,
-    completionRate: 0
+    newUsersThisMonth: 0,
+    averageOrderValue: 0,
+    activeUsers: 0,
+    averageRating: 0,
+    completedOrders: 0,
+    refundRate: 0
   })
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
   const [statsLoading, setStatsLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSync, setLastSync] = useState<string>('')
 
   // Load and subscribe to real-time admin stats
   useEffect(() => {
@@ -56,24 +68,13 @@ export default function AdminDashboard() {
       return
     }
 
-    let orderSubscription: any = null
-
     const loadStats = async () => {
       try {
         setStatsLoading(true)
         console.log('[AdminDashboard] Loading admin stats')
 
-        // Fetch user count
-        const { count: userCount, error: usersError } = await supabase
-          .from('users')
-          .select('*', { count: 'exact', head: true })
-
-        // Fetch total orders
-        const { data: ordersData, count: orderCount, error: ordersError } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .limit(10)
+        // Get metrics from sync service
+        const metrics = await getDashboardMetrics()
 
         // Fetch recent orders with customer names
         const { data: recentOrdersData, error: recentError } = await supabase
@@ -83,43 +84,36 @@ export default function AdminDashboard() {
             status,
             total_price,
             created_at,
-            users(name)
+            user_id
           `)
           .order('created_at', { ascending: false })
           .limit(10)
 
-        // Calculate total revenue
-        let totalRevenue = 0
-        const activeOrders = (ordersData || []).filter((o: any) => o.status !== 'delivered' && o.status !== 'cancelled').length
-        
-        ;(ordersData || []).forEach((order: any) => {
-          totalRevenue += order.total_price || 0
-        })
-
-        // Calculate completion rate
-        const deliveredCount = (ordersData || []).filter((o: any) => o.status === 'delivered').length
-        const completionRate = orderCount ? Math.round((deliveredCount / orderCount) * 100) : 0
-
         // Transform recent orders
         const transformed: RecentOrder[] = (recentOrdersData || []).map((order: any) => ({
           id: order.id,
-          customer_name: order.users?.name || 'Unknown',
+          customer_name: 'Customer',
           status: order.status,
-          total_price: order.total_price || 0,
+          price: order.total_price || 0,
           created_at: order.created_at
         }))
 
         setStats({
-          totalUsers: userCount || 0,
-          totalOrders: orderCount || 0,
-          totalRevenue,
-          activeOrders,
-          avgRating: 4.8, // Would come from reviews table aggregation
-          completionRate
+          totalUsers: metrics.totalUsers,
+          totalOrders: metrics.totalOrders,
+          totalRevenue: metrics.totalRevenue,
+          activeOrders: metrics.activeOrders,
+          newUsersThisMonth: metrics.newUsersThisMonth,
+          averageOrderValue: metrics.averageOrderValue,
+          activeUsers: metrics.activeUsers,
+          averageRating: metrics.averageRating,
+          completedOrders: metrics.completedOrders,
+          refundRate: metrics.refundRate
         })
 
         setRecentOrders(transformed)
-        console.log('[AdminDashboard] Stats loaded')
+        setLastSync(new Date().toLocaleTimeString())
+        console.log('[AdminDashboard] Stats loaded', metrics)
         setStatsLoading(false)
       } catch (error) {
         console.error('[AdminDashboard] Error:', error)
@@ -130,13 +124,53 @@ export default function AdminDashboard() {
     loadStats()
   }, [user, loading, userData])
 
+  const handleSync = async () => {
+    try {
+      setSyncing(true)
+      console.log('[AdminDashboard] Triggering manual sync')
+
+      const response = await fetch('/api/admin/sync-all-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer admin'
+        },
+        body: JSON.stringify({ force: true })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Update stats with new data
+        setStats({
+          totalUsers: result.metrics.totalUsers,
+          totalOrders: result.metrics.totalOrders,
+          totalRevenue: result.metrics.totalRevenue,
+          activeOrders: result.metrics.activeOrders,
+          newUsersThisMonth: result.metrics.newUsersThisMonth,
+          averageOrderValue: result.metrics.averageOrderValue,
+          activeUsers: result.metrics.activeUsers,
+          averageRating: result.metrics.averageRating,
+          completedOrders: result.metrics.completedOrders,
+          refundRate: result.metrics.refundRate
+        })
+        setLastSync(new Date().toLocaleTimeString())
+        console.log('[AdminDashboard] Sync completed:', result)
+      }
+    } catch (error) {
+      console.error('[AdminDashboard] Sync error:', error)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const statCards = [
-    { label: 'Total Users', value: stats.totalUsers.toString(), icon: Users },
-    { label: 'Total Orders', value: stats.totalOrders.toString(), icon: Package },
-    { label: 'Total Revenue', value: '$' + stats.totalRevenue.toFixed(2), icon: DollarSign },
-    { label: 'Active Orders', value: stats.activeOrders.toString(), icon: Activity },
-    { label: 'Avg Rating', value: stats.avgRating.toFixed(1) + '★', icon: TrendingUp },
-    { label: 'Completion Rate', value: stats.completionRate + '%', icon: BarChart3 }
+    { label: 'Total Users', value: stats.totalUsers.toString(), icon: Users, color: 'text-blue-600' },
+    { label: 'Total Orders', value: stats.totalOrders.toString(), icon: Package, color: 'text-green-600' },
+    { label: 'Total Revenue', value: '$' + stats.totalRevenue.toFixed(2), icon: DollarSign, color: 'text-emerald-600' },
+    { label: 'Active Orders', value: stats.activeOrders.toString(), icon: Activity, color: 'text-orange-600' },
+    { label: 'Active Users (30d)', value: stats.activeUsers.toString(), icon: TrendingUp, color: 'text-purple-600' },
+    { label: 'Avg Order Value', value: '$' + stats.averageOrderValue.toFixed(2), icon: BarChart3, color: 'text-pink-600' }
   ]
 
   return (
@@ -148,15 +182,21 @@ export default function AdminDashboard() {
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-dark mb-2">Admin Dashboard</h1>
-              <p className="text-lg text-gray">Real-time platform analytics & monitoring</p>
+              <div className="flex items-center gap-4">
+                <p className="text-lg text-gray">Real-time platform analytics & monitoring</p>
+                {lastSync && (
+                  <p className="text-sm text-gray">Last sync: {lastSync}</p>
+                )}
+              </div>
             </div>
-            <Link
-              href="/admin/settings"
-              className="p-3 bg-primary hover:bg-accent text-white rounded-full transition shadow-lg hover:shadow-xl"
-              title="Admin Settings"
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="p-3 bg-primary hover:bg-accent text-white rounded-full transition shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Sync data"
             >
-              <Settings size={24} />
-            </Link>
+              <RefreshCw size={24} className={syncing ? 'animate-spin' : ''} />
+            </button>
           </div>
 
           {/* Stats Grid */}
@@ -176,7 +216,7 @@ export default function AdminDashboard() {
                           <p className="text-gray text-sm font-semibold mb-2">{stat.label}</p>
                           <p className="text-3xl font-bold text-dark">{stat.value}</p>
                         </div>
-                        <Icon size={24} className="text-primary opacity-50" />
+                        <Icon size={24} className={`${stat.color} opacity-50`} />
                       </div>
                     </Card>
                   )
@@ -202,7 +242,7 @@ export default function AdminDashboard() {
                                 <p className="text-sm text-gray">{order.id}</p>
                               </div>
                               <div className="text-right">
-                                <p className="font-bold text-dark">${order.total_price.toFixed(2)}</p>
+                                <p className="font-bold text-dark">${order.price.toFixed(2)}</p>
                                 <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
                                   order.status === 'delivered' ? 'bg-green-100 text-green-700' :
                                   order.status === 'in-transit' ? 'bg-blue-100 text-blue-700' :

@@ -27,7 +27,13 @@ function getSupabaseClient(): SupabaseClient {
         throw error
       }
 
-      supabaseClientInstance = createClient(supabaseUrl, supabaseAnonKey)
+      supabaseClientInstance = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        },
+      })
       initializationAttempted = true
     } catch (error) {
       if (error instanceof Error) {

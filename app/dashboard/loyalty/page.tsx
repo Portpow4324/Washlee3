@@ -18,15 +18,9 @@ export default function LoyaltyPage() {
       if (!user) return
 
       try {
-        const { data, error } = await supabase
-          .from('loyalty_members')
-          .select('*')
-          .eq('customer_id', user.id)
-          .single()
-
-        if (data && !error) {
-          setLoyaltyData(data)
-        }
+        // Loyalty members table doesn't exist yet
+        // For now, return empty loyalty data
+        setLoyaltyData(null)
       } catch (err) {
         console.error('Error fetching loyalty data:', err)
       } finally {
