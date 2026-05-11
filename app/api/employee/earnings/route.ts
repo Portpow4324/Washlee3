@@ -6,6 +6,20 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+async function getAuthenticatedUser(request: NextRequest) {
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  if (!token) return { userId: null, error: 'Missing authorization token' }
+
+  const supabaseAuth = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+  const { data, error } = await supabaseAuth.auth.getUser(token)
+
+  if (error || !data.user) return { userId: null, error: 'Invalid or expired token' }
+  return { userId: data.user.id, error: null }
+}
+
 function getTimeframeRange(timeframe: string) {
   const now = new Date()
   let startDate = new Date()
@@ -28,12 +42,21 @@ function getTimeframeRange(timeframe: string) {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await getAuthenticatedUser(request)
+  if (auth.error || !auth.userId) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const employeeId = searchParams.get('employeeId')
   const timeframe = searchParams.get('timeframe') || 'week'
   
   if (!employeeId) {
     return NextResponse.json({ error: 'Missing employeeId parameter' }, { status: 400 })
+  }
+
+  if (employeeId !== auth.userId) {
+    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
   }
   
   try {
@@ -86,11 +109,20 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await getAuthenticatedUser(request)
+  if (auth.error || !auth.userId) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: 401 })
+  }
+
   try {
     const { employeeId, startDate, endDate } = await request.json()
     
     if (!employeeId) {
       return NextResponse.json({ error: 'Missing employeeId' }, { status: 400 })
+    }
+
+    if (employeeId !== auth.userId) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
     
     // Fetch transactions for statement generation

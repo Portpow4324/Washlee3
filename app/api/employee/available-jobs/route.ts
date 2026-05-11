@@ -191,7 +191,7 @@ async function createUserNotification(userId: string, payload: {
 
 export async function GET(request: NextRequest) {
   const auth = await getAuthenticatedUser(request)
-  if (auth.error && auth.error !== 'Missing authorization token') {
+  if (auth.error || !auth.userId) {
     return NextResponse.json({ success: false, error: auth.error }, { status: 401 })
   }
 
@@ -293,7 +293,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const auth = await getAuthenticatedUser(request)
-  if (auth.error && auth.error !== 'Missing authorization token') {
+  if (auth.error || !auth.userId) {
     return NextResponse.json({ success: false, error: auth.error }, { status: 401 })
   }
 
