@@ -67,6 +67,7 @@ export default function BookingHybrid() {
   const [addressPredictions, setAddressPredictions] = useState<any[]>([])
   const [isValidatingAddress, setIsValidatingAddress] = useState(false)
   const [showAddressPredictions, setShowAddressPredictions] = useState(false)
+  const [addressPredictionTarget, setAddressPredictionTarget] = useState<'pickup' | 'delivery' | null>(null)
   const [addressError, setAddressError] = useState('')
 
   const [bookingData, setBookingData] = useState({
@@ -167,23 +168,49 @@ export default function BookingHybrid() {
   ]
 
   // Fetch address predictions from Google Places (Australia only)
-  const fetchAddressPredictions = async (input: string) => {
+  const fetchAddressPredictions = async (input: string, target: 'pickup' | 'delivery') => {
+    const query = input.trim()
+    setAddressPredictionTarget(target)
+
+    if (query.length < 3) {
+      setAddressPredictions([])
+      setShowAddressPredictions(false)
+      return
+    }
+
     try {
       const response = await fetch('/api/places/autocomplete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          input,
+          input: query,
           componentRestrictions: { country: 'au' } // Restrict to Australia
         }),
       })
-      if (!response.ok) throw new Error('Failed to fetch predictions')
-      const data = await response.json()
-      console.log('Received predictions:', data.predictions)
-      setAddressPredictions(data.predictions || [])
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || 'Address search is unavailable right now')
+      }
+
+      const predictions = data.predictions || []
+      setAddressPredictions(predictions)
+      setShowAddressPredictions(predictions.length > 0)
+      setAddressPredictionTarget(target)
+      setAddressError(
+        predictions.length === 0
+          ? 'No matching Australian addresses found. Try adding the suburb and state.'
+          : ''
+      )
     } catch (err) {
       console.error('Error fetching predictions:', err)
       setAddressPredictions([])
+      setShowAddressPredictions(false)
+      setAddressPredictionTarget(target)
+      setAddressError(
+        err instanceof Error
+          ? err.message
+          : 'Address search is unavailable right now'
+      )
     }
   }
 
@@ -1005,18 +1032,13 @@ export default function BookingHybrid() {
                       const val = e.target.value
                       setAddressInput(val)
                       setAddressError('')
-                      setShowAddressPredictions(val.length > 0)
-                      if (val.length >= 3) {
-                        fetchAddressPredictions(val)
-                      } else {
-                        setAddressPredictions([])
-                      }
+                      fetchAddressPredictions(val, 'pickup')
                     }}
                     placeholder="Enter your address (e.g., 123 Main St, Sydney NSW)"
                     className="w-full px-4 py-3 border-2 border-gray rounded-lg focus:border-primary outline-none"
                   />
                   
-                  {showAddressPredictions && addressPredictions.length > 0 && (
+                  {addressPredictionTarget === 'pickup' && showAddressPredictions && addressPredictions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 bg-white border-2 border-primary rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto mt-1">
                       {addressPredictions.map((prediction, idx) => (
                         <button
@@ -1040,7 +1062,7 @@ export default function BookingHybrid() {
                   </div>
                 )}
                 
-                {addressError && (
+                {addressPredictionTarget === 'pickup' && addressError && (
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-sm text-red-700">{addressError}</p>
                   </div>
@@ -1111,34 +1133,46 @@ export default function BookingHybrid() {
                 {!sameAsPickup && (
                   <div className="mb-6">
                     <label className="block text-sm font-semibold text-dark mb-2">Delivery Address</label>
-                    <input
-                      type="text"
-                      placeholder="Enter delivery address..."
-                      value={bookingData.deliveryAddress}
-                      onChange={(e) => {
-                        setBookingData({ ...bookingData, deliveryAddress: e.target.value })
-                        if (e.target.value.length >= 3) {
-                          fetchAddressPredictions(e.target.value)
-                        }
-                      }}
-                      className="w-full px-4 py-3 border-2 border-gray rounded-lg focus:border-primary outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Enter delivery address..."
+                        value={bookingData.deliveryAddress}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setBookingData({
+                            ...bookingData,
+                            deliveryAddress: val,
+                            deliveryAddressDetails: null,
+                          })
+                          setAddressError('')
+                          fetchAddressPredictions(val, 'delivery')
+                        }}
+                        className="w-full px-4 py-3 border-2 border-gray rounded-lg focus:border-primary outline-none"
+                      />
+
+                      {addressPredictionTarget === 'delivery' && showAddressPredictions && addressPredictions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 bg-white border-2 border-primary rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto mt-1">
+                          {addressPredictions.map((prediction, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                selectAddress({ ...prediction, isDelivery: true })
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-mint border-b border-light last:border-b-0 transition"
+                            >
+                              <p className="font-semibold text-dark text-sm">{prediction.main_text}</p>
+                              <p className="text-xs text-gray">{prediction.secondary_text}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     
-                    {showAddressPredictions && addressPredictions.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 bg-white border-2 border-primary rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto mt-1">
-                        {addressPredictions.map((prediction, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              selectAddress({ ...prediction, isDelivery: true })
-                            }}
-                            className="w-full text-left px-4 py-3 hover:bg-mint border-b border-light last:border-b-0 transition"
-                          >
-                            <p className="font-semibold text-dark text-sm">{prediction.main_text}</p>
-                            <p className="text-xs text-gray">{prediction.secondary_text}</p>
-                          </button>
-                        ))}
+                    {addressPredictionTarget === 'delivery' && addressError && (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-700">{addressError}</p>
                       </div>
                     )}
                     
