@@ -160,8 +160,8 @@ export default function EmployeeCodesPage() {
                     <DollarSign size={20} />
                     Standard Employee ID
                   </div>
-                  <p className="text-xs text-gray mt-2">EMP-{Date.now()}-A7K9Q</p>
-                  <p className="text-xs text-gray mt-1">General employee identification</p>
+                  <p className="text-xs text-gray mt-2">123456</p>
+                  <p className="text-xs text-gray mt-1">Short Pro app sign-in ID</p>
                 </button>
 
                 <button

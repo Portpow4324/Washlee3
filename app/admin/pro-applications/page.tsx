@@ -138,10 +138,7 @@ export default function ProApplicationsPage() {
   }
 
   const generateEmployeeId = () => {
-    // Format: EMP-{TIMESTAMP}-{RANDOM}
-    const timestamp = Date.now()
-    const random = Math.random().toString(36).substring(2, 7).toUpperCase()
-    const id = `EMP-${timestamp}-${random}`
+    const id = Math.floor(100000 + Math.random() * 900000).toString()
     setGeneratedEmployeeId(id)
     setEmployeeIdGenerated(true)
   }
@@ -157,7 +154,8 @@ export default function ProApplicationsPage() {
 
     setActionLoading(true)
     try {
-      const employeeId = generatedEmployeeId || `EMP-${Date.now()}`
+      const employeeId =
+        generatedEmployeeId || Math.floor(100000 + Math.random() * 900000).toString()
 
       const response = await fetch('/api/admin/pro-approvals', {
         method: 'PATCH',
@@ -173,6 +171,7 @@ export default function ProApplicationsPage() {
       if (!response.ok) throw new Error('Failed to approve application')
 
       const result = await response.json()
+      const approvedEmployeeId = result?.data?.employeeId || employeeId
 
       // Update local state
       setApplications(applications.map(app =>
@@ -181,7 +180,7 @@ export default function ProApplicationsPage() {
               ...app,
               status: 'approved' as const,
               reviewedAt: new Date().toISOString(),
-              employeeId: employeeId,
+              employeeId: approvedEmployeeId,
               verificationChecklist: verificationChecklist as {
                 idVerified: boolean
                 contactVerified: boolean
@@ -193,7 +192,7 @@ export default function ProApplicationsPage() {
           : app
       ))
 
-      setSuccessMessage(`✓ Application approved! Employee ID: ${employeeId}`)
+      setSuccessMessage(`✓ Application approved! Employee ID: ${approvedEmployeeId}`)
       setShowApprovalModal(false)
       setTimeout(() => {
         setSuccessMessage('')

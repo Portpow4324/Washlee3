@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdminClient } from '@/lib/supabaseFactory'
 
 /**
- * Generates unique employee/payslip codes
- * Format: EMP-{TIMESTAMP}-{RANDOM_STRING}
- * Example: EMP-1709567890123-A7K9Q
+ * Generates unique employee/payslip codes.
+ * Standard Pro login IDs are short 6-digit codes, e.g. 123456.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -31,10 +30,7 @@ export async function POST(request: NextRequest) {
         const random = Math.random().toString(36).substring(2, 7).toUpperCase()
         code = `PS-${dateStr}-${random}`
       } else {
-        // Default format: EMP-{TIMESTAMP}-{RANDOM}
-        const timestamp = Date.now()
-        const random = Math.random().toString(36).substring(2, 7).toUpperCase()
-        code = `EMP-${timestamp}-${random}`
+        code = Math.floor(100000 + Math.random() * 900000).toString()
       }
 
       codes.push({

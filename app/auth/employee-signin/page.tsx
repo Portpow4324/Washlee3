@@ -62,16 +62,13 @@ export default function EmployeeSignIn() {
       return
     }
 
-    // Accept multiple formats:
-    // 1. 6-digit: 123456
-    // 2. Standard: EMP-1773230849589-1ZE64
-    // 3. Payslip: PS-20240304-X9K2L
+    // Accept current 6-digit IDs plus old full-code formats for legacy Pros.
     const isSixDigit = /^\d{6}$/.test(employeeId.trim())
     const isStandardFormat = /^EMP-\d+-[A-Z0-9]+$/.test(employeeId.trim())
     const isPayslipFormat = /^PS-\d{8}-[A-Z0-9]+$/.test(employeeId.trim())
 
     if (!isSixDigit && !isStandardFormat && !isPayslipFormat) {
-      setError('Invalid employee ID. Use 6 digits or full format from your email.')
+      setError('Invalid employee ID. Use your 6-digit Pro ID or full legacy code.')
       return
     }
 
@@ -187,7 +184,7 @@ export default function EmployeeSignIn() {
                 <input
                   id="employeeId"
                   type="text"
-                  placeholder="Enter your Employee ID (6 digits or full code)"
+                  placeholder="Enter your 6-digit Pro ID"
                   value={employeeId}
                   onChange={(e) => setEmployeeId(e.target.value)}
                   className="pl-10 pr-4 py-3 w-full border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#48C9B0] focus:border-transparent transition"

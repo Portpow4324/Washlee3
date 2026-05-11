@@ -38,6 +38,7 @@ function transformProInquiry(row: any) {
     },
     skillsAssessment: row.skills_assessment || '',
     comments: row.comments || '',
+    employeeId: row.employee_id || '',
     submittedAt: row.created_at,
     updatedAt: row.updated_at,
     idImage: idImage,
@@ -104,6 +105,21 @@ export async function PATCH(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    const generateUniqueEmployeeId = async () => {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const candidate = Math.floor(100000 + Math.random() * 900000).toString()
+        const { data, error } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('employee_id', candidate)
+          .maybeSingle()
+
+        if (!error && !data) return candidate
+      }
+
+      return Math.floor(100000 + Math.random() * 900000).toString()
+    }
+
     // First, get the pro inquiry to find the user_id
     const { data: proInquiryData, error: fetchError } = await supabase
       .from('pro_inquiries')
@@ -117,6 +133,25 @@ export async function PATCH(request: NextRequest) {
     }
 
     const userId = proInquiryData.user_id
+    let finalEmployeeId =
+      typeof employeeId === 'string' && /^\d{6}$/.test(employeeId.trim())
+        ? employeeId.trim()
+        : ''
+
+    if (status === 'approved') {
+      if (finalEmployeeId) {
+        const { data: existingEmployee } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('employee_id', finalEmployeeId)
+          .neq('id', userId)
+          .maybeSingle()
+
+        if (existingEmployee) finalEmployeeId = ''
+      }
+
+      if (!finalEmployeeId) finalEmployeeId = await generateUniqueEmployeeId()
+    }
 
     // Update the pro_inquiries status
     const updatePayload: any = { 
@@ -124,7 +159,7 @@ export async function PATCH(request: NextRequest) {
       updated_at: new Date().toISOString()
     }
     if (comments) updatePayload.comments = comments
-    if (employeeId && status === 'approved') updatePayload.employee_id = employeeId
+    if (finalEmployeeId && status === 'approved') updatePayload.employee_id = finalEmployeeId
 
     const { data: updatedData, error: updateError } = await supabase
       .from('pro_inquiries')
@@ -165,7 +200,7 @@ export async function PATCH(request: NextRequest) {
           .upsert({
             id: userId,
             user_id: userId,
-            employee_id: employeeId,
+            employee_id: finalEmployeeId,
             first_name: proInquiryData.first_name,
             last_name: proInquiryData.last_name,
             email: proInquiryData.email,

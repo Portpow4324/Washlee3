@@ -18,12 +18,14 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[Employee Login] Attempting login:', { employeeId, email, password: '***' })
+    const normalizedEmployeeId = String(employeeId).trim().toUpperCase()
+    const normalizedEmail = String(email).trim().toLowerCase()
 
     // Validate employee ID format
     // Accept: 6-digit (123456), Standard (EMP-xxx-xxx), Payslip (PS-yyyymmdd-xxx)
-    const isSixDigit = /^\d{6}$/.test(employeeId)
-    const isStandardFormat = /^EMP-\d+-[A-Z0-9]+$/.test(employeeId)
-    const isPayslipFormat = /^PS-\d{8}-[A-Z0-9]+$/.test(employeeId)
+    const isSixDigit = /^\d{6}$/.test(normalizedEmployeeId)
+    const isStandardFormat = /^EMP-\d+-[A-Z0-9]+$/.test(normalizedEmployeeId)
+    const isPayslipFormat = /^PS-\d{8}-[A-Z0-9]+$/.test(normalizedEmployeeId)
 
     if (!isSixDigit && !isStandardFormat && !isPayslipFormat) {
       return NextResponse.json(
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
         { status: 400 }
@@ -44,12 +46,29 @@ export async function POST(request: NextRequest) {
     // Step 1: Verify employee exists in employees table
     const { data: employeeData, error: employeeError } = await serviceRoleClient
       .from('employees')
-      .select('id, first_name, last_name, email')
-      .eq('email', email)
+      .select('id, employee_id, first_name, last_name, email')
+      .eq('email', normalizedEmail)
       .single()
 
     if (employeeError || !employeeData) {
-      console.error('[Employee Login] Employee not found:', email)
+      console.error('[Employee Login] Employee not found:', normalizedEmail)
+      return NextResponse.json(
+        { error: 'Employee not found or invalid credentials' },
+        { status: 401 }
+      )
+    }
+
+    const storedEmployeeId = String(employeeData.employee_id || '').trim().toUpperCase()
+    const storedUuid = String(employeeData.id || '').trim().toUpperCase()
+    const employeeIdMatches =
+      normalizedEmployeeId === storedEmployeeId ||
+      normalizedEmployeeId === storedUuid
+
+    if (!employeeIdMatches) {
+      console.error('[Employee Login] Employee ID mismatch:', {
+        email: normalizedEmail,
+        provided: normalizedEmployeeId,
+      })
       return NextResponse.json(
         { error: 'Employee not found or invalid credentials' },
         { status: 401 }
@@ -59,7 +78,7 @@ export async function POST(request: NextRequest) {
     // Step 2: Verify password against Supabase Auth
     try {
       const { data: authData, error: authError } = await anonClient.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password
       })
 
@@ -91,7 +110,7 @@ export async function POST(request: NextRequest) {
           email: employeeData.email,
           firstName: employeeData.first_name,
           lastName: employeeData.last_name,
-          employeeId: employeeId
+          employeeId: employeeData.employee_id || employeeId
         }
       })
     } catch (authError: any) {
