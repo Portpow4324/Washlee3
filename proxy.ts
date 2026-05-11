@@ -14,6 +14,13 @@ type RateLimitBucket = {
 const rateLimitBuckets = new Map<string, RateLimitBucket>()
 const PROTECTED_DASHBOARD_ROUTES = ['/dashboard/customer', '/dashboard/pro']
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+const TRUSTED_APP_ORIGINS = new Set([
+  'https://washlee3-llqy.onrender.com',
+  process.env.NEXT_PUBLIC_SITE_URL,
+  process.env.NEXT_PUBLIC_APP_URL,
+  process.env.APP_URL,
+  process.env.FRONTEND_URL,
+].filter(Boolean) as string[])
 
 function securityHeaders(request: NextRequest) {
   const headers = new Headers()
@@ -143,7 +150,7 @@ function isSameOriginUnsafeRequest(request: NextRequest) {
       ? `${forwardedProto || request.nextUrl.protocol.replace(':', '')}://${forwardedHost || host}`
       : appOrigin
 
-  return origin === appOrigin || origin === externalOrigin
+  return origin === appOrigin || origin === externalOrigin || TRUSTED_APP_ORIGINS.has(origin)
 }
 
 function isAdminPage(pathname: string) {
