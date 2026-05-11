@@ -135,7 +135,15 @@ function isSameOriginUnsafeRequest(request: NextRequest) {
   const origin = request.headers.get('origin')
   if (!origin) return true
 
-  return origin === appOrigin
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const host = request.headers.get('host')
+  const externalOrigin =
+    forwardedHost || host
+      ? `${forwardedProto || request.nextUrl.protocol.replace(':', '')}://${forwardedHost || host}`
+      : appOrigin
+
+  return origin === appOrigin || origin === externalOrigin
 }
 
 function isAdminPage(pathname: string) {
