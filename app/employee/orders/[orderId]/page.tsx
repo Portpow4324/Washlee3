@@ -10,6 +10,8 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import EmployeeOrderMap from '@/components/EmployeeOrderMap'
 
+const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
 interface OrderData {
   id: string
   status: string
@@ -225,13 +227,15 @@ export default function EmployeeOrderDetails() {
 
   return (
     <>
-      <Head>
-        <script
-          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-          async
-          defer
-        ></script>
-      </Head>
+      {googleMapsApiKey && (
+        <Head>
+          <script
+            src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`}
+            async
+            defer
+          ></script>
+        </Head>
+      )}
       <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">

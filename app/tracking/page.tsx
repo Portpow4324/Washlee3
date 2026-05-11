@@ -10,6 +10,8 @@ import Spinner from '@/components/Spinner'
 import { MapPin, Navigation } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
+const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
 interface Order {
   id: string
   status: string
@@ -229,13 +231,15 @@ function TrackingPageContent() {
   if (loading) {
     return (
       <>
-        <Head>
-          <script
-            src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-            async
-            defer
-          ></script>
-        </Head>
+        {googleMapsApiKey && (
+          <Head>
+            <script
+              src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`}
+              async
+              defer
+            ></script>
+          </Head>
+        )}
         <div className="min-h-screen bg-light flex flex-col">
           <Header />
           <main className="flex-1 flex items-center justify-center">
@@ -253,13 +257,15 @@ function TrackingPageContent() {
   if (error) {
     return (
       <>
-        <Head>
-          <script
-            src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-            async
-            defer
-          ></script>
-        </Head>
+        {googleMapsApiKey && (
+          <Head>
+            <script
+              src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`}
+              async
+              defer
+            ></script>
+          </Head>
+        )}
         <div className="min-h-screen bg-light flex flex-col">
           <Header />
           <main className="flex-1 flex items-center justify-center px-4">
@@ -278,13 +284,15 @@ function TrackingPageContent() {
 
   return (
     <>
-      <Head>
-        <script
-          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-          async
-          defer
-        ></script>
-      </Head>
+      {googleMapsApiKey && (
+        <Head>
+          <script
+            src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`}
+            async
+            defer
+          ></script>
+        </Head>
+      )}
       <div className="min-h-screen bg-light flex flex-col">
         <Header />
         <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-12">

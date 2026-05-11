@@ -17,13 +17,17 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <head>
-        <Script
-          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-          strategy="beforeInteractive"
-        />
+        {googleMapsApiKey && (
+          <Script
+            src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`}
+            strategy="beforeInteractive"
+          />
+        )}
       </head>
       <body className="bg-white text-dark font-sans">
         <ErrorBoundary>
