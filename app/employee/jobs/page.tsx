@@ -76,6 +76,11 @@ export default function EmployeeJobs() {
         
         // Fetch order details for each job
         const details: Record<string, OrderDetails> = {}
+        const { data: sessionData } = await supabase.auth.getSession()
+        const authHeaders = sessionData.session?.access_token
+          ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+          : undefined
+
         for (const job of jobsData) {
           if (!job.order_id) {
             console.warn('Job missing order_id:', job.id)
@@ -83,7 +88,9 @@ export default function EmployeeJobs() {
           }
           
           try {
-            const orderResponse = await fetch(`/api/orders/details?orderId=${job.order_id}`)
+            const orderResponse = await fetch(`/api/orders/details?orderId=${job.order_id}`, {
+              headers: authHeaders,
+            })
             if (orderResponse.ok) {
               const orderData = await orderResponse.json()
               details[job.order_id] = {
@@ -496,4 +503,3 @@ export default function EmployeeJobs() {
     </div>
   )
 }
-

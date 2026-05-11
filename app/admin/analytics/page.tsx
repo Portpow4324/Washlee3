@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
@@ -38,7 +38,7 @@ interface ProStats {
 
 export default function AnalyticsDashboard() {
   const router = useRouter()
-  const { user, userData, loading: authLoading } = useAuth()
+  const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [analytics, setAnalytics] = useState<AnalyticsData>({
     totalRevenue: 0,
     totalOrders: 0,
@@ -54,16 +54,6 @@ export default function AnalyticsDashboard() {
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d'>('30d')
 
   const COLORS = ['#48C9B0', '#7FE3D3', '#E8FFFB', '#1f2d2b', '#6b7b78']
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/auth/login')
-      return
-    }
-    if (!authLoading && user && !userData?.is_admin) {
-      router.push('/')
-    }
-  }, [user, authLoading, userData, router])
 
   const getDaysInRange = () => {
     return dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90
@@ -188,20 +178,16 @@ export default function AnalyticsDashboard() {
   }
 
   useEffect(() => {
-    if (!user || !userData?.is_admin) return
+    if (!hasAdminAccess) return
     fetchAnalytics()
-  }, [user, userData, dateRange])
+  }, [hasAdminAccess, dateRange])
 
   const completionRate = analytics.totalOrders > 0 
     ? (analytics.completedOrders / analytics.totalOrders * 100).toFixed(1) 
     : '0'
 
-  if (authLoading || loading) {
+  if (checkingAdminAccess || loading) {
     return <div className="min-h-screen flex items-center justify-center"><p>Loading...</p></div>
-  }
-
-  if (!userData?.is_admin) {
-    return <div className="min-h-screen flex items-center justify-center"><p>Access denied</p></div>
   }
 
   return (

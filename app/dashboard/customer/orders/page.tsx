@@ -29,9 +29,13 @@ interface Order {
   returns_on_hangers?: boolean
   hang_dry?: boolean
   additional_requests?: string
-  items?: string
+  items?: string | Record<string, any>
   notes?: string
+  scheduled_pickup_date?: string
+  scheduled_delivery_date?: string
+  delivery_time_slot?: string
   created_at: string
+  updated_at?: string
   customer_name?: string
   customer_email?: string
   customer_phone?: string
@@ -87,6 +91,19 @@ export default function CustomerOrders() {
   }, [user?.id])
 
   const selectedOrderData = selectedOrder ? orders.find(o => o.id === selectedOrder) : null
+  const selectedOrderItems = (() => {
+    if (!selectedOrderData?.items) return null
+    try {
+      return typeof selectedOrderData.items === 'string'
+        ? JSON.parse(selectedOrderData.items)
+        : selectedOrderData.items
+    } catch {
+      return null
+    }
+  })()
+  const deliveryWindow = selectedOrderData?.delivery_time_slot || selectedOrderItems?.deliveryTimeSlot
+  const scheduledPickupDate = selectedOrderData?.scheduled_pickup_date || selectedOrderItems?.pickupDate
+  const scheduledDeliveryDate = selectedOrderData?.scheduled_delivery_date || selectedOrderItems?.deliveryDate
 
   const handleEditField = (field: string, currentValue: string) => {
     setEditingField(field)
@@ -130,9 +147,13 @@ export default function CustomerOrders() {
 
     try {
       console.log('[Delete] Sending API request...')
+      const { data: sessionData } = await supabase.auth.getSession()
       const response = await fetch('/api/orders/delete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+        },
         body: JSON.stringify({ 
           orderId: deletingOrderId,
           userId: user?.id
@@ -426,6 +447,36 @@ export default function CustomerOrders() {
                         </div>
                       )}
 
+                      {(scheduledPickupDate || scheduledDeliveryDate || deliveryWindow) && (
+                        <div className="space-y-3 pt-4 border-t border-gray-200">
+                          <h4 className="font-bold text-dark uppercase text-xs tracking-wide">Job Timing</h4>
+                          {scheduledPickupDate && (
+                            <div className="flex items-center gap-2">
+                              <Clock size={16} className="text-primary" />
+                              <span className="text-gray text-sm">
+                                <span className="font-semibold">Pickup date:</span> {new Date(`${scheduledPickupDate}T00:00:00`).toLocaleDateString('en-AU')}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Clock size={16} className="text-primary" />
+                            <span className="text-gray text-sm">
+                              <span className="font-semibold">Pickup time:</span> Pro to confirm after accepting
+                            </span>
+                          </div>
+                          {(scheduledDeliveryDate || deliveryWindow) && (
+                            <div className="flex items-center gap-2">
+                              <Clock size={16} className="text-primary" />
+                              <span className="text-gray text-sm">
+                                <span className="font-semibold">Delivery:</span>{' '}
+                                {scheduledDeliveryDate ? new Date(`${scheduledDeliveryDate}T00:00:00`).toLocaleDateString('en-AU') : ''}
+                                {deliveryWindow ? ` ${deliveryWindow}` : ''}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Laundry Preferences */}
                       {(selectedOrderData.detergent || selectedOrderData.delicate_cycle || selectedOrderData.returns_on_hangers || selectedOrderData.hang_dry) && (
                         <div className="space-y-3 pt-4 border-t border-gray-200">
@@ -479,7 +530,7 @@ export default function CustomerOrders() {
                       {/* Created Date */}
                       <div className="pt-4 border-t border-gray-200 flex items-center gap-2 text-gray text-sm">
                         <Clock size={16} />
-                        <span>Placed on {new Date(selectedOrderData.created_at).toLocaleDateString()}</span>
+                        <span>Placed on {new Date(selectedOrderData.created_at).toLocaleString('en-AU')}</span>
                       </div>
                     </div>
                   </Card>

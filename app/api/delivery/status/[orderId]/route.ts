@@ -1,168 +1,165 @@
 /**
  * GET /api/delivery/status/[orderId]
- * Get delivery status and real-time updates for an order
+ * Returns customer-safe delivery status, pro assignment, and live pro location
+ * when a job is actively assigned.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { readNumber, readString } from '@/lib/mobileBackend'
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
+function stageIndex(status: string) {
+  const normalized = status.toLowerCase().replace(/[-\s]+/g, '_')
+  if (normalized.includes('deliver') || normalized === 'completed') return 4
+  if (normalized.includes('transit') || normalized.includes('out_for_delivery')) return 3
+  if (normalized.includes('clean') || normalized.includes('process') || normalized.includes('wash')) return 2
+  if (normalized.includes('pick')) return 1
+  return 0
+}
+
+function getStatusMessage(status: string, deliverySpeed: string) {
+  switch (stageIndex(status)) {
+    case 4:
+      return 'Your order has been delivered.'
+    case 3:
+      return 'Your laundry is on the way.'
+    case 2:
+      return 'Your laundry is being cleaned with care.'
+    case 1:
+      return 'Your Washlee Pro is handling pickup.'
+    default:
+      return `Your order is queued for ${deliverySpeed === 'express' ? 'Express' : 'Standard'} service.`
+  }
+}
+
+function getNextStep(status: string) {
+  switch (stageIndex(status)) {
+    case 4:
+      return 'Order complete'
+    case 3:
+      return 'Delivery in progress'
+    case 2:
+      return 'Cleaning in progress'
+    case 1:
+      return 'Pickup in progress'
+    default:
+      return 'Waiting for pro assignment'
+  }
+}
+
+function progressPercent(status: string) {
+  switch (stageIndex(status)) {
+    case 4:
+      return 100
+    case 3:
+      return 78
+    case 2:
+      return 55
+    case 1:
+      return 32
+    default:
+      return 15
+  }
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ orderId: string }> }
+) {
   try {
     const { orderId } = await params
+    if (!orderId) return NextResponse.json({ error: 'Order ID is required' }, { status: 400 })
 
-    if (!orderId) {
-      return NextResponse.json(
-        { error: 'Order ID is required' },
-        { status: 400 }
-      )
-    }
-
-    console.log('[Delivery Status] Fetching status for order:', orderId)
-
-    // Get order details
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .select(
-        `
-        id,
-        status,
-        delivery_speed,
-        weight_kg,
-        created_at,
-        pickup_date,
-        estimated_delivery_date,
-        delivery_address,
-        customer_id,
-        assigned_pro_id
-      `
-      )
+      .select('*')
       .eq('id', orderId)
-      .single()
+      .maybeSingle()
 
     if (orderError || !order) {
-      console.error('[Delivery Status] Order not found:', orderId)
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      )
+      console.error('[Delivery Status] Order not found:', orderId, orderError?.message)
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    // Get assigned pro details if available
-    let proDetails = null
-    if (order.assigned_pro_id) {
+    const proId = readString(order, ['assigned_pro_id', 'pro_id', 'employee_id'])
+    let assignedPro = null
+
+    if (proId) {
       const { data: pro } = await supabaseAdmin
         .from('employees')
-        .select('id, first_name, last_name, phone, vehicle')
-        .eq('id', order.assigned_pro_id)
-        .single()
+        .select('*')
+        .eq('id', proId)
+        .maybeSingle()
 
-      proDetails = pro
+      if (pro) {
+        const currentLatitude =
+          readNumber(pro, ['current_latitude']) ||
+          readNumber(order, ['pro_latitude'])
+        const currentLongitude =
+          readNumber(pro, ['current_longitude']) ||
+          readNumber(order, ['pro_longitude'])
+        const hasCurrentLocation =
+          Number.isFinite(currentLatitude) &&
+          Number.isFinite(currentLongitude) &&
+          (currentLatitude !== 0 || currentLongitude !== 0)
+
+        assignedPro = {
+          id: pro.id,
+          firstName: readString(pro, ['first_name', 'firstName']),
+          lastName: readString(pro, ['last_name', 'lastName']),
+          name: readString(pro, ['name'], `${readString(pro, ['first_name'])} ${readString(pro, ['last_name'])}`.trim()),
+          phone: readString(pro, ['phone']),
+          vehicle: pro.vehicle || null,
+          rating: pro.rating || null,
+          currentLocation: hasCurrentLocation
+            ? {
+                latitude: currentLatitude,
+                longitude: currentLongitude,
+                accuracyMeters:
+                  readNumber(pro, ['current_location_accuracy_m']) ||
+                  readNumber(order, ['pro_location_accuracy_m']) ||
+                  null,
+                heading:
+                  readNumber(pro, ['current_location_heading']) ||
+                  readNumber(order, ['pro_location_heading']) ||
+                  null,
+                updatedAt:
+                  pro.current_location_updated_at ||
+                  order.pro_location_updated_at ||
+                  null,
+              }
+            : null,
+        }
+      }
     }
 
-    // Calculate real-time metrics
-    const createdTime = new Date(order.created_at)
-    const now = new Date()
-    const elapsedHours = (now.getTime() - createdTime.getTime()) / (1000 * 60 * 60)
+    const deliverySpeed = readString(order, ['delivery_speed'], 'standard')
+    const currentStatus = readString(order, ['stage_status', 'status'], 'pending')
+    const estimatedDeliveryDate =
+      order.estimated_delivery_date ||
+      order.scheduled_delivery_date ||
+      order.delivery_date ||
+      null
 
-    // Determine estimated delivery based on delivery speed
-    let estimatedDeliveryHours = 24
-    if (order.delivery_speed === 'express') {
-      estimatedDeliveryHours = 6
-    }
-    const estimatedDeliveryTime = new Date(createdTime.getTime() + estimatedDeliveryHours * 60 * 60 * 1000)
-
-    // Calculate progress percentage
-    const progressPercent = Math.min((elapsedHours / estimatedDeliveryHours) * 100, 100)
-
-    const status = {
-      orderId: order.id,
-      currentStatus: order.status, // pending, processing, in_transit, delivered, cancelled
-      deliverySpeed: order.delivery_speed,
-      weightKg: order.weight_kg,
-      deliveryAddress: order.delivery_address,
-      
-      // Timeline
-      createdAt: order.created_at,
-      elapsedHours: parseFloat(elapsedHours.toFixed(1)),
-      estimatedDeliveryHours,
-      estimatedDeliveryTime: estimatedDeliveryTime.toISOString(),
-      progressPercent: parseFloat(progressPercent.toFixed(1)),
-      
-      // Pro assignment
-      assignedPro: proDetails || null,
-      
-      // Status messages
-      statusMessage: getStatusMessage(order.status, order.delivery_speed, elapsedHours, estimatedDeliveryHours),
-      nextStep: getNextStep(order.status),
-      
-      // ETA
-      estimatedDeliveryDate: estimatedDeliveryTime.toLocaleDateString('en-AU', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-      }),
-      estimatedDeliveryTimeStr: estimatedDeliveryTime.toLocaleTimeString('en-AU', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      }),
-      
-      lastUpdated: now.toISOString(),
-    }
-
-    return NextResponse.json({ status }, { status: 200 })
-  } catch (error: any) {
+    return NextResponse.json({
+      status: {
+        orderId: order.id,
+        currentStatus,
+        deliverySpeed,
+        weightKg: readNumber(order, ['weight_kg', 'weight']),
+        deliveryAddress: order.delivery_address || null,
+        pickupAddress: order.pickup_address || null,
+        createdAt: order.created_at,
+        estimatedDeliveryDate,
+        progressPercent: progressPercent(currentStatus),
+        assignedPro,
+        statusMessage: getStatusMessage(currentStatus, deliverySpeed),
+        nextStep: getNextStep(currentStatus),
+        lastUpdated: new Date().toISOString(),
+      },
+    })
+  } catch (error) {
     console.error('[Delivery Status] Unexpected error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-
-/**
- * Generate customer-friendly status message
- */
-function getStatusMessage(
-  status: string,
-  deliverySpeed: string,
-  elapsedHours: number,
-  estimatedHours: number
-): string {
-  const speedLabel = deliverySpeed === 'express' ? 'Express' : 'Standard'
-
-  switch (status) {
-    case 'pending':
-      return `Your order is in queue for ${speedLabel} delivery. We'll assign a team member soon.`
-    case 'processing':
-      return `Your laundry is being processed (${elapsedHours.toFixed(1)}/${estimatedHours} hours elapsed). On track for ${speedLabel} delivery.`
-    case 'in_transit':
-      return `Your order is on the way! A Washlee team member will deliver it soon.`
-    case 'delivered':
-      return `✅ Your order has been delivered!`
-    case 'cancelled':
-      return `❌ Your order was cancelled. Please contact support.`
-    default:
-      return `Order status: ${status}`
-  }
-}
-
-/**
- * Get next action for customer
- */
-function getNextStep(status: string): string {
-  switch (status) {
-    case 'pending':
-      return 'Waiting for team assignment'
-    case 'processing':
-      return 'Your laundry is being cleaned'
-    case 'in_transit':
-      return 'Delivery in progress - be ready to receive'
-    case 'delivered':
-      return 'Order complete! Leave a review'
-    case 'cancelled':
-      return 'Contact support if you need help'
-    default:
-      return 'No action needed'
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,10 +1,9 @@
 /**
  * Unified Email Service for Washlee V2
  * ====================================
- * Supports multiple email providers:
- * 1. Resend (primary - for production)
+ * Supports email providers:
+ * 1. Resend (primary)
  * 2. SMTP via Nodemailer (fallback - for development/testing)
- * 3. SendGrid (legacy)
  */
 
 import nodemailer from 'nodemailer'
@@ -32,13 +31,13 @@ const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.de
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null
 
 // ============================================
-// SMTP Configuration (Gmail, Outlook, etc)
+// SMTP Configuration (optional fallback)
 // ============================================
 const SMTP_HOST = process.env.SMTP_HOST
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587')
-const SMTP_USER = process.env.SMTP_USER || process.env.GMAIL_USER
-const SMTP_PASSWORD = process.env.SMTP_PASSWORD || process.env.GMAIL_APP_PASSWORD
-const SMTP_FROM_EMAIL = process.env.SMTP_FROM_EMAIL || SMTP_USER || 'noreply@washlee.com'
+const SMTP_USER = process.env.SMTP_USER
+const SMTP_PASSWORD = process.env.SMTP_PASSWORD
+const SMTP_FROM_EMAIL = process.env.SMTP_FROM_EMAIL || SMTP_USER || 'onboarding@resend.dev'
 
 let smtpTransporter: nodemailer.Transporter | null = null
 
@@ -121,7 +120,7 @@ async function sendViaResend(options: EmailOptions): Promise<EmailResponse> {
 }
 
 /**
- * Send email via SMTP (Gmail, Outlook, custom SMTP)
+ * Send email via SMTP fallback
  */
 async function sendViaSMTP(options: EmailOptions): Promise<EmailResponse> {
   const transporter = getSmtpTransporter()
@@ -163,8 +162,8 @@ async function sendViaSMTP(options: EmailOptions): Promise<EmailResponse> {
 
 /**
  * Primary email sending function - tries multiple providers
- * 1. Tries Resend first (if configured and from email is verified)
- * 2. Falls back to SMTP (Gmail, Outlook, etc)
+ * 1. Tries Resend first (including onboarding@resend.dev for testing)
+ * 2. Falls back to SMTP if explicitly configured
  * 3. Returns success/error with provider information
  */
 export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
@@ -172,7 +171,7 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
   console.log('[Email] Subject:', options.subject)
 
   // Try Resend first
-  if (RESEND_API_KEY && RESEND_FROM_EMAIL !== 'onboarding@resend.dev') {
+  if (RESEND_API_KEY) {
     console.log('[Email] Trying Resend...')
     const resendResult = await sendViaResend(options)
     if (resendResult.success) {

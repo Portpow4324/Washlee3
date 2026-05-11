@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Menu, X, ArrowLeft, LogOut, User, Droplets, Shield, Briefcase, Settings, ChevronDown, Home, Package, DollarSign, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
+import { clearAdminAccess } from '@/lib/useAdminAccess'
 import { createClient } from '@supabase/supabase-js'
 
 export default function Header() {
@@ -19,9 +20,12 @@ export default function Header() {
   const router = useRouter()
   const pathname = usePathname()
   const { user, userData, isAuthenticated, loading } = useAuth()
+  const isAdminRoute = pathname?.startsWith('/admin') || pathname === '/admin-login' || pathname === '/admin-setup'
 
   // Fetch pro inquiry status for user
   useEffect(() => {
+    if (isAdminRoute) return
+
     if (isAuthenticated && user?.id && !loading) {
       const fetchProInquiryStatus = async () => {
         try {
@@ -59,7 +63,7 @@ export default function Header() {
 
       fetchProInquiryStatus()
     }
-  }, [isAuthenticated, user?.id, loading])
+  }, [isAuthenticated, user?.id, loading, isAdminRoute])
 
   // Log role switch state for debugging
   useEffect(() => {
@@ -89,6 +93,11 @@ export default function Header() {
   
   // Handle back button click - try browser back first, fallback to home
   const handleBackClick = () => {
+    if (isAdminRoute) {
+      router.push('/admin')
+      return
+    }
+
     const referrer = document.referrer
     if (referrer && referrer.includes(window.location.host)) {
       // If referrer is from same domain, use browser back
@@ -113,6 +122,13 @@ export default function Header() {
     }
   }
 
+  const handleAdminLogout = async () => {
+    await fetch('/api/admin/session', { method: 'DELETE' }).catch(() => undefined)
+    clearAdminAccess()
+    router.push('/admin/login')
+    router.refresh()
+  }
+
   const switchToEmployeeDashboard = () => {
     localStorage.setItem('employeeMode', 'true')
     sessionStorage.setItem('employeeMode', 'true')
@@ -127,6 +143,52 @@ export default function Header() {
     localStorage.removeItem('employeeMode')
     router.push('/employee/dashboard')
     setShowRoleSwitch(false)
+  }
+
+  if (isAdminRoute) {
+    return (
+      <header className="bg-white shadow-sm sticky top-0 z-50">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between gap-4">
+            <Link href="/admin" className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+                <Image
+                  src="/logo-washlee.png"
+                  alt="Washlee Logo"
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <span className="font-bold text-xl text-dark">Washlee Admin</span>
+            </Link>
+
+            <div className="hidden items-center gap-2 md:flex">
+              <Link href="/admin" className="px-3 py-2 text-sm font-semibold text-primary hover:bg-mint rounded-lg transition">
+                Control Center
+              </Link>
+              <Link href="/admin/monitoring" className="px-3 py-2 text-sm font-semibold text-primary hover:bg-mint rounded-lg transition">
+                Monitoring
+              </Link>
+              <Link href="/admin/security" className="px-3 py-2 text-sm font-semibold text-primary hover:bg-mint rounded-lg transition">
+                Security
+              </Link>
+              <Link href="/" className="px-3 py-2 text-sm font-semibold text-gray hover:bg-light rounded-lg transition">
+                Public Site
+              </Link>
+            </div>
+
+            <button
+              onClick={handleAdminLogout}
+              className="inline-flex items-center gap-2 rounded-lg bg-gray-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-gray-800"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
+          </div>
+        </nav>
+      </header>
+    )
   }
 
   return (

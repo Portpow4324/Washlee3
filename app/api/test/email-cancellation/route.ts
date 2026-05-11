@@ -1,13 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email-service'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('[Email Test] Starting email test...')
     console.log('[Email Test] Environment variables check:')
-    console.log('[Email Test] SMTP_HOST:', process.env.SMTP_HOST)
-    console.log('[Email Test] SMTP_USER:', process.env.SMTP_USER)
-    console.log('[Email Test] GMAIL_USER:', process.env.GMAIL_USER)
+    console.log('[Email Test] RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'Present' : 'Missing')
+    console.log('[Email Test] RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev')
     console.log('[Email Test] ADMIN_EMAIL:', process.env.ADMIN_EMAIL)
 
     const testEmail = process.env.ADMIN_EMAIL || 'lukaverde045@gmail.com'
@@ -85,12 +84,13 @@ export async function GET(request: NextRequest) {
       recipient: testEmail,
       timestamp: new Date().toISOString(),
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Email test failed'
     console.error('[Email Test] Error:', error)
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Email test failed',
+        error: message,
         details: error,
       },
       { status: 500 }

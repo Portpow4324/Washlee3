@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
@@ -27,26 +27,13 @@ interface GeneratedCode {
 
 export default function EmployeeCodesPage() {
   const router = useRouter()
-  const { user, userData, loading: authLoading } = useAuth()
+  const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [codeCount, setCodeCount] = useState(10)
   const [codeFormat, setCodeFormat] = useState<'standard' | 'payslip'>('standard')
   const [generatedCodes, setGeneratedCodes] = useState<GeneratedCode[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [error, setError] = useState('')
-  const [hasAdminAccess, setHasAdminAccess] = useState(false)
-
-  useEffect(() => {
-    // Check for password-based admin access from sessionStorage
-    const ownerAccess = sessionStorage.getItem('ownerAccess') === 'true'
-    setHasAdminAccess(ownerAccess)
-    
-    if (!ownerAccess) {
-      console.error('[EmployeeCodes] Admin access denied. Redirecting to login.')
-      router.push('/admin/login')
-    }
-  }, [router])
-
   const handleGenerateCodes = async () => {
     setError('')
     setSuccessMessage('')
@@ -106,12 +93,12 @@ export default function EmployeeCodesPage() {
     window.URL.revokeObjectURL(url)
   }
 
-  if (authLoading || !hasAdminAccess) {
+  if (checkingAdminAccess || !hasAdminAccess) {
     return (
       <>
         <Header />
         <div className="min-h-screen flex items-center justify-center">
-          {authLoading ? <Spinner /> : <div className="text-center">
+          {checkingAdminAccess ? <Spinner /> : <div className="text-center">
             <AlertCircle size={48} className="mx-auto text-red-600 mb-4" />
             <p className="text-red-600 font-semibold">Admin access required</p>
           </div>}

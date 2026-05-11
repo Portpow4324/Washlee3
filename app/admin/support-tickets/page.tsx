@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { ChevronLeft, Search, MoreVertical, MessageCircle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -37,18 +36,15 @@ export default function SupportTicketsPage() {
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
-        .from('inquiries')
-        .select('*')
-        .eq('type', 'customer_inquiry')
-        .order('submitted_at', { ascending: false })
+      const response = await fetch('/api/admin/collections?name=supportTickets', { cache: 'no-store' })
+      const result = await response.json()
 
-      if (fetchError) {
-        setError(fetchError.message)
+      if (!response.ok || !result.success) {
+        setError(result.error || 'Failed to load support tickets')
         return
       }
 
-      const transformed: SupportTicket[] = (data || []).map((item: any) => ({
+      const transformed: SupportTicket[] = (result.data || []).map((item: any) => ({
         id: item.id,
         user_id: item.user_id,
         email: item.email,
@@ -71,13 +67,19 @@ export default function SupportTicketsPage() {
 
   const updateStatus = async (ticketId: string, newStatus: string) => {
     try {
-      const { error: updateError } = await supabase
-        .from('inquiries')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', ticketId)
+      const response = await fetch('/api/admin/collections', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'supportTickets',
+          id: ticketId,
+          updates: { status: newStatus, updated_at: new Date().toISOString() },
+        }),
+      })
+      const result = await response.json()
 
-      if (updateError) {
-        alert(`Error: ${updateError.message}`)
+      if (!response.ok || !result.success) {
+        alert(`Error: ${result.error || 'Failed to update ticket'}`)
         return
       }
 
@@ -102,13 +104,19 @@ export default function SupportTicketsPage() {
       const newNotes =
         currentNotes + `[${new Date().toLocaleString()}] Admin: ${adminNote}`
 
-      const { error: updateError } = await supabase
-        .from('inquiries')
-        .update({ admin_notes: newNotes, updated_at: new Date().toISOString() })
-        .eq('id', ticketId)
+      const response = await fetch('/api/admin/collections', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'supportTickets',
+          id: ticketId,
+          updates: { admin_notes: newNotes, updated_at: new Date().toISOString() },
+        }),
+      })
+      const result = await response.json()
 
-      if (updateError) {
-        alert(`Error: ${updateError.message}`)
+      if (!response.ok || !result.success) {
+        alert(`Error: ${result.error || 'Failed to update ticket'}`)
         return
       }
 

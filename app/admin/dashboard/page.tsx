@@ -1,9 +1,7 @@
 'use client'
 
-import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { getDashboardMetrics } from '@/lib/supabaseAdminSync'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
@@ -43,7 +41,7 @@ interface RecentOrder {
 }
 
 export default function AdminDashboard() {
-  const { user, userData, loading } = useAuth()
+  const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalOrders: 0,
@@ -63,8 +61,7 @@ export default function AdminDashboard() {
 
   // Load and subscribe to real-time admin stats
   useEffect(() => {
-    if (loading || !user || !userData?.is_admin) {
-      setStatsLoading(false)
+    if (!hasAdminAccess) {
       return
     }
 
@@ -73,42 +70,45 @@ export default function AdminDashboard() {
         setStatsLoading(true)
         console.log('[AdminDashboard] Loading admin stats')
 
-        // Get metrics from sync service
-        const metrics = await getDashboardMetrics()
+        const [metricsResponse, ordersResponse] = await Promise.all([
+          fetch('/api/admin/analytics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'get_dashboard_summary',
+              adminId: 'password-admin',
+            }),
+          }),
+          fetch('/api/admin/orders', { cache: 'no-store' }),
+        ])
 
-        // Fetch recent orders with customer names
-        const { data: recentOrdersData, error: recentError } = await supabase
-          .from('orders')
-          .select(`
-            id,
-            status,
-            total_price,
-            created_at,
-            user_id
-          `)
-          .order('created_at', { ascending: false })
-          .limit(10)
+        const metricsResult = await metricsResponse.json()
+        const ordersResult = await ordersResponse.json()
+        const metrics = metricsResult.analytics || {}
+        const recentOrdersData = ordersResult.orders || []
+        const activeOrders = recentOrdersData.filter((order: any) => !['delivered', 'cancelled'].includes(order.status)).length
+        const completedOrders = recentOrdersData.filter((order: any) => order.status === 'delivered').length
 
         // Transform recent orders
         const transformed: RecentOrder[] = (recentOrdersData || []).map((order: any) => ({
           id: order.id,
-          customer_name: 'Customer',
+          customer_name: order.users?.name || 'Customer',
           status: order.status,
           price: order.total_price || 0,
           created_at: order.created_at
-        }))
+        })).slice(0, 10)
 
         setStats({
-          totalUsers: metrics.totalUsers,
-          totalOrders: metrics.totalOrders,
-          totalRevenue: metrics.totalRevenue,
-          activeOrders: metrics.activeOrders,
-          newUsersThisMonth: metrics.newUsersThisMonth,
-          averageOrderValue: metrics.averageOrderValue,
-          activeUsers: metrics.activeUsers,
-          averageRating: metrics.averageRating,
-          completedOrders: metrics.completedOrders,
-          refundRate: metrics.refundRate
+          totalUsers: metrics.activeUsers || metrics.newSignups || 0,
+          totalOrders: metrics.totalOrders || 0,
+          totalRevenue: metrics.totalRevenue || 0,
+          activeOrders,
+          newUsersThisMonth: metrics.newSignups || 0,
+          averageOrderValue: metrics.averageOrderValue || 0,
+          activeUsers: metrics.activeUsers || 0,
+          averageRating: 0,
+          completedOrders,
+          refundRate: metrics.refundRate || 0
         })
 
         setRecentOrders(transformed)
@@ -122,7 +122,7 @@ export default function AdminDashboard() {
     }
 
     loadStats()
-  }, [user, loading, userData])
+  }, [hasAdminAccess])
 
   const handleSync = async () => {
     try {
@@ -200,7 +200,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Stats Grid */}
-          {statsLoading ? (
+          {checkingAdminAccess || statsLoading ? (
             <div className="flex items-center justify-center py-12">
               <Spinner />
             </div>

@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
           Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: process.env.RESEND_FROM_EMAIL || 'noreply@washlee.com',
+          from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
           to: adminEmail,
           subject: `New Refund Request: ID #${refund.id}`,
           html: adminHtml,

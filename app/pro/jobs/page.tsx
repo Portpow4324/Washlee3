@@ -24,6 +24,9 @@ interface OrderData {
   delivery_address: string
   weight?: string
   scheduled_pickup_date: string
+  scheduled_delivery_date?: string
+  created_at?: string
+  items?: any
 }
 
 export default function JobsPage() {
@@ -70,6 +73,8 @@ export default function JobsPage() {
               delivery_address,
               items,
               scheduled_pickup_date,
+              scheduled_delivery_date,
+              created_at,
               status
             `)
             .in('id', orderIds)
@@ -85,11 +90,13 @@ export default function JobsPage() {
           // Combine job and order data, parsing weight from items JSON
           const combined = jobsData.map((job: any) => {
             const order = ordersData?.find((o: any) => o.id === job.order_id)
-            const weight = order?.items ? (JSON.parse(typeof order.items === 'string' ? order.items : JSON.stringify(order.items))?.weight || 0) : 0
+            const parsedItems = order?.items ? JSON.parse(typeof order.items === 'string' ? order.items : JSON.stringify(order.items)) : null
+            const weight = parsedItems?.weight || 0
             return {
               ...job,
               ...order,
               weight,
+              items: parsedItems,
             }
           })
 
@@ -175,7 +182,19 @@ export default function JobsPage() {
                     {job.scheduled_pickup_date && (
                       <p className="flex items-center gap-2">
                         <Briefcase className="w-4 h-4" />
-                        {new Date(job.scheduled_pickup_date).toLocaleDateString()}
+                        Pickup date: {new Date(`${job.scheduled_pickup_date}T00:00:00`).toLocaleDateString('en-AU')}
+                      </p>
+                    )}
+                    {(job.scheduled_delivery_date || job.items?.deliveryTimeSlot) && (
+                      <p className="flex items-center gap-2">
+                        <Briefcase className="w-4 h-4" />
+                        Delivery: {job.scheduled_delivery_date ? new Date(`${job.scheduled_delivery_date}T00:00:00`).toLocaleDateString('en-AU') : ''}{job.items?.deliveryTimeSlot ? ` ${job.items.deliveryTimeSlot}` : ''}
+                      </p>
+                    )}
+                    {job.created_at && (
+                      <p className="flex items-center gap-2">
+                        <Briefcase className="w-4 h-4" />
+                        Posted: {new Date(job.created_at).toLocaleString('en-AU')}
                       </p>
                     )}
                   </div>

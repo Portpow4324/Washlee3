@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { getBearerUser, hasAdminSession } from '@/lib/security/apiAuth'
+import { cleanString } from '@/lib/security/validation'
 
 interface DeleteOrderRequest {
   orderId: string
@@ -9,7 +11,8 @@ interface DeleteOrderRequest {
 export async function POST(request: NextRequest) {
   try {
     const body: DeleteOrderRequest = await request.json()
-    const { orderId, userId } = body
+    const orderId = cleanString(body.orderId, 100)
+    const userId = cleanString(body.userId, 80)
 
     if (!orderId) {
       return NextResponse.json(
@@ -18,8 +21,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const [authenticatedUser, adminSession] = await Promise.all([
+      getBearerUser(request),
+      hasAdminSession(request),
+    ])
+
+    if (!adminSession && (!authenticatedUser || authenticatedUser.id !== userId)) {
+      return NextResponse.json(
+        { error: 'Unauthorized: You do not own this order' },
+        { status: 403 }
+      )
+    }
+
     console.log('[Delete Order API] Processing deletion for order:', orderId)
-    console.log('[Delete Order API] User ID provided:', userId)
 
     // Get order details first (including pro_id, user_id, total_price)
     // Note: Using service role, so we can query any order, but we verify user ownership below
@@ -39,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Verify that the user requesting deletion owns this order
     // If userId is provided, verify it matches
-    if (userId && order.user_id !== userId) {
+    if (!adminSession && order.user_id !== userId) {
       console.error('[Delete Order API] User does not own this order:', {
         requestingUser: userId,
         orderOwner: order.user_id,
@@ -76,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     // 2. PRO DASHBOARD: Remove assignment if pro is assigned
     if (order.pro_id) {
-      const { error: proError } = await supabaseAdmin
+      await supabaseAdmin
         .from('orders')
         .update({ pro_id: null })
         .eq('id', orderId)

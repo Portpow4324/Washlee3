@@ -1,73 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAnonClient } from '@/lib/supabaseClientFactory'
+import { cleanString, isBodyTooLarge, isEmail } from '@/lib/security/validation'
+
+const MAX_LOGIN_BODY_BYTES = 4_096
 
 export async function POST(request: NextRequest) {
-  console.log('[LOGIN-API] POST /api/auth/login called')
-  
   const supabase = getAnonClient()
   
   try {
-    const body = await request.json()
-    console.log('[LOGIN-API] Request body received:', { 
-      email: body.email,
-      hasPassword: !!body.password
-    })
+    if (isBodyTooLarge(request.headers.get('content-length'), MAX_LOGIN_BODY_BYTES)) {
+      return NextResponse.json(
+        { error: 'Request body is too large', code: 'REQUEST_TOO_LARGE' },
+        { status: 413 }
+      )
+    }
 
-    const { email, password } = body
+    const body = await request.json().catch(() => null)
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid request body', code: 'INVALID_BODY' },
+        { status: 400 }
+      )
+    }
 
-    // Validate input
-    if (!email || !password) {
-      console.error('[LOGIN-API] Validation failed - missing fields')
+    const email = cleanString((body as { email?: unknown }).email, 254).toLowerCase()
+    const password = (body as { password?: unknown }).password
+
+    if (!email || typeof password !== 'string') {
       return NextResponse.json(
         { error: 'Missing required fields: email, password' },
         { status: 400 }
       )
     }
 
-    // Sign in with Supabase Auth
-    console.log('[LOGIN-API] Signing in with Supabase...')
+    if (!isEmail(email) || password.length > 200) {
+      return NextResponse.json(
+        { error: 'Invalid email or password', code: 'INVALID_CREDENTIALS' },
+        { status: 401 }
+      )
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
-    console.log('[LOGIN-API] Auth response received')
-    console.log('[LOGIN-API] Auth error:', error ? error.message : 'none')
-    console.log('[LOGIN-API] Auth user ID:', data?.user?.id ? 'found' : 'not found')
-
-    if (error) {
-      console.error('[LOGIN-API] Auth error:', error.message)
-      
-      // Check for invalid credentials
-      if (error.message && (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed'))) {
-        console.warn('[LOGIN-API] Invalid credentials or email not confirmed:', email)
-        return NextResponse.json(
-          { 
-            error: error.message || 'Invalid email or password',
-            code: 'INVALID_CREDENTIALS'
-          },
-          { status: 401 }
-        )
-      }
-      
+    if (error || !data.user) {
+      console.warn('[LOGIN-API] Login failed')
       return NextResponse.json(
-        { error: error.message || 'Authentication failed' },
-        { status: 400 }
+        { error: 'Invalid email or password', code: 'INVALID_CREDENTIALS' },
+        { status: 401 }
       )
     }
-
-    if (!data.user) {
-      console.error('[LOGIN-API] No user returned from auth')
-      return NextResponse.json(
-        { error: 'Failed to authenticate' },
-        { status: 500 }
-      )
-    }
-
-    console.log('[LOGIN-API] ✓ User logged in:', data.user.id)
     
-    // Fetch user data from database
-    console.log('[LOGIN-API] Fetching user data from database...')
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id, email, user_type, created_at')
@@ -77,24 +62,6 @@ export async function POST(request: NextRequest) {
     if (userError) {
       console.warn('[LOGIN-API] Failed to fetch user data:', userError.message)
       // Don't fail - auth was successful, just missing database record
-    } else {
-      console.log('[LOGIN-API] ✓ User data fetched:', userData)
-    }
-
-    // Fetch customer profile if customer
-    if (userData?.user_type === 'customer') {
-      console.log('[LOGIN-API] Fetching customer profile...')
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .select('id, email, first_name, last_name')
-        .eq('id', data.user.id)
-        .single()
-
-      if (customerError) {
-        console.warn('[LOGIN-API] Failed to fetch customer data:', customerError.message)
-      } else {
-        console.log('[LOGIN-API] ✓ Customer data fetched')
-      }
     }
 
     return NextResponse.json(
@@ -113,13 +80,12 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 }
     )
-  } catch (error: any) {
+  } catch (error) {
     console.error('[LOGIN-API] Unexpected error:', error)
-    console.error('[LOGIN-API] Error message:', error?.message)
     
     return NextResponse.json(
       { 
-        error: error?.message || 'Login failed',
+        error: 'Login failed',
         code: 'LOGIN_ERROR'
       },
       { status: 500 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { sendEmail } from '@/lib/email-service'
+import { getBearerUser, hasAdminSession } from '@/lib/security/apiAuth'
+import { cleanString } from '@/lib/security/validation'
 
 interface RefundRequest {
   orderId: string
@@ -10,13 +12,23 @@ interface RefundRequest {
 export async function POST(request: NextRequest) {
   try {
     const body: RefundRequest = await request.json()
-    const { orderId, userId } = body
+    const orderId = cleanString(body.orderId, 100)
+    const userId = cleanString(body.userId, 80)
 
     if (!orderId || !userId) {
       return NextResponse.json(
         { error: 'Missing required fields: orderId, userId' },
         { status: 400 }
       )
+    }
+
+    const [authenticatedUser, adminSession] = await Promise.all([
+      getBearerUser(request),
+      hasAdminSession(request),
+    ])
+
+    if (!adminSession && (!authenticatedUser || authenticatedUser.id !== userId)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     console.log('[Refund API] Processing refund request:', { orderId, userId })

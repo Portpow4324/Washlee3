@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdminClient } from '@/lib/supabaseFactory'
+import { getBearerUser, hasAdminSession } from '@/lib/security/apiAuth'
+import { cleanString, isUuid } from '@/lib/security/validation'
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.nextUrl.searchParams.get('userId')
+    const userId = cleanString(request.nextUrl.searchParams.get('userId'), 80)
     
-    if (!userId) {
+    if (!userId || !isUuid(userId)) {
       return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+    }
+
+    const [user, adminSession] = await Promise.all([
+      getBearerUser(request),
+      hasAdminSession(request),
+    ])
+
+    if (!adminSession && user?.id !== userId) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
     const supabase = getSupabaseAdminClient()
@@ -19,7 +30,6 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (!customerError && customerData) {
-      console.log('[Profile API] ✓ Found customer:', customerData.email)
       return NextResponse.json({
         success: true,
         data: {
@@ -44,7 +54,6 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (!employeeError && employeeData) {
-      console.log('[Profile API] ✓ Found employee:', employeeData.email)
       return NextResponse.json({
         success: true,
         data: {
@@ -62,17 +71,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Not found in either table
-    console.log('[Profile API] ⚠️ Profile not found for user:', userId)
     return NextResponse.json({
       success: false,
       error: 'Profile not found'
     }, { status: 404 })
 
-  } catch (error: any) {
-    console.error('[Profile API] Error:', error.message)
+  } catch (error) {
+    console.error('[Profile API] Error:', error)
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: 'Failed to fetch profile'
     }, { status: 500 })
   }
 }

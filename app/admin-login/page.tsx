@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Lock, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-
-const ADMIN_PASSWORD = '0Anev5Cyh54ZhfNwWM1f' // 20-character password
+import { grantAdminAccess } from '@/lib/useAdminAccess'
 
 export default function AdminLogin() {
   const router = useRouter()
@@ -21,18 +20,27 @@ export default function AdminLogin() {
     setLoading(true)
 
     try {
-      if (password === ADMIN_PASSWORD) {
-        // Store admin access in sessionStorage
-        sessionStorage.setItem('ownerAccess', 'true')
-        sessionStorage.setItem('adminLoginTime', new Date().toISOString())
-        
-        // Redirect to admin dashboard
-        router.push('/admin')
-      } else {
-        setError('Invalid password')
+      const response = await fetch('/api/admin/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          setError('Too many attempts. Please wait a few minutes and try again.')
+        } else {
+          setError('Invalid password')
+        }
         setPassword('')
+        return
       }
-    } catch (err: any) {
+
+      grantAdminAccess()
+      const next = new URLSearchParams(window.location.search).get('next')
+      router.push(next?.startsWith('/admin') ? next : '/admin')
+      router.refresh()
+    } catch {
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -54,7 +62,7 @@ export default function AdminLogin() {
           </div>
 
           {/* Login Form */}
-          <form onSubmit={handleLogin} className="bg-white rounded-lg shadow-lg p-8 space-y-6">
+          <form onSubmit={handleLogin} className="bg-white rounded-lg shadow-lg p-8 space-y-6" autoComplete="off">
             {/* Error Message */}
             {error && (
               <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -75,6 +83,7 @@ export default function AdminLogin() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
                 <input
                   id="password"
+                  name="washlee-admin-passphrase"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => {
@@ -84,6 +93,9 @@ export default function AdminLogin() {
                   placeholder="Enter admin password"
                   className="w-full pl-12 pr-12 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   disabled={loading}
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   autoFocus
                 />
                 <button

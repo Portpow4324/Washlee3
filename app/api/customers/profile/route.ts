@@ -7,19 +7,43 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { getBearerUser, hasAdminSession } from '@/lib/security/apiAuth'
+import { cleanString, isUuid } from '@/lib/security/validation'
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.nextUrl.searchParams.get('userId')
+    const userId = cleanString(request.nextUrl.searchParams.get('userId'), 80)
 
-    if (!userId) {
+    if (!userId || !isUuid(userId)) {
       return NextResponse.json(
         { error: 'userId query parameter is required' },
         { status: 400 }
       )
     }
 
-    // Use admin client to bypass RLS and fetch customer profile
+    const [user, adminSession] = await Promise.all([
+      getBearerUser(request),
+      hasAdminSession(request),
+    ])
+
+    if (!adminSession && user?.id !== userId) {
+      if (!user) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+
+      const { data: assignedOrder, error: assignedOrderError } = await supabaseAdmin
+        .from('orders')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('pro_id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (assignedOrderError || !assignedOrder) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('users')
       .select('full_name, name, email, phone')
@@ -29,7 +53,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('[API] Error fetching customer:', error)
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Failed to fetch customer profile' },
         { status: 400 }
       )
     }
@@ -46,15 +70,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Return full_name if available, otherwise name
-    return NextResponse.json({
-      name: data.full_name || data.name || 'Unknown',
-      email: data.email || '',
-      phone: data.phone || '',
-    }, { status: 200 })
+    return NextResponse.json(
+      {
+        name: data.full_name || data.name || 'Unknown',
+        email: data.email || '',
+        phone: data.phone || '',
+      },
+      { status: 200 }
+    )
   } catch (err) {
     console.error('[API] Exception:', err)
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Unknown error' },
+      { error: 'Failed to fetch customer profile' },
       { status: 500 }
     )
   }

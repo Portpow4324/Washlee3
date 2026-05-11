@@ -3,7 +3,7 @@ import { sendEmail } from '@/lib/emailService'
 import { getVerificationEmailHtml } from '@/lib/resend-email'
 
 /**
- * Send confirmation email via SendGrid
+ * Send confirmation email via Resend
  * POST /api/auth/send-confirmation
  * Body: { email: string, firstName: string, verificationCode: string }
  */
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Get email template
     const htmlContent = getVerificationEmailHtml(firstName, verificationCode || '000000')
 
-    // Send via SendGrid
+    // Send via Resend-backed email service
     const result = await sendEmail({
       to: email,
       subject: 'Verify Your Washlee Email Address',

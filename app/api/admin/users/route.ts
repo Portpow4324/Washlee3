@@ -9,6 +9,15 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
+    const { data: appUsers, error: appUsersError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (appUsersError) {
+      console.error('[Admin] Error fetching users table:', appUsersError)
+    }
+
     // Get all auth users
     const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
 
@@ -22,13 +31,24 @@ export async function GET(request: NextRequest) {
     // Get all customer profiles
     const { data: customers, error: customersError } = await supabaseAdmin
       .from('customers')
-      .select('id, email, first_name, last_name, created_at, account_status')
+      .select('id, email, first_name, last_name, created_at')
 
     if (customersError) {
       console.error('[Admin] Error fetching customers:', customersError)
     }
 
     return NextResponse.json({
+      users: (appUsers || []).map((u: any) => ({
+        id: u.id,
+        email: u.email || '',
+        name: u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || 'N/A',
+        phone: u.phone || 'N/A',
+        user_type: u.user_type || 'customer',
+        is_admin: Boolean(u.is_admin),
+        is_employee: Boolean(u.is_employee),
+        profile_picture_url: u.profile_picture_url || '',
+        created_at: u.created_at || new Date().toISOString(),
+      })),
       authUsersCount: users?.length || 0,
       customersCount: customers?.length || 0,
       authUsers: users?.map((u: any) => ({

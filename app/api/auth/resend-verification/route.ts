@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     const firstName = email.split('@')[0].split('.')[0]
     const htmlContent = getVerificationEmailHtml(firstName, verificationCode)
 
-    // Send via email service (SendGrid primary, Resend fallback)
+    // Send via Resend-backed email service
     const result = await sendEmail({
       to: email,
       subject: 'Verify Your Washlee Email Address - New Code',

@@ -117,9 +117,13 @@ export default function OrdersPage() {
     if (!cancellingOrderId || !user) return
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
       const response = await fetch('/api/orders/cancel', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           orderId: cancellingOrderId,
           userId: user.id,
@@ -158,6 +162,10 @@ export default function OrdersPage() {
       setIsCancellingAll(true)
       const cancelledOrderIds: string[] = []
       const failedOrderIds: string[] = []
+      const { data: sessionData } = await supabase.auth.getSession()
+      const authHeaders: Record<string, string> = sessionData.session?.access_token
+        ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+        : {}
 
       // Cancel all orders that are not already completed or cancelled
       for (const order of orders) {
@@ -165,7 +173,7 @@ export default function OrdersPage() {
           try {
             const response = await fetch('/api/orders/cancel', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify({
                 orderId: order.id,
                 userId: user.id,
@@ -223,9 +231,13 @@ export default function OrdersPage() {
     if (!user) return
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
       const response = await fetch('/api/orders/refund', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           orderId,
           userId: user.id,

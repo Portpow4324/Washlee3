@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { ChevronLeft, Search, MoreVertical } from 'lucide-react'
 import Link from 'next/link'
 
@@ -30,17 +29,15 @@ export default function UsersAdminPage() {
       setLoading(true)
       setError(null)
       
-      const { data, error: fetchError } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const response = await fetch('/api/admin/users', { cache: 'no-store' })
+      const result = await response.json()
 
-      if (fetchError) {
-        setError(`Failed to load users: ${fetchError.message}`)
+      if (!response.ok) {
+        setError(`Failed to load users: ${result.error || response.statusText}`)
         return
       }
 
-      const transformed: User[] = (data || []).map((item: any) => ({
+      const transformed: User[] = (result.users || []).map((item: any) => ({
         id: item.id,
         email: item.email,
         name: item.name || 'N/A',

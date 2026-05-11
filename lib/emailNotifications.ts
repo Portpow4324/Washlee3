@@ -1,13 +1,4 @@
-import nodemailer from 'nodemailer'
-
-// Configure email transporter (using SendGrid or your email service)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-})
+import { sendEmail } from './emailService'
 
 const SUPPORT_EMAIL = 'support@washlee.com'
 const WASHLEE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'
@@ -60,7 +51,10 @@ export async function sendOrderConfirmation(
       `,
     }
 
-    await transporter.sendMail(mailOptions)
+    const result = await sendEmail(mailOptions)
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send email')
+    }
     console.log('[EMAIL] Order confirmation sent to:', customerEmail)
   } catch (error) {
     console.error('[EMAIL] Failed to send order confirmation:', error)
@@ -118,7 +112,10 @@ export async function sendProAssignment(
       `,
     }
 
-    await transporter.sendMail(mailOptions)
+    const result = await sendEmail(mailOptions)
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send email')
+    }
     console.log('[EMAIL] Pro assignment notification sent to:', proEmail)
   } catch (error) {
     console.error('[EMAIL] Failed to send pro assignment notification:', error)
@@ -162,7 +159,10 @@ export async function sendPickupReminder(
       `,
     }
 
-    await transporter.sendMail(mailOptions)
+    const result = await sendEmail(mailOptions)
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send email')
+    }
     console.log('[EMAIL] Pickup reminder sent to:', customerEmail)
   } catch (error) {
     console.error('[EMAIL] Failed to send pickup reminder:', error)
@@ -210,7 +210,10 @@ export async function sendDeliveryConfirmation(
       `,
     }
 
-    await transporter.sendMail(mailOptions)
+    const result = await sendEmail(mailOptions)
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send email')
+    }
     console.log('[EMAIL] Delivery confirmation sent to:', customerEmail)
   } catch (error) {
     console.error('[EMAIL] Failed to send delivery confirmation:', error)

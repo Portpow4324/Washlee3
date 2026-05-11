@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAllOrders, createOrder, updateOrder } from '@/lib/supabaseAdmin'
 import { createClient } from '@supabase/supabase-js'
+import { hasAdminSession } from '@/lib/security/apiAuth'
+import { cleanString } from '@/lib/security/validation'
+import { calculateBookingQuote, getMobilePricingConfig } from '@/lib/mobilePricing'
 
 export async function GET(request: NextRequest) {
   try {
+    if (!(await hasAdminSession(request))) {
+      return NextResponse.json({ error: 'Admin session required' }, { status: 401 })
+    }
+
     const result = await getAllOrders()
     return NextResponse.json(result)
   } catch (error) {
@@ -19,19 +26,41 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     console.log('[API] POST /api/orders - Received payload:', JSON.stringify(body).substring(0, 200))
-    
-    // Map booking page payload to createOrder format
+    const bookingData = body.bookingData || body
+    const pricingConfig = await getMobilePricingConfig()
+    const quote = calculateBookingQuote({
+      estimatedWeight: bookingData?.estimatedWeight,
+      weight: bookingData?.weight,
+      customWeight: bookingData?.customWeight,
+      bagCount: bookingData?.bagCount,
+      deliverySpeed: bookingData?.deliverySpeed || body.delivery_speed,
+      protectionPlan: bookingData?.protectionPlan || body.protection_plan,
+      hangDry: bookingData?.hangDry,
+      returnsOnHangers: bookingData?.returnsOnHangers,
+    }, pricingConfig)
+
+    // Map booking page payload to createOrder format. The server quote is the
+    // source of truth for order total; the client-sent total is treated as
+    // display-only context and never trusted for the stored amount.
     const mappedData = {
-      user_id: body.uid,
-      service_type: body.bookingData?.selectedService || 'standard',
-      total_price: body.orderTotal || 0,
-      bagCount: body.bookingData?.bagCount,
-      pickupAddress: body.bookingData?.pickupAddress,
-      deliveryAddress: body.bookingData?.deliveryAddress,
-      delivery_speed: body.bookingData?.deliverySpeed,
-      protection_plan: body.bookingData?.protectionPlan,
-      notes: body.bookingData?.pickupInstructions,
-      ...body.bookingData // Include all booking data fields
+      ...bookingData, // Include all booking data fields, then override trusted server values below.
+      user_id: body.uid || body.customer_id,
+      customerName: body.customerName || bookingData?.customerName,
+      customerEmail: body.customerEmail || body.email || bookingData?.customerEmail,
+      customerPhone: body.customerPhone || body.phone || bookingData?.customerPhone,
+      service_type: bookingData?.selectedService || body.service_type || 'standard',
+      total_price: quote.total,
+      weight: quote.estimatedWeight,
+      bagCount: bookingData?.bagCount,
+      pickupAddress: bookingData?.pickupAddress || body.pickup_address || body.delivery_address,
+      deliveryAddress: bookingData?.deliveryAddress || body.delivery_address,
+      delivery_speed: bookingData?.deliverySpeed || body.delivery_speed,
+      protection_plan: bookingData?.protectionPlan || body.protection_plan,
+      notes: bookingData?.pickupInstructions || body.pickup_instructions,
+      pickupDate: bookingData?.pickupDate || body.pickup_date,
+      deliveryDate: bookingData?.deliveryDate || body.delivery_date,
+      deliveryTimeSlot: bookingData?.deliveryTimeSlot || body.delivery_time_slot,
+      pricingQuote: quote,
     }
     
     console.log('[API] Calling createOrder with:', { user_id: mappedData.user_id, total_price: mappedData.total_price })
@@ -57,7 +86,7 @@ export async function POST(request: NextRequest) {
             customerName: customerName,
             orderId: orderId,
             pickupDate: mappedData.pickupDate || 'Soon',
-            pickupTime: mappedData.pickupTime || 'To be scheduled',
+            pickupTime: 'Your pro will confirm after accepting',
             pickupAddress: mappedData.pickupAddress || 'As provided',
             totalPrice: mappedData.total_price,
             serviceType: mappedData.service_type,
@@ -119,7 +148,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { orderId, status, paymentStatus } = body
+    const orderId = cleanString(body.orderId, 100)
+    const status = cleanString(body.status, 40)
+    const paymentStatus = cleanString(body.paymentStatus, 40)
 
     if (!orderId) {
       return NextResponse.json(
@@ -128,10 +159,34 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const result = await updateOrder(orderId, {
-      status,
-      payment_status: paymentStatus,
-    })
+    const adminSession = await hasAdminSession(request)
+    const { data: existingOrder, error: existingOrderError } = await supabase
+      .from('orders')
+      .select('id, user_id, pro_id')
+      .eq('id', orderId)
+      .maybeSingle()
+
+    if (existingOrderError) {
+      return NextResponse.json({ error: 'Failed to verify order access' }, { status: 500 })
+    }
+
+    if (!existingOrder) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    if (!adminSession && existingOrder.user_id !== user.id && existingOrder.pro_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const updates: Record<string, string> = {}
+    if (status) updates.status = status
+    if (paymentStatus) updates.payment_status = paymentStatus
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No valid updates provided' }, { status: 400 })
+    }
+
+    const result = await updateOrder(orderId, updates)
 
     return NextResponse.json(result)
   } catch (error) {
@@ -143,10 +198,10 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
+export async function PUT() {
   return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   return NextResponse.json({ success: false, message: 'Method not allowed' }, { status: 405 })
 }

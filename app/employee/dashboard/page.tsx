@@ -192,35 +192,7 @@ export default function EmployeeDashboard() {
     }
   ]
 
-  const displayOrders = dataLoading ? [] : recentOrders.length > 0 ? recentOrders : [
-    {
-      id: 'ORD-1001',
-      customer: 'Sarah Mitchell',
-      status: 'in-progress',
-      weight: '6 kg',
-      pickup: 'Today 4:00 PM',
-      earnings: '$18.00',
-      address: '123 Main St'
-    },
-    {
-      id: 'ORD-1002',
-      customer: 'John Davis',
-      status: 'pending-pickup',
-      weight: '8 kg',
-      pickup: 'Today 6:00 PM',
-      earnings: '$24.00',
-      address: '456 Oak Ave'
-    },
-    {
-      id: 'ORD-1003',
-      customer: 'Emma Johnson',
-      status: 'completed',
-      weight: '5 kg',
-      pickup: 'Yesterday',
-      earnings: '$15.00',
-      address: '789 Pine Rd'
-    }
-  ]
+  const displayOrders = dataLoading ? [] : recentOrders
 
   const getStatusColor = (status: string) => {
     switch (status) {

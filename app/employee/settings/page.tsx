@@ -3,12 +3,12 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import Toast from '@/components/Toast'
-import { Settings, User, Lock, Bell, FileText, MapPin, Clock, CheckCircle, Upload } from 'lucide-react'
-import { supabase } from '@/lib/supabaseClient'
+import { Settings, User, Bell, FileText, MapPin, Clock, CheckCircle, Upload } from 'lucide-react'
 
 interface AvailabilityData {
   [day: string]: {
@@ -18,15 +18,96 @@ interface AvailabilityData {
   }
 }
 
-const loadAvailability = async (userId: string, setAvailabilityData: any) => {
+type EmployeeProfileData = {
+  first_name?: string
+  last_name?: string
+  name?: string
+  phone?: string
+  address?: string
+  city?: string
+  state?: string
+  postcode?: string
+  latitude?: number | null
+  longitude?: number | null
+  service_areas?: Array<{
+    address?: string
+    suburb?: string
+    state?: string
+    postcode?: string
+    lat?: number | null
+    lng?: number | null
+    radiusKm?: number
+  }>
+}
+
+type AddressPrediction = {
+  placeId: string
+  main_text?: string
+  secondary_text?: string
+}
+
+const loadAvailability = async (
+  userId: string,
+  setAvailabilityData: Dispatch<SetStateAction<AvailabilityData>>,
+  setServiceRadiusKm: (value: number) => void
+) => {
   try {
     const response = await fetch(`/api/employee/availability?employeeId=${userId}`)
     const result = await response.json()
     if (result.data) {
       setAvailabilityData(result.data)
     }
+    if (result.serviceRadiusKm) {
+      setServiceRadiusKm(result.serviceRadiusKm)
+    }
   } catch (error) {
     console.error('Error loading availability:', error)
+  }
+}
+
+const loadEmployeeProfile = async (
+  userId: string,
+  setFormData: Dispatch<SetStateAction<{
+    firstName: string
+    lastName: string
+    email: string
+    phone: string
+    address: string
+    city: string
+    state: string
+    postcode: string
+    latitude: number | null
+    longitude: number | null
+  }>>,
+  setServiceRadiusKm: (value: number) => void
+) => {
+  try {
+    const response = await fetch(`/api/employee/profile?employeeId=${userId}`)
+    const result = await response.json()
+    const profile = result.data as EmployeeProfileData | null
+    if (!profile) return
+
+    const serviceArea = Array.isArray(profile.service_areas) ? profile.service_areas[0] : null
+    const [fallbackFirstName, ...fallbackLastName] = (profile.name || '').split(' ')
+
+    setFormData(prev => ({
+      ...prev,
+      firstName: profile.first_name || fallbackFirstName || prev.firstName,
+      lastName: profile.last_name || fallbackLastName.join(' ') || prev.lastName,
+      phone: profile.phone || prev.phone,
+      address: profile.address || serviceArea?.address || prev.address,
+      city: profile.city || serviceArea?.suburb || prev.city,
+      state: profile.state || serviceArea?.state || prev.state,
+      postcode: profile.postcode || serviceArea?.postcode || prev.postcode,
+      latitude: profile.latitude ?? serviceArea?.lat ?? prev.latitude,
+      longitude: profile.longitude ?? serviceArea?.lng ?? prev.longitude,
+    }))
+
+    if (serviceArea?.radiusKm) {
+      setServiceRadiusKm(serviceArea.radiusKm)
+    }
+  } catch (error) {
+    console.error('Error loading employee profile:', error)
   }
 }
 
@@ -45,8 +126,13 @@ export default function EmployeeSettings() {
     address: '',
     city: '',
     state: '',
-    postcode: ''
+    postcode: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
   })
+  const [addressPredictions, setAddressPredictions] = useState<AddressPrediction[]>([])
+  const [showAddressPredictions, setShowAddressPredictions] = useState(false)
+  const [addressError, setAddressError] = useState('')
   const [availability, setAvailabilityData] = useState<AvailabilityData>({
     monday: { available: true, start: '09:00', end: '17:00' },
     tuesday: { available: true, start: '09:00', end: '17:00' },
@@ -56,6 +142,7 @@ export default function EmployeeSettings() {
     saturday: { available: true, start: '10:00', end: '14:00' },
     sunday: { available: false, start: '00:00', end: '00:00' }
   })
+  const [serviceRadiusKm, setServiceRadiusKm] = useState(15)
 
   useEffect(() => {
     if (hasCheckedAuth) return
@@ -77,12 +164,15 @@ export default function EmployeeSettings() {
         phone: userData.phone || '',
         address: '',
         city: '',
-        state: (userData as any)?.state || '',
-        postcode: ''
+        state: 'state' in userData ? String(userData.state || '') : '',
+        postcode: '',
+        latitude: null,
+        longitude: null,
       })
 
       // Load availability
-      loadAvailability(user.id, setAvailabilityData)
+      loadAvailability(user.id, setAvailabilityData, setServiceRadiusKm)
+      loadEmployeeProfile(user.id, setFormData, setServiceRadiusKm)
     }
   }, [user, loading, userData, hasCheckedAuth, router])
 
@@ -104,7 +194,7 @@ export default function EmployeeSettings() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleAvailabilityChange = (day: string, field: string, value: any) => {
+  const handleAvailabilityChange = (day: string, field: string, value: boolean | string) => {
     setAvailabilityData(prev => ({
       ...prev,
       [day]: {
@@ -114,19 +204,101 @@ export default function EmployeeSettings() {
     }))
   }
 
+  const fetchAddressPredictions = async (input: string) => {
+    if (!input || input.length < 3) {
+      setAddressPredictions([])
+      setShowAddressPredictions(false)
+      return
+    }
+
+    try {
+      const response = await fetch('/api/places/autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input,
+          componentRestrictions: { country: 'au' },
+        }),
+      })
+      if (!response.ok) throw new Error('Failed to fetch address predictions')
+      const data = await response.json()
+      setAddressPredictions(data.predictions || [])
+      setShowAddressPredictions((data.predictions || []).length > 0)
+    } catch (error) {
+      console.error('Error fetching address predictions:', error)
+      setAddressPredictions([])
+      setShowAddressPredictions(false)
+    }
+  }
+
+  const selectServiceAddress = async (prediction: AddressPrediction) => {
+    try {
+      setAddressError('')
+      const response = await fetch('/api/places/details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ placeId: prediction.placeId }),
+      })
+      if (!response.ok) throw new Error('Failed to validate address')
+      const data = await response.json()
+      const addressParts = data.addressParts
+
+      if (addressParts?.country?.toLowerCase() !== 'australia') {
+        setAddressError('Please select an Australian service address.')
+        return
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        address: addressParts.formattedAddress || '',
+        city: addressParts.suburb || '',
+        state: addressParts.state || prev.state,
+        postcode: addressParts.postcode || '',
+        latitude: addressParts.latitude ?? null,
+        longitude: addressParts.longitude ?? null,
+      }))
+      setShowAddressPredictions(false)
+      setAddressPredictions([])
+    } catch (error) {
+      console.error('Error selecting service address:', error)
+      setAddressError('Failed to validate address. Please try again.')
+    }
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const profileResponse = await fetch('/api/employee/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: user?.id,
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          postcode: formData.postcode,
+          country: 'Australia',
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          serviceRadiusKm,
+        })
+      })
+
       const response = await fetch('/api/employee/availability', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employeeId: user?.id,
-          availability: availability
+          availability: availability,
+          serviceRadiusKm,
         })
       })
       
-      if (response.ok) {
+      if (response.ok && profileResponse.ok) {
         setToastMessage('Settings saved successfully!')
         setToastType('success')
       } else {
@@ -148,7 +320,8 @@ export default function EmployeeSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employeeId: user?.id,
-          availability: availability
+          availability: availability,
+          serviceRadiusKm,
         })
       })
       
@@ -300,13 +473,38 @@ export default function EmployeeSettings() {
               
               <div>
                 <label className="block text-dark font-semibold text-sm mb-2">Street Address</label>
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 bg-light border border-gray-200 text-dark rounded-lg placeholder-gray-400 focus:outline-none focus:border-primary transition"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={(e) => {
+                      handleInputChange(e)
+                      setFormData(prev => ({ ...prev, latitude: null, longitude: null }))
+                      fetchAddressPredictions(e.target.value)
+                    }}
+                    className="w-full px-4 py-2.5 bg-light border border-gray-200 text-dark rounded-lg placeholder-gray-400 focus:outline-none focus:border-primary transition"
+                  />
+                  {showAddressPredictions && addressPredictions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto">
+                      {addressPredictions.map((prediction, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => selectServiceAddress(prediction)}
+                          className="w-full text-left px-4 py-3 hover:bg-light border-b border-gray-100 last:border-b-0 transition"
+                        >
+                          <p className="font-semibold text-dark text-sm">{prediction.main_text}</p>
+                          <p className="text-xs text-gray">{prediction.secondary_text}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {addressError && <p className="text-red-600 text-sm mt-2">{addressError}</p>}
+                {formData.latitude && formData.longitude && (
+                  <p className="text-primary text-sm mt-2">Service address verified for radius matching.</p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -416,12 +614,13 @@ export default function EmployeeSettings() {
                     type="range"
                     min="1"
                     max="50"
-                    defaultValue="15"
+                    value={serviceRadiusKm}
+                    onChange={(e) => setServiceRadiusKm(Number(e.target.value))}
                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                   />
                   <div className="flex justify-between text-sm text-gray">
                     <span>1 km</span>
-                    <span className="text-primary font-semibold">15 km</span>
+                    <span className="text-primary font-semibold">{serviceRadiusKm} km</span>
                     <span>50 km</span>
                   </div>
                 </div>

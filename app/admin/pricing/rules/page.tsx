@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
@@ -25,8 +24,7 @@ interface PricingRule {
 }
 
 export default function PricingRulesPage() {
-  const router = useRouter()
-  const { user, userData, loading: authLoading } = useAuth()
+  const { checkingAdminAccess } = useRequireAdminAccess()
   const [activeTab, setActiveTab] = useState<'rules' | 'preview' | 'surge'>('rules')
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([
     {
@@ -105,12 +103,6 @@ export default function PricingRulesPage() {
   const [previewPrice, setPreviewPrice] = useState<any>(null)
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/auth/login')
-    }
-  }, [user, authLoading, router])
-
-  useEffect(() => {
     if (activeTab === 'preview') {
       const pricing = calculatePrice({
         weightKg: previewWeight,
@@ -125,18 +117,10 @@ export default function PricingRulesPage() {
     }
   }, [previewWeight, previewDistance, previewService, previewZone, previewWeather, activeTab])
 
-  if (authLoading) {
+  if (checkingAdminAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray">Loading...</p>
-      </div>
-    )
-  }
-
-  if (!userData?.is_admin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray">You don't have access to this page</p>
       </div>
     )
   }

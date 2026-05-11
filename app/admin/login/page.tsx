@@ -6,6 +6,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import { grantAdminAccess } from '@/lib/useAdminAccess'
 import { Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
 
 export default function AdminLogin() {
@@ -15,24 +16,33 @@ export default function AdminLogin() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  const adminPassword = '0Anev5Cyh54ZhfNwWM1f' // 20-character password
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setIsLoading(true)
 
     try {
-      if (password === adminPassword) {
-        // Store in session storage
-        sessionStorage.setItem('ownerAccess', 'true')
-        // Redirect to admin
-        router.push('/admin')
-      } else {
-        setError('Invalid admin password')
+      const response = await fetch('/api/admin/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          setError('Too many attempts. Please wait a few minutes and try again.')
+        } else {
+          setError('Invalid admin password')
+        }
         setPassword('')
+        return
       }
-    } catch (err) {
+
+      grantAdminAccess()
+      const next = new URLSearchParams(window.location.search).get('next')
+      router.push(next?.startsWith('/admin') ? next : '/admin')
+      router.refresh()
+    } catch {
       setError('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)
@@ -64,7 +74,7 @@ export default function AdminLogin() {
           )}
 
           {/* Login Form */}
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-6" autoComplete="off">
             {/* Password Input */}
             <div>
               <label className="block text-sm font-semibold text-[#1f2d2b] mb-2">
@@ -72,12 +82,16 @@ export default function AdminLogin() {
               </label>
               <div className="relative">
                 <input
+                  name="washlee-admin-passphrase"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter admin password"
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#48C9B0] transition text-[#1f2d2b]"
                   disabled={isLoading}
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                 />
                 <button
                   type="button"

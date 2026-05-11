@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
+import { supabase } from '@/lib/supabaseClient'
 import { CheckCircle, Clock, MapPin, Package, ChevronRight } from 'lucide-react'
 
 interface OrderData {
@@ -51,7 +52,12 @@ function CheckoutSuccessContent() {
 
         // Fetch order details from Supabase
         console.log('[CheckoutSuccess] Fetching order from Supabase:', savedOrderId)
-        const response = await fetch(`/api/orders/details?orderId=${savedOrderId}`)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const response = await fetch(`/api/orders/details?orderId=${savedOrderId}`, {
+          headers: sessionData.session?.access_token
+            ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+            : undefined,
+        })
         
         if (!response.ok) {
           console.error('[CheckoutSuccess] Failed to fetch order:', response.status)

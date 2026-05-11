@@ -1,8 +1,8 @@
 'use client'
 
-import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Header from '@/components/Header'
@@ -28,8 +28,8 @@ interface Payout {
 }
 
 export default function AdminPayoutManagement() {
-  const { userData } = useAuth()
   const router = useRouter()
+  const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [payouts, setPayouts] = useState<Payout[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'pending' | 'processing' | 'completed' | 'rejected'>('pending')
@@ -39,13 +39,9 @@ export default function AdminPayoutManagement() {
   const [bankTransactionId, setBankTransactionId] = useState('')
 
   useEffect(() => {
-    // Check if user is admin (admin check should be done on server-side for security)
-    if (!userData) {
-      router.push('/')
-      return
-    }
+    if (!hasAdminAccess) return
     fetchPayouts()
-  }, [filter])
+  }, [filter, hasAdminAccess])
 
   const fetchPayouts = async () => {
     try {
@@ -201,7 +197,7 @@ export default function AdminPayoutManagement() {
         </div>
 
         {/* Payouts Grid */}
-        {loading ? (
+        {checkingAdminAccess || loading ? (
           <Card className="p-12 text-center">
             <p className="text-gray">Loading payouts...</p>
           </Card>

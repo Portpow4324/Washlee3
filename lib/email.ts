@@ -1,45 +1,37 @@
 /**
  * Email service utility functions
- * Supports SendGrid, Gmail, or console-only mode for testing
+ * Sends through the shared Resend-backed email service
  */
 
-import nodemailer from 'nodemailer'
+import { sendEmail } from './emailService'
 
-// Initialize transporter based on available credentials
-let transporter: any = null
+type WorkVerification = {
+  hasWorkRight?: boolean | null
+  hasValidLicense?: boolean | null
+  hasTransport?: boolean | null
+  hasEquipment?: boolean | null
+  ageVerified?: boolean | null
+}
 
-// Try to create transporter with available email service
-if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-  // Gmail configuration (for development/testing)
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  })
-  console.log('[Email] ✅ Gmail transporter initialized:', process.env.GMAIL_USER)
-} else if (process.env.SENDGRID_API_KEY) {
-  // SendGrid configuration (for production)
-  const sgMail = require('@sendgrid/mail')
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-  transporter = sgMail
-  console.log('[Email] ✅ SendGrid transporter initialized')
-} else {
-  console.warn('[Email] ⚠️ No email service configured - emails will not be sent')
-  console.warn('[Email] Set GMAIL_USER + GMAIL_APP_PASSWORD or SENDGRID_API_KEY in .env.local')
+type EmployeeEmailData = {
+  firstName: string
+  lastName: string
+  employeeId?: string
+  email?: string
+  phone?: string
+  state?: string
+  workVerification?: WorkVerification
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || 'Failed to send email')
 }
 
 export async function sendEmployeeConfirmationEmail(
   email: string,
-  employeeData: any
+  employeeData: EmployeeEmailData
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!transporter) {
-      console.warn('[Email] Email service not configured - skipping send')
-      return { success: true } // Don't fail - let development proceed without email
-    }
-
     const { firstName, lastName, employeeId } = employeeData
 
     const htmlContent = `
@@ -87,41 +79,29 @@ export async function sendEmployeeConfirmationEmail(
       </div>
     `
 
-    if (process.env.SENDGRID_API_KEY) {
-      // SendGrid send
-      await transporter.send({
-        to: email,
-        from: process.env.GMAIL_USER || 'noreply@washlee.com.au',
-        subject: '🎉 Welcome to Washlee Pro!',
-        html: htmlContent,
-      })
-    } else {
-      // Gmail send via nodemailer
-      await transporter.sendMail({
-        from: process.env.GMAIL_USER,
-        to: email,
-        subject: '🎉 Welcome to Washlee Pro!',
-        html: htmlContent,
-      })
+    const result = await sendEmail({
+      to: email,
+      subject: 'Welcome to Washlee Pro!',
+      html: htmlContent,
+    })
+
+    if (!result.success) {
+      return { success: false, error: result.error || 'Failed to send email' }
     }
 
     console.log('[Email] ✅ Employee confirmation email sent to:', email)
     return { success: true }
-  } catch (err: any) {
-    console.error('[Email] Error sending employee confirmation:', err.message)
-    return { success: false, error: err.message || 'Failed to send email' }
+  } catch (err: unknown) {
+    const message = getErrorMessage(err)
+    console.error('[Email] Error sending employee confirmation:', message)
+    return { success: false, error: message }
   }
 }
 
 export async function sendEmployerNotificationEmail(
-  employeeData: any
+  employeeData: EmployeeEmailData
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!transporter) {
-      console.warn('[Email] Email service not configured - skipping send')
-      return { success: true }
-    }
-
     const { firstName, lastName, email, phone, state, employeeId, workVerification } = employeeData
 
     const htmlContent = `
@@ -167,29 +147,22 @@ export async function sendEmployerNotificationEmail(
 
     const adminEmail = process.env.EMPLOYER_EMAIL || 'admin@washlee.com.au'
 
-    if (process.env.SENDGRID_API_KEY) {
-      // SendGrid send
-      await transporter.send({
-        to: adminEmail,
-        from: process.env.GMAIL_USER || 'noreply@washlee.com.au',
-        subject: `📋 New Pro Application: ${firstName} ${lastName}`,
-        html: htmlContent,
-      })
-    } else {
-      // Gmail send via nodemailer
-      await transporter.sendMail({
-        from: process.env.GMAIL_USER,
-        to: adminEmail,
-        subject: `📋 New Pro Application: ${firstName} ${lastName}`,
-        html: htmlContent,
-      })
+    const result = await sendEmail({
+      to: adminEmail,
+      subject: `New Pro Application: ${firstName} ${lastName}`,
+      html: htmlContent,
+    })
+
+    if (!result.success) {
+      return { success: false, error: result.error || 'Failed to send email' }
     }
 
     console.log('[Email] ✅ Employer notification email sent to:', adminEmail)
     return { success: true }
-  } catch (err: any) {
-    console.error('[Email] Error sending employer notification:', err.message)
-    return { success: false, error: err.message || 'Failed to send email' }
+  } catch (err: unknown) {
+    const message = getErrorMessage(err)
+    console.error('[Email] Error sending employer notification:', message)
+    return { success: false, error: message }
   }
 }
 
@@ -199,11 +172,6 @@ export async function sendEmailVerificationCode(
   code: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!transporter) {
-      console.warn('[Email] Email service not configured - skipping send')
-      return { success: true }
-    }
-
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f7fefe;">
         <div style="background: linear-gradient(135deg, #48C9B0 0%, #7FE3D3 100%); color: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
@@ -239,29 +207,22 @@ export async function sendEmailVerificationCode(
       </div>
     `
 
-    if (process.env.SENDGRID_API_KEY) {
-      // SendGrid send
-      await transporter.send({
-        to: email,
-        from: process.env.GMAIL_USER || 'noreply@washlee.com.au',
-        subject: '🔐 Your Washlee Verification Code',
-        html: htmlContent,
-      })
-    } else {
-      // Gmail send via nodemailer
-      await transporter.sendMail({
-        from: process.env.GMAIL_USER,
-        to: email,
-        subject: '🔐 Your Washlee Verification Code',
-        html: htmlContent,
-      })
+    const result = await sendEmail({
+      to: email,
+      subject: 'Your Washlee Verification Code',
+      html: htmlContent,
+    })
+
+    if (!result.success) {
+      return { success: false, error: result.error || 'Failed to send email' }
     }
 
     console.log('[Email] ✅ Verification code sent to:', email)
     return { success: true }
-  } catch (err: any) {
-    console.error('[Email] Error sending verification code:', err.message)
-    return { success: false, error: err.message || 'Failed to send email' }
+  } catch (err: unknown) {
+    const message = getErrorMessage(err)
+    console.error('[Email] Error sending verification code:', message)
+    return { success: false, error: message }
   }
 }
 
@@ -279,9 +240,9 @@ export async function sendPhoneVerificationCode(
     // Example: await client.messages.create({ to: phone, from: '...', body: ... })
     
     return { success: true }
-  } catch (err: any) {
-    console.error('[SMS] Error sending phone code:', err.message)
-    return { success: false, error: err.message || 'Failed to send SMS' }
+  } catch (err: unknown) {
+    const message = getErrorMessage(err)
+    console.error('[SMS] Error sending phone code:', message)
+    return { success: false, error: message || 'Failed to send SMS' }
   }
 }
-

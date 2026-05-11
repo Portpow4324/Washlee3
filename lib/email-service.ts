@@ -7,28 +7,15 @@ interface EmailOptions {
   text?: string
 }
 
-// Initialize nodemailer transporter
-// For production, use SMTP (SendGrid, Brevo, Gmail, etc.)
+// Initialize nodemailer transporter.
+// Resend SMTP is the primary path; custom SMTP remains as a fallback.
 let transporter: nodemailer.Transporter | null = null
 
 function initializeTransporter() {
   if (transporter) return transporter
 
-  // Priority: SendGrid > Resend > SMTP (Gmail) > Fallback
-  // SendGrid is prioritized as it's properly configured with lukaverde045@gmail.com
-  if (process.env.SENDGRID_API_KEY) {
-    console.log('[Email] Using SendGrid SMTP relay (Primary)')
-    transporter = nodemailer.createTransport({
-      host: 'smtp.sendgrid.net',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'apikey',
-        pass: process.env.SENDGRID_API_KEY,
-      },
-    })
-  } else if (process.env.RESEND_API_KEY) {
-    console.log('[Email] Using Resend SMTP (Backup)')
+  if (process.env.RESEND_API_KEY) {
+    console.log('[Email] Using Resend SMTP')
     transporter = nodemailer.createTransport({
       host: 'smtp.resend.com',
       port: 465,
@@ -71,7 +58,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const mailer = initializeTransporter()
 
     const mailOptions = {
-      from: process.env.SMTP_FROM_EMAIL || process.env.SENDGRID_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'noreply@washlee.com',
+      from: process.env.SMTP_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
       to: options.to,
       subject: options.subject,
       html: options.html,

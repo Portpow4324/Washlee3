@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { ChevronLeft, Search, Filter, MoreVertical, Gift } from 'lucide-react'
 import Link from 'next/link'
 
@@ -36,29 +35,15 @@ export default function WashClubPage() {
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
-        .from('wash_clubs')
-        .select(`
-          id,
-          user_id,
-          card_number,
-          tier,
-          credits_balance,
-          earned_credits,
-          redeemed_credits,
-          total_spend,
-          status,
-          join_date,
-          users(email)
-        `)
-        .order('join_date', { ascending: false })
+      const response = await fetch('/api/admin/collections?name=washClub', { cache: 'no-store' })
+      const result = await response.json()
 
-      if (fetchError) {
-        setError(fetchError.message)
+      if (!response.ok || !result.success) {
+        setError(result.error || 'Failed to load wash club members')
         return
       }
 
-      const transformed: WashClubMember[] = (data || []).map((item: any) => ({
+      const transformed: WashClubMember[] = (result.data || []).map((item: any) => ({
         id: item.id,
         user_id: item.user_id,
         card_number: item.card_number,

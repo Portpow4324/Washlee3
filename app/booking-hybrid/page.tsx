@@ -39,6 +39,13 @@ export default function BookingHybrid() {
   const [showAddressPredictions, setShowAddressPredictions] = useState(false)
   const [addressError, setAddressError] = useState('')
 
+  // Scheduling states
+  const [availableDeliverySlots, setAvailableDeliverySlots] = useState<any[]>([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
+  const [slotsError, setSlotsError] = useState('')
+  const [selectedPickupDate, setSelectedPickupDate] = useState<string>('')
+  const [selectedDeliveryDate, setSelectedDeliveryDate] = useState<string>('')
+
   const [bookingData, setBookingData] = useState({
     // Step 1: Select Service
     selectedService: 'standard',
@@ -75,6 +82,11 @@ export default function BookingHybrid() {
     // Step 7: Delivery Address
     deliveryAddress: '',
     deliveryAddressDetails: null as AddressParts | null,
+
+    // Step 8: Scheduling
+    pickupDate: '',
+    deliveryDate: '',
+    deliveryTimeSlot: '',
   })
 
   const steps = [
@@ -84,7 +96,9 @@ export default function BookingHybrid() {
     { number: 4, title: 'Bag Count', description: 'How many bags are you sending?' },
     { number: 5, title: 'Delivery Speed', description: 'Choose your desired delivery speed' },
     { number: 6, title: 'Protection Plan', description: 'Washlee\'s Protection Plan covers damage & loss' },
-    { number: 7, title: 'Review & Confirm', description: 'Review your order and complete checkout' },
+    { number: 7, title: 'Delivery Address', description: 'Where should we deliver your laundry?' },
+    { number: 8, title: 'Schedule Times', description: 'Choose pickup date and delivery time' },
+    { number: 9, title: 'Review & Confirm', description: 'Review your order and complete checkout' },
   ]
 
   const services = [
@@ -153,6 +167,52 @@ export default function BookingHybrid() {
     }
   }
 
+  // Fetch available scheduling slots
+  const fetchAvailableSlots = async (pickupDate: string) => {
+    setSlotsLoading(true)
+    setSlotsError('')
+    
+    try {
+      // Calculate delivery date based on delivery speed
+      const pickupDateObj = new Date(pickupDate)
+      let deliveryDateObj = new Date(pickupDateObj)
+      
+      if (bookingData.deliverySpeed === 'standard') {
+        deliveryDateObj.setDate(deliveryDateObj.getDate() + 2) // 24-48 hours
+      } else {
+        deliveryDateObj.setDate(deliveryDateObj.getDate()) // Same-day express
+      }
+      
+      const deliveryDateStr = deliveryDateObj.toISOString().split('T')[0]
+      
+      // Fetch delivery slots
+      const deliveryResponse = await fetch('/api/scheduling/delivery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: deliveryDateStr,
+          address: bookingData.deliveryAddress,
+          addressDetails: bookingData.deliveryAddressDetails || bookingData.pickupAddressDetails,
+          duration_minutes: 30
+        })
+      })
+      
+      if (!deliveryResponse.ok) throw new Error('Failed to fetch delivery slots')
+      const deliveryData = await deliveryResponse.json()
+      setAvailableDeliverySlots(deliveryData.slots || [])
+      setSelectedDeliveryDate(deliveryDateStr)
+      setBookingData(prev => ({ ...prev, deliveryDate: deliveryDateStr }))
+    } catch (error) {
+      setSlotsError(error instanceof Error ? error.message : 'Failed to load time slots')
+    } finally {
+      setSlotsLoading(false)
+    }
+  }
+
+  const getDisplayedDeliverySlots = () => {
+    return availableDeliverySlots
+  }
+
   // Select an address from predictions and validate it
   const selectAddress = async (prediction: any) => {
     try {
@@ -180,8 +240,9 @@ export default function BookingHybrid() {
       setAddressInput(data.addressParts.formattedAddress)
       setBookingData({
         ...bookingData,
-        pickupAddress: data.addressParts.formattedAddress,
-        pickupAddressDetails: data.addressParts,
+        ...(prediction.isDelivery
+          ? { deliveryAddress: data.addressParts.formattedAddress, deliveryAddressDetails: data.addressParts }
+          : { pickupAddress: data.addressParts.formattedAddress, pickupAddressDetails: data.addressParts }),
       })
       setShowAddressPredictions(false)
       setAddressPredictions([])
@@ -237,7 +298,7 @@ export default function BookingHybrid() {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      if (currentStep < 7) {
+      if (currentStep < 9) {
         setCurrentStep(currentStep + 1)
       } else {
         handleSubmitOrder()
@@ -273,6 +334,26 @@ export default function BookingHybrid() {
       case 6:
         return true
       case 7:
+        if (!bookingData.deliveryAddress) {
+          setError('Please provide a delivery address')
+          return false
+        }
+        return true
+      case 8:
+        if (!bookingData.pickupDate) {
+          setError('Please select a pickup date')
+          return false
+        }
+        if (!bookingData.deliveryDate) {
+          setError('Please select a delivery date')
+          return false
+        }
+        if (!bookingData.deliveryTimeSlot) {
+          setError('Please select a delivery time')
+          return false
+        }
+        return true
+      case 9:
         if (!agreedToTerms) {
           setError('Please agree to the Terms of Service')
           return false
@@ -317,6 +398,10 @@ export default function BookingHybrid() {
           }),
           total_price: orderTotal,
           created_at: new Date().toISOString(),
+          // Scheduling fields
+          pickup_date: bookingData.pickupDate,
+          delivery_date: bookingData.deliveryDate,
+          delivery_time_slot: bookingData.deliveryTimeSlot,
         }),
       })
 
@@ -351,6 +436,8 @@ export default function BookingHybrid() {
       </div>
     )
   }
+
+  const displayedDeliverySlots = getDisplayedDeliverySlots()
 
   return (
     <div className="min-h-screen bg-light flex flex-col">
@@ -791,8 +878,94 @@ export default function BookingHybrid() {
           </div>
         )}
 
-        {/* STEP 7: Review & Confirm */}
-        {currentStep === 7 && (
+        {/* STEP 8: Schedule Pickup Date & Delivery Time */}
+        {currentStep === 8 && (
+          <div className="max-w-3xl mx-auto">
+            <Card className="p-8 mb-8">
+              {slotsError && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 font-semibold flex items-center gap-2">
+                    <AlertCircle size={18} /> {slotsError}
+                  </p>
+                </div>
+              )}
+              
+              {/* Pickup Date Selection */}
+              <div className="mb-8">
+                <label className="block text-sm font-semibold text-dark mb-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock size={18} className="text-primary" />
+                    Pickup Date (required)
+                  </div>
+                </label>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  {/* Date Picker */}
+                  <div>
+                    <input
+                      type="date"
+                      min={new Date().toISOString().split('T')[0]}
+                      max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                      value={selectedPickupDate}
+                      onChange={(e) => {
+                        const nextPickupDate = e.target.value
+                        setSelectedPickupDate(nextPickupDate)
+                        setBookingData({ ...bookingData, pickupDate: nextPickupDate, deliveryDate: '', deliveryTimeSlot: '' })
+                        if (nextPickupDate) {
+                          fetchAvailableSlots(nextPickupDate)
+                        } else {
+                          setSelectedDeliveryDate('')
+                          setAvailableDeliverySlots([])
+                        }
+                      }}
+                      className="w-full border-2 border-gray rounded-lg p-3 focus:border-primary outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Delivery Date & Time Selection */}
+              <div className="mb-8">
+                <label className="block text-sm font-semibold text-dark mb-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Truck size={18} className="text-primary" />
+                    Delivery Date & Time (required)
+                  </div>
+                </label>
+                
+                {/* Time Slots Grid */}
+                {slotsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner />
+                  </div>
+                ) : displayedDeliverySlots.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {displayedDeliverySlots.map((slot: any) => (
+                      <button
+                        key={slot.timeSlot}
+                        onClick={() => setBookingData({ ...bookingData, deliveryTimeSlot: slot.timeSlot })}
+                        className={`p-4 rounded-lg border-2 transition text-center ${
+                          bookingData.deliveryTimeSlot === slot.timeSlot
+                            ? 'border-primary bg-mint text-dark font-semibold'
+                            : 'border-gray hover:border-primary text-gray'
+                        }`}
+                      >
+                        <div className="font-semibold">{slot.timeSlot}</div>
+                      </button>
+                    ))}
+                  </div>
+                ) : selectedPickupDate && selectedDeliveryDate && !slotsLoading ? (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-700">No available time slots for this date.</p>
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* STEP 9: Review & Confirm */}
+        {currentStep === 9 && (
           <div className="max-w-2xl mx-auto">
             <Card className="p-8 mb-8">
               <h3 className="font-bold text-dark mb-6">Order Summary</h3>
@@ -813,6 +986,14 @@ export default function BookingHybrid() {
                 <div className="flex justify-between">
                   <span className="text-gray">Protection:</span>
                   <span className="font-semibold text-dark">{protectionPlans.find(p => p.id === bookingData.protectionPlan)?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray">Pickup Date:</span>
+                  <span className="font-semibold text-dark">{bookingData.pickupDate}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray">Delivery:</span>
+                  <span className="font-semibold text-dark">{bookingData.deliveryDate} {bookingData.deliveryTimeSlot}</span>
                 </div>
               </div>
 

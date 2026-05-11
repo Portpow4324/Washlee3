@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     const result = await sendEmail({
       to: email,
-      subject: subject || '🔐 Washlee Test Email',
+      subject: subject || 'Washlee Test Email',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f7fefe;">
           <div style="background: linear-gradient(135deg, #48C9B0 0%, #7FE3D3 100%); color: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
             </p>
 
             <p style="font-size: 14px; color: #6b7b78; line-height: 1.6; margin: 20px 0;">
-              This is a test email to verify that SendGrid is working correctly.
+              This is a test email to verify that Resend is working correctly.
             </p>
 
             ${code ? `
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
             ` : ''}
 
             <p style="font-size: 13px; color: #6b7b78; line-height: 1.6;">
-              If you received this email, SendGrid is working correctly!
+              If you received this email, Resend is working correctly!
             </p>
 
             <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 25px; text-align: center;">
@@ -59,10 +59,11 @@ export async function POST(request: NextRequest) {
       messageId: result.messageId,
       error: result.error,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to send test email'
     console.error('[TEST] Email test error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to send test email' },
+      { error: message },
       { status: 500 }
     )
   }

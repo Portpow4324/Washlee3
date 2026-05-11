@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Card from '@/components/Card'
@@ -24,8 +23,7 @@ interface Campaign {
 }
 
 export default function EmailCampaignsPage() {
-  const router = useRouter()
-  const { user, userData, loading: authLoading } = useAuth()
+  const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewCampaign, setShowNewCampaign] = useState(false)
@@ -42,22 +40,10 @@ export default function EmailCampaignsPage() {
   const templates = getEmailTemplates()
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      console.log('[Marketing] Not logged in, redirecting to login')
-      router.push('/auth/login')
-      return
-    }
-    if (!authLoading && user && !userData?.is_admin) {
-      console.error('[Marketing] User is not admin. Current user:', user.email)
-      router.push('/')
-    }
-  }, [user, authLoading, userData, router])
-
-  useEffect(() => {
-    if (user && userData?.is_admin) {
+    if (hasAdminAccess) {
       fetchCampaigns()
     }
-  }, [user, userData])
+  }, [hasAdminAccess])
 
   const fetchCampaigns = async () => {
     try {
@@ -119,18 +105,10 @@ export default function EmailCampaignsPage() {
     }
   }
 
-  if (authLoading || loading) {
+  if (checkingAdminAccess || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray">Loading campaigns...</p>
-      </div>
-    )
-  }
-
-  if (!userData?.is_admin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray">You don't have access to this page</p>
       </div>
     )
   }

@@ -1,31 +1,33 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/AuthContext'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  BarChart3,
-  Users,
-  ShoppingCart,
-  TrendingUp,
+  Activity,
   AlertCircle,
-  Eye,
-  LogOut,
-  Briefcase,
-  Lock,
-  ChevronDown,
-  Shield,
-  Settings,
-  DollarSign,
-  Megaphone,
+  BarChart3,
   Bell,
+  Bot,
+  Briefcase,
   CreditCard,
+  DollarSign,
+  ExternalLink,
   Gift,
-  MessageSquare
+  LineChart,
+  LogOut,
+  MessageSquare,
+  MonitorCheck,
+  RefreshCw,
+  Shield,
+  ShoppingCart,
+  Smartphone,
+  type LucideIcon,
+  Users,
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Spinner from '@/components/Spinner'
+import { clearAdminAccess, confirmAdminAccess } from '@/lib/useAdminAccess'
 
 interface AnalyticsData {
   totalRevenue: number
@@ -38,542 +40,497 @@ interface AnalyticsData {
   topProEarnings: number
 }
 
+type MonitoringSummary = {
+  ok: boolean
+  setupRequired?: boolean
+  error?: string
+  generatedAt?: string
+  overview?: {
+    visitorsToday: number
+    eventsToday: number
+    activeSessions: number
+    authFailuresToday: number
+    adminPathViewsToday: number
+    webEventsToday?: number
+    mobileEventsToday?: number
+    openAlerts?: number
+    criticalAlerts?: number
+    lastEventAt?: string | null
+  }
+  topPages?: Array<{ label: string; count: number }>
+  topScreens?: Array<{ label: string; count: number }>
+  funnel?: Record<string, number>
+  alerts?: Array<{
+    id: string
+    severity: 'info' | 'warning' | 'critical'
+    category: string
+    title: string
+    created_at: string
+  }>
+  monitorRuns?: Array<{
+    id: string
+    check_name: string
+    target: string
+    status: 'ok' | 'warning' | 'critical'
+    created_at: string
+  }>
+  ai?: { enabled: boolean; message: string }
+}
+
+type ActionItem = {
+  label: string
+  detail: string
+  href: string
+  icon: LucideIcon
+}
+
+const actionGroups: Array<{ title: string; items: ActionItem[] }> = [
+  {
+    title: 'Operate',
+    items: [
+      { label: 'Orders', detail: 'Manage jobs, status and disputes', href: '/admin/orders', icon: ShoppingCart },
+      { label: 'Users', detail: 'Customers, pros and admin users', href: '/admin/users', icon: Users },
+      { label: 'Pro Applications', detail: 'Review pending providers', href: '/admin/pro-applications', icon: Briefcase },
+    ],
+  },
+  {
+    title: 'Grow',
+    items: [
+      { label: 'Analytics', detail: 'Revenue and platform performance', href: '/admin/analytics', icon: BarChart3 },
+      { label: 'Marketing', detail: 'Campaigns and promotions', href: '/admin/marketing/campaigns', icon: LineChart },
+      { label: 'Wash Club', detail: 'Membership and loyalty', href: '/admin/wash-club', icon: Gift },
+    ],
+  },
+  {
+    title: 'System',
+    items: [
+      { label: 'Monitoring', detail: 'Website, mobile, uptime and alerts', href: '/admin/monitoring', icon: MonitorCheck },
+      { label: 'Security', detail: 'Errors, access and debug logs', href: '/admin/security', icon: Shield },
+      { label: 'Pricing Rules', detail: 'Rates, zones and service settings', href: '/admin/pricing/rules', icon: DollarSign },
+    ],
+  },
+  {
+    title: 'Support',
+    items: [
+      { label: 'Inquiries', detail: 'Customer messages and requests', href: '/admin/inquiries', icon: Bell },
+      { label: 'Support Tickets', detail: 'Open issues and follow-up', href: '/admin/support-tickets', icon: MessageSquare },
+      { label: 'Subscriptions', detail: 'Plans and billing state', href: '/admin/subscriptions', icon: CreditCard },
+    ],
+  },
+]
+
+function formatCurrency(value = 0) {
+  return new Intl.NumberFormat('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return 'No events yet'
+  return new Intl.DateTimeFormat('en-AU', {
+    hour: 'numeric',
+    minute: '2-digit',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(value))
+}
+
+function conversionPercent(done = 0, started = 0) {
+  if (started <= 0) return 0
+  return Math.round((done / started) * 100)
+}
+
+function healthScore(summary: MonitoringSummary | null) {
+  const overview = summary?.overview
+  let score = 100
+  score -= (overview?.criticalAlerts || 0) * 25
+  score -= (overview?.openAlerts || 0) * 8
+  score -= Math.min(20, (overview?.authFailuresToday || 0) * 5)
+  if (summary?.setupRequired) score -= 30
+  return Math.max(0, Math.min(100, score))
+}
+
+function statusCopy(score: number) {
+  if (score >= 90) return 'Healthy'
+  if (score >= 70) return 'Watch'
+  return 'Needs attention'
+}
+
+function StatTile({
+  label,
+  value,
+  detail,
+  icon: Icon,
+}: {
+  label: string
+  value: string | number
+  detail: string
+  icon: LucideIcon
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-gray-600">{label}</p>
+        <Icon className="h-5 w-5 text-[#48C9B0]" />
+      </div>
+      <p className="mt-3 text-3xl font-bold text-gray-950">{value}</p>
+      <p className="mt-1 text-sm text-gray-500">{detail}</p>
+    </div>
+  )
+}
+
+function ActionGroup({ title, items }: { title: string; items: ActionItem[] }) {
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <h2 className="mb-4 text-lg font-bold text-gray-950">{title}</h2>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3 transition hover:border-[#48C9B0] hover:bg-[#f4fffb]"
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
+                <item.icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-gray-950">{item.label}</span>
+                <span className="block truncate text-xs text-gray-500">{item.detail}</span>
+              </span>
+            </span>
+            <ExternalLink className="h-4 w-4 flex-shrink-0 text-gray-400" />
+          </a>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function FunnelStep({ label, count, max }: { label: string; count: number; max: number }) {
+  const width = max > 0 ? Math.max(4, Math.round((count / max) * 100)) : 0
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+        <span className="font-semibold text-gray-700">{label}</span>
+        <span className="font-bold text-gray-950">{count}</span>
+      </div>
+      <div className="h-2 rounded-full bg-gray-100">
+        <div className="h-2 rounded-full bg-[#48C9B0]" style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  )
+}
+
 export default function AdminDashboard() {
-  const { user, userData, loading: authLoading } = useAuth()
   const router = useRouter()
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [monitoring, setMonitoring] = useState<MonitoringSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [hasOwnerAccess, setHasOwnerAccess] = useState(false)
 
-  // Handle logout
-  const handleLogout = () => {
-    sessionStorage.removeItem('ownerAccess')
-    sessionStorage.removeItem('adminLoginTime')
-    router.push('/admin/login')
-  }
-
-  // Check admin access
-  useEffect(() => {
-    // Check for session-based owner access from password login
-    const ownerAccess = sessionStorage.getItem('ownerAccess') === 'true'
-    setHasOwnerAccess(ownerAccess)
-
-    console.log('[AdminPage] Auth state:', { ownerAccess })
-    
-    if (!ownerAccess) {
-      console.log('[AdminPage] No admin access, redirecting to admin login')
-      router.push('/admin/login')
-      return
-    }
-    
-    console.log('[AdminPage] Admin access granted')
-  }, [router])
-
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const response = await fetch('/api/admin/analytics', {
+  const loadDashboard = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      const [analyticsResponse, monitoringResponse] = await Promise.all([
+        fetch('/api/admin/analytics', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'get_dashboard_summary',
-            adminId: 'password-admin'
-          })
-        })
+            adminId: 'password-admin',
+          }),
+        }),
+        fetch('/api/analytics/summary', { cache: 'no-store' }),
+      ])
 
-        if (response.ok) {
-          const data = await response.json()
-          setAnalytics(data.analytics)
-        }
-      } catch (error) {
-        console.error('Error fetching analytics:', error)
-      } finally {
-        setLoading(false)
+      if (analyticsResponse.ok) {
+        const data = await analyticsResponse.json()
+        setAnalytics(data.analytics)
       }
-    }
 
-    if (hasOwnerAccess) {
-      fetchAnalytics()
+      if (monitoringResponse.ok) {
+        setMonitoring(await monitoringResponse.json())
+      }
+    } catch (error) {
+      console.error('Error fetching admin dashboard:', error)
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-  }, [hasOwnerAccess])
+  }, [])
 
-  // Show loading while checking admin access
+  const handleLogout = async () => {
+    await fetch('/api/admin/session', { method: 'DELETE' }).catch(() => undefined)
+    clearAdminAccess()
+    router.push('/admin/login')
+    router.refresh()
+  }
+
+  useEffect(() => {
+    let cancelled = false
+
+    confirmAdminAccess().then((ownerAccess) => {
+      if (cancelled) return
+      setHasOwnerAccess(ownerAccess)
+
+      if (!ownerAccess) {
+        router.push('/admin/login')
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [router])
+
+  useEffect(() => {
+    if (!hasOwnerAccess) return
+
+    loadDashboard()
+    const timer = window.setInterval(loadDashboard, 60_000)
+    return () => window.clearInterval(timer)
+  }, [hasOwnerAccess, loadDashboard])
+
+  const overview = monitoring?.overview || {
+    visitorsToday: 0,
+    eventsToday: 0,
+    activeSessions: 0,
+    authFailuresToday: 0,
+    adminPathViewsToday: 0,
+    webEventsToday: 0,
+    mobileEventsToday: 0,
+    openAlerts: 0,
+    criticalAlerts: 0,
+    lastEventAt: null,
+  }
+
+  const funnel = monitoring?.funnel || {}
+  const pageViews = funnel.page_view || 0
+  const signupStarted = funnel.signup_started || 0
+  const signupCompleted = funnel.signup_completed || 0
+  const bookingStarted = funnel.booking_started || 0
+  const bookingCompleted = funnel.booking_completed || 0
+  const maxFunnel = Math.max(pageViews, signupStarted, signupCompleted, bookingStarted, bookingCompleted, 1)
+  const score = healthScore(monitoring)
+  const bookingConversion = conversionPercent(bookingCompleted, bookingStarted)
+
+  const attentionItems = useMemo(
+    () => [
+      {
+        label: 'Open alerts',
+        value: overview.openAlerts || 0,
+        detail: (overview.openAlerts || 0) > 0 ? 'Review monitoring alerts' : 'No open alerts',
+      },
+      {
+        label: 'Login failures',
+        value: overview.authFailuresToday,
+        detail: overview.authFailuresToday > 0 ? 'Watch auth attempts today' : 'No failed logins today',
+      },
+      {
+        label: 'Pending pros',
+        value: analytics?.pendingApplications || 0,
+        detail: (analytics?.pendingApplications || 0) > 0 ? 'Applications waiting' : 'No pending applications',
+      },
+      {
+        label: 'Booking conversion',
+        value: `${bookingConversion}%`,
+        detail: bookingStarted > 0 ? 'Started to completed bookings' : 'Waiting for booking events',
+      },
+    ],
+    [analytics?.pendingApplications, bookingConversion, bookingStarted, overview.authFailuresToday, overview.openAlerts]
+  )
+
   if (!hasOwnerAccess && loading) {
     return (
       <>
         <Header />
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center space-y-4">
+        <main className="flex min-h-screen items-center justify-center">
+          <div className="space-y-4 text-center">
             <Spinner />
-            <p className="text-gray">Loading admin dashboard...</p>
+            <p className="text-gray-600">Loading admin dashboard...</p>
           </div>
-        </div>
+        </main>
         <Footer />
       </>
     )
   }
 
-  // If no admin access, show denied (this shouldn't happen as we redirect in useEffect)
-  if (!hasOwnerAccess) {
-    return (
-      <>
-        <Header />
-        <div className="min-h-screen bg-gray-50 py-12 px-4">
-          <div className="max-w-md mx-auto bg-white rounded-lg shadow p-8 text-center">
-            <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h1>
-            <p className="text-gray-600 mb-6">You don't have admin access.</p>
-            <a
-              href="/admin/login"
-              className="inline-block px-6 py-2 bg-[#48C9B0] text-white rounded hover:bg-[#3aad9a] transition font-semibold"
-            >
-              Go to Admin Setup
-            </a>
-          </div>
-        </div>
-        <Footer />
-      </>
-    )
-  }
+  if (!hasOwnerAccess) return null
 
   return (
     <>
       <Header />
-      <div className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8 flex items-center justify-between">
+      <main className="min-h-screen bg-gray-50 px-4 py-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-              <p className="text-gray-600">Welcome back, Owner</p>
+              <p className="text-sm font-bold uppercase tracking-wide text-[#48C9B0]">Washlee Admin</p>
+              <h1 className="text-4xl font-bold text-gray-950">Control Center</h1>
+              <p className="mt-2 text-gray-600">Website, mobile app, orders and alerts in one place.</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition"
-            >
-              <LogOut size={20} />
-              Logout
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={loadDashboard}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </button>
+              <a
+                href="/admin/monitoring"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#48C9B0] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#3aad9a]"
+              >
+                <MonitorCheck className="h-4 w-4" />
+                Monitoring
+              </a>
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center gap-2 rounded-lg bg-gray-950 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-gray-800"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
           </div>
 
-          {/* Admin Alert */}
-          <div className="bg-red-50 border-l-4 border-red-600 p-4 mb-8">
-            <div className="flex gap-3">
-              <AlertCircle className="text-red-600 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-red-900">Admin Access Granted</p>
-                <p className="text-sm text-red-700">You have full access to platform management. Handle with care.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          {analytics && (
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {/* Total Revenue */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-600 font-semibold">Total Revenue</h3>
-                  <TrendingUp className="text-green-600" size={24} />
-                </div>
-                <p className="text-3xl font-bold text-gray-900 mb-2">
-                  ${analytics.totalRevenue.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-500">Monthly total</p>
-              </div>
-
-              {/* Total Orders */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-600 font-semibold">Total Orders</h3>
-                  <ShoppingCart className="text-blue-600" size={24} />
-                </div>
-                <p className="text-3xl font-bold text-gray-900 mb-2">
-                  {analytics.totalOrders.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-500">All time</p>
-              </div>
-
-              {/* Active Users */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-600 font-semibold">Active Users</h3>
-                  <Users className="text-primary" size={24} />
-                </div>
-                <p className="text-3xl font-bold text-gray-900 mb-2">
-                  {analytics.activeUsers.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-500">This month</p>
-              </div>
-
-              {/* Avg Order Value */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-600 font-semibold">Avg Order Value</h3>
-                  <BarChart3 className="text-purple-600" size={24} />
-                </div>
-                <p className="text-3xl font-bold text-gray-900 mb-2">
-                  ${analytics.averageOrderValue.toFixed(2)}
-                </p>
-                <p className="text-sm text-gray-500">Average</p>
-              </div>
+          {monitoring?.setupRequired && (
+            <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+              Monitoring setup needs attention: {monitoring.error || 'Supabase monitoring tables are not available.'}
             </div>
           )}
 
-          {/* Collections Organization */}
-          
-          {/* CORE MANAGEMENT */}
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Briefcase size={28} className="text-primary" />
-              Core Management
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Users Management */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <Users size={24} />
-                    Users
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Manage employees & customers</p>
-                  <a
-                    href="/admin/users"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-center font-semibold text-sm"
-                  >
-                    View All Users
-                  </a>
-                  <a
-                    href="/admin/users?type=pro"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 border-2 border-blue-500 text-blue-500 rounded hover:bg-blue-50 transition text-center font-semibold text-sm"
-                  >
-                    Pro Applications
-                  </a>
-                </div>
-              </div>
-
-              {/* Orders Management */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <ShoppingCart size={24} />
-                    Orders
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">View all orders & status</p>
-                  <a
-                    href="/admin/orders"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition text-center font-semibold text-sm"
-                  >
-                    All Orders
-                  </a>
-                  <a
-                    href="/admin/orders?status=disputed"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 border-2 border-green-500 text-green-500 rounded hover:bg-green-50 transition text-center font-semibold text-sm"
-                  >
-                    Disputed Orders
-                  </a>
-                </div>
-              </div>
-
-              {/* Analytics */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <BarChart3 size={24} />
-                    Analytics
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Revenue & performance</p>
-                  <a
-                    href="/admin/analytics"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition text-center font-semibold text-sm"
-                  >
-                    View Analytics
-                  </a>
-                  <a
-                    href="/admin/reports"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 border-2 border-purple-500 text-purple-500 rounded hover:bg-purple-50 transition text-center font-semibold text-sm"
-                  >
-                    Generate Reports
-                  </a>
-                </div>
-              </div>
-
-              {/* Subscriptions */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-cyan-500 to-cyan-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <CreditCard size={24} />
-                    Subscriptions
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Active subscriptions & plans</p>
-                  <a
-                    href="/admin/subscriptions"
-                    className="block px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition text-center font-semibold text-sm"
-                  >
-                    View Subscriptions
-                  </a>
-                  <a
-                    href="/admin/subscriptions?status=active"
-                    className="block px-4 py-2 border-2 border-cyan-500 text-cyan-500 rounded hover:bg-cyan-50 transition text-center font-semibold text-sm"
-                  >
-                    Active Only
-                  </a>
-                </div>
-              </div>
-
-              {/* Wash Club Members */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <Gift size={24} />
-                    Wash Club
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Loyalty program members</p>
-                  <a
-                    href="/admin/wash-club"
-                    className="block px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-center font-semibold text-sm"
-                  >
-                    View Members
-                  </a>
-                  <a
-                    href="/admin/wash-club?tier=gold"
-                    className="block px-4 py-2 border-2 border-yellow-500 text-yellow-500 rounded hover:bg-yellow-50 transition text-center font-semibold text-sm"
-                  >
-                    Premium Members
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CONFIGURATION */}
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Settings size={28} className="text-amber-600" />
-              Configuration
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Pricing Rules */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <DollarSign size={24} />
-                    Pricing Rules
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Manage pricing & rates</p>
-                  <a
-                    href="/admin/pricing/rules"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 transition text-center font-semibold text-sm"
-                  >
-                    Pricing Rules
-                  </a>
-                  <a
-                    href="/admin/pricing/rules"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 border-2 border-amber-500 text-amber-500 rounded hover:bg-amber-50 transition text-center font-semibold text-sm"
-                  >
-                    View All Rates
-                  </a>
-                </div>
-              </div>
-
-              {/* Marketing */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-pink-500 to-pink-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <Megaphone size={24} />
-                    Marketing
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Campaigns & promotions</p>
-                  <a
-                    href="/admin/marketing/campaigns"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 transition text-center font-semibold text-sm"
-                  >
-                    Campaigns
-                  </a>
-                  <a
-                    href="/admin/marketing/campaigns"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 border-2 border-pink-500 text-pink-500 rounded hover:bg-pink-50 transition text-center font-semibold text-sm"
-                  >
-                    Promotions
-                  </a>
-                </div>
-              </div>
-
-              {/* Security */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <Shield size={24} />
-                    Security
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Compliance & access</p>
-                  <a
-                    href="/admin/security"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition text-center font-semibold text-sm"
-                  >
-                    Security Logs
-                  </a>
-                  <a
-                    href="/admin/security"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 border-2 border-red-500 text-red-500 rounded hover:bg-red-50 transition text-center font-semibold text-sm"
-                  >
-                    Access Control
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SUPPORT */}
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Bell size={28} className="text-indigo-600" />
-              Support & Inquiries
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Pro Applications */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <Briefcase size={24} />
-                    Pro Applications
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Review and approve service provider applications</p>
-                  <a
-                    href="/admin/pro-applications"
-                    className="block px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition text-center font-semibold text-sm"
-                  >
-                    View Applications
-                  </a>
-                  <a
-                    href="/admin/pro-applications?status=pending"
-                    className="block px-4 py-2 border-2 border-emerald-500 text-emerald-500 rounded hover:bg-emerald-50 transition text-center font-semibold text-sm"
-                  >
-                    Pending ({analytics?.pendingApplications || 0})
-                  </a>
-                </div>
-              </div>
-
-              {/* Inquiries */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <Bell size={24} />
-                    Inquiries
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Customer support tickets</p>
-                  <a
-                    href="/admin/inquiries"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-center font-semibold text-sm"
-                  >
-                    View Inquiries
-                  </a>
-                  <a
-                    href="/admin/inquiries"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 border-2 border-indigo-500 text-indigo-500 rounded hover:bg-indigo-50 transition text-center font-semibold text-sm"
-                  >
-                    Pending Applications
-                  </a>
-                </div>
-              </div>
-
-              {/* Support Tickets */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    <MessageSquare size={24} />
-                    Support Tickets
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-600 text-sm">Customer inquiries & issues</p>
-                  <a
-                    href="/admin/support-tickets"
-                    className="block px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition text-center font-semibold text-sm"
-                  >
-                    View Tickets
-                  </a>
-                  <a
-                    href="/admin/support-tickets?status=pending"
-                    className="block px-4 py-2 border-2 border-orange-500 text-orange-500 rounded hover:bg-orange-50 transition text-center font-semibold text-sm"
-                  >
-                    Pending
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Additional Info */}
-          {analytics && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Key Metrics</h2>
-              <div className="grid md:grid-cols-3 gap-6">
+          <section className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_2fr]">
+            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-gray-600 text-sm mb-2">New Signups (This Month)</p>
-                  <p className="text-2xl font-bold text-gray-900">{analytics.newSignups}</p>
+                  <p className="text-sm font-semibold text-gray-500">Business Health</p>
+                  <p className="mt-2 text-5xl font-bold text-gray-950">{score}</p>
+                  <p className="mt-1 text-sm font-bold text-[#2b8f7d]">{statusCopy(score)}</p>
                 </div>
-                <div>
-                  <p className="text-gray-600 text-sm mb-2">Pending Pro Applications</p>
-                  <p className="text-2xl font-bold text-gray-900">{analytics.pendingApplications}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600 text-sm mb-2">Refund Rate</p>
-                  <p className="text-2xl font-bold text-gray-900">{analytics.refundRate.toFixed(1)}%</p>
+                <div className="rounded-lg bg-[#ecfbf8] p-3 text-[#2b8f7d]">
+                  <Bot className="h-6 w-6" />
                 </div>
               </div>
+              <div className="mt-5 space-y-2 text-sm text-gray-600">
+                <p>{monitoring?.ai?.message || 'API disabled: mock mode.'}</p>
+                <p>Last event: {formatTime(overview.lastEventAt)}</p>
+                <a
+                  href="http://127.0.0.1:8787"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 font-bold text-[#2b8f7d] hover:underline"
+                >
+                  Open local AI agent
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
             </div>
-          )}
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {attentionItems.map((item) => (
+                <div key={item.label} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm font-semibold text-gray-600">{item.label}</p>
+                  <p className="mt-3 text-3xl font-bold text-gray-950">{item.value}</p>
+                  <p className="mt-1 text-sm text-gray-500">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatTile label="Revenue" value={formatCurrency(analytics?.totalRevenue || 0)} detail="Platform total" icon={DollarSign} />
+            <StatTile label="Orders" value={(analytics?.totalOrders || 0).toLocaleString()} detail="All tracked orders" icon={ShoppingCart} />
+            <StatTile label="Visitors Today" value={overview.visitorsToday} detail={`${overview.eventsToday} event(s) today`} icon={Users} />
+            <StatTile label="Mobile Events" value={overview.mobileEventsToday || 0} detail={`${overview.webEventsToday || 0} web event(s)`} icon={Smartphone} />
+          </section>
+
+          <section className="mb-6 grid gap-6 lg:grid-cols-3">
+            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-950">Live Funnel</h2>
+                  <p className="text-sm text-gray-500">Landing to signup to booking, web and mobile combined.</p>
+                </div>
+                <span className="rounded-full border border-gray-200 px-3 py-1 text-sm font-bold text-gray-700">
+                  {bookingConversion}% booking conversion
+                </span>
+              </div>
+              <div className="space-y-4">
+                <FunnelStep label="Page views" count={pageViews} max={maxFunnel} />
+                <FunnelStep label="Signup started" count={signupStarted} max={maxFunnel} />
+                <FunnelStep label="Signup completed" count={signupCompleted} max={maxFunnel} />
+                <FunnelStep label="Booking started" count={bookingStarted} max={maxFunnel} />
+                <FunnelStep label="Booking completed" count={bookingCompleted} max={maxFunnel} />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-950">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                Open Alerts
+              </h2>
+              <div className="space-y-3">
+                {(monitoring?.alerts || []).length === 0 && <p className="text-sm text-gray-500">No open security or config alerts.</p>}
+                {(monitoring?.alerts || []).slice(0, 4).map((alert) => (
+                  <a
+                    key={alert.id}
+                    href="/admin/monitoring"
+                    className="block rounded-lg border border-gray-200 p-3 transition hover:border-amber-300 hover:bg-amber-50"
+                  >
+                    <p className="text-sm font-bold text-gray-950">{alert.title}</p>
+                    <p className="mt-1 text-xs uppercase text-gray-500">{alert.severity} · {alert.category}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="mb-6 grid gap-6 lg:grid-cols-4">
+            {actionGroups.map((group) => (
+              <ActionGroup key={group.title} title={group.title} items={group.items} />
+            ))}
+          </section>
+
+          <section className="grid gap-6 lg:grid-cols-2">
+            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-950">
+                <Activity className="h-5 w-5 text-[#48C9B0]" />
+                Top Website Pages
+              </h2>
+              <div className="space-y-3">
+                {(monitoring?.topPages || []).length === 0 && <p className="text-sm text-gray-500">No page traffic yet.</p>}
+                {(monitoring?.topPages || []).slice(0, 6).map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-4">
+                    <span className="truncate text-sm font-semibold text-gray-700">{row.label}</span>
+                    <span className="text-sm font-bold text-gray-950">{row.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-950">
+                <Smartphone className="h-5 w-5 text-[#48C9B0]" />
+                Top Mobile Screens
+              </h2>
+              <div className="space-y-3">
+                {(monitoring?.topScreens || []).length === 0 && <p className="text-sm text-gray-500">No mobile screen events yet.</p>}
+                {(monitoring?.topScreens || []).slice(0, 6).map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-4">
+                    <span className="truncate text-sm font-semibold text-gray-700">{row.label}</span>
+                    <span className="text-sm font-bold text-gray-950">{row.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
         </div>
-      </div>
+      </main>
       <Footer />
     </>
   )

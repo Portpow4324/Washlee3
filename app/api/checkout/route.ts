@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import { calculateBookingQuote, getMobilePricingConfig } from '@/lib/mobilePricing'
 
 export async function POST(request: NextRequest) {
   console.log('[CHECKOUT] ===== NEW CHECKOUT REQUEST =====')
@@ -113,21 +114,28 @@ export async function POST(request: NextRequest) {
     // Build line items from booking details
     const lineItems: any[] = []
     const bookingDetails = body.bookingDetails || {}
+    const pricingConfig = await getMobilePricingConfig()
+    const quote = calculateBookingQuote({
+      estimatedWeight: bookingDetails.estimatedWeight,
+      weight: bookingDetails.weight,
+      customWeight: bookingDetails.customWeight,
+      bagCount: bookingDetails.bagCount,
+      deliverySpeed: bookingDetails.deliverySpeed,
+      protectionPlan: bookingDetails.protectionPlan || body.protectionPlan,
+      hangDry: bookingDetails.hangDry,
+      returnsOnHangers: bookingDetails.returnsOnHangers,
+    }, pricingConfig)
 
     // Base laundry service
-    const estimatedWeight = bookingDetails.estimatedWeight || (bookingDetails.bagCount * 2.5) || 0
-    const baseRate = bookingDetails.deliverySpeed === 'express' ? 12.50 : 7.50
-    const baseCost = estimatedWeight * baseRate
-
-    if (baseCost > 0) {
+    if (quote.baseSubtotal > 0) {
       lineItems.push({
         price_data: {
           currency: 'aud',
           product_data: {
             name: 'Laundry Service',
-            description: `${estimatedWeight.toFixed(1)}kg @ $${baseRate}/kg${bookingDetails.deliverySpeed === 'express' ? ' (Express)' : ''}`,
+            description: `${quote.estimatedWeight.toFixed(1)}kg @ $${quote.ratePerKg.toFixed(2)}/kg${quote.deliverySpeed === 'express' ? ' (Express)' : ''}${quote.minimumOrderApplied ? ' · minimum order applied' : ''}`,
           },
-          unit_amount: Math.round(baseCost * 100),
+          unit_amount: Math.round(quote.baseSubtotal * 100),
         },
         quantity: 1,
       })
@@ -142,7 +150,21 @@ export async function POST(request: NextRequest) {
             name: 'Hang Dry Service',
             description: 'Hang-dry delicate items',
           },
-          unit_amount: 1650,
+          unit_amount: Math.round(quote.hangDryPrice * 100),
+        },
+        quantity: 1,
+      })
+    }
+
+    if (quote.returnOnHangersPrice > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'aud',
+          product_data: {
+            name: 'Return on Hangers',
+            description: 'Return selected garments on hangers',
+          },
+          unit_amount: Math.round(quote.returnOnHangersPrice * 100),
         },
         quantity: 1,
       })
@@ -205,27 +227,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Protection Plan
-    if (bookingDetails.protectionPlan === 'premium') {
+    if (quote.protectionPrice > 0) {
       lineItems.push({
         price_data: {
           currency: 'aud',
           product_data: {
-            name: 'Protection Plan - Premium',
-            description: 'Premium damage protection',
+            name: quote.protectionPlan === 'standard'
+              ? 'Protection Plan - Standard'
+              : 'Protection Plan - Premium',
+            description: quote.protectionPlan === 'standard'
+              ? 'Standard damage protection'
+              : 'Premium damage protection',
           },
-          unit_amount: 350,
-        },
-        quantity: 1,
-      })
-    } else if (bookingDetails.protectionPlan === 'premium-plus') {
-      lineItems.push({
-        price_data: {
-          currency: 'aud',
-          product_data: {
-            name: 'Protection Plan - Premium Plus',
-            description: 'Premium Plus damage protection',
-          },
-          unit_amount: 850,
+          unit_amount: Math.round(quote.protectionPrice * 100),
         },
         quantity: 1,
       })
@@ -233,7 +247,7 @@ export async function POST(request: NextRequest) {
 
     // If no line items, add a single line for the total
     if (lineItems.length === 0) {
-      const totalCents = Math.round(body.amount * 100)
+      const totalCents = Math.round(quote.total * 100)
       lineItems.push({
         price_data: {
           currency: 'aud',
@@ -267,6 +281,8 @@ export async function POST(request: NextRequest) {
         orderId: body.orderId,
         customerName: body.name.substring(0, 100),
         customerEmail: body.email.substring(0, 100),
+        protectionPlan: quote.protectionPlan,
+        quotedTotal: quote.total.toFixed(2),
       },
     })
 

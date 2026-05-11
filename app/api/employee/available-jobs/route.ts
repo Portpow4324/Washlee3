@@ -2,226 +2,456 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendProAcceptedJobEmail } from '@/lib/emailMarketing'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+
+type JsonRecord = Record<string, unknown>
+
+function parseItems(raw: unknown): JsonRecord {
+  if (!raw) return {}
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as JsonRecord
+  if (typeof raw === 'string') {
+    try {
+      const decoded = JSON.parse(raw)
+      return decoded && typeof decoded === 'object' && !Array.isArray(decoded)
+        ? decoded as JsonRecord
+        : {}
+    } catch {
+      return {}
+    }
+  }
+  return {}
+}
+
+function readString(source: JsonRecord | null | undefined, keys: string[], fallback = '') {
+  if (!source) return fallback
+  for (const key of keys) {
+    const value = source[key]
+    if (value === null || value === undefined) continue
+    const text = String(value).trim()
+    if (text) return text
+  }
+  return fallback
+}
+
+function readNumber(source: JsonRecord | null | undefined, keys: string[], fallback = 0) {
+  if (!source) return fallback
+  for (const key of keys) {
+    const value = source[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string') {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return fallback
+}
+
+function parseDeniedBy(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String)
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed.map(String) : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function estimatedProEarnings(totalPrice: number) {
+  if (!Number.isFinite(totalPrice) || totalPrice <= 0) return 0
+  return Math.round(totalPrice * 0.75 * 100) / 100
+}
+
+async function getAuthenticatedUser(request: NextRequest) {
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  if (!token) return { userId: null, error: 'Missing authorization token' }
+
+  const auth = createClient(supabaseUrl, anonKey)
+  const { data, error } = await auth.auth.getUser(token)
+
+  if (error || !data.user) return { userId: null, error: 'Invalid or expired token' }
+  return { userId: data.user.id, error: null }
+}
+
+async function resolveJob(jobIdOrOrderId: string) {
+  let { data, error } = await supabaseAdmin
+    .from('pro_jobs')
+    .select('*')
+    .eq('id', jobIdOrOrderId)
+    .maybeSingle()
+
+  if (!data && error?.code === '22P02') {
+    error = null
+  }
+
+  if (!data && !error) {
+    const fallback = await supabaseAdmin
+      .from('pro_jobs')
+      .select('*')
+      .eq('order_id', jobIdOrOrderId)
+      .maybeSingle()
+    data = fallback.data
+    error = fallback.error
+  }
+
+  return { data, error }
+}
+
+async function updateOrderAssignment(orderId: string, employeeId: string) {
+  const now = new Date().toISOString()
+  const update = {
+    pro_id: employeeId,
+    employee_id: employeeId,
+    assigned_pro_id: employeeId,
+    status: 'assigned',
+    stage_status: 'assigned',
+    stage_updated_at: now,
+    updated_at: now,
+  }
+
+  const { error } = await supabaseAdmin
+    .from('orders')
+    .update(update)
+    .eq('id', orderId)
+
+  if (!error) return
+
+  let retry = await supabaseAdmin
+    .from('orders')
+    .update({
+      pro_id: employeeId,
+      assigned_pro_id: employeeId,
+      status: 'assigned',
+      stage_status: 'assigned',
+      stage_updated_at: now,
+      updated_at: now,
+    })
+    .eq('id', orderId)
+
+  if (retry.error) {
+    retry = await supabaseAdmin
+      .from('orders')
+      .update({
+        employee_id: employeeId,
+        assigned_pro_id: employeeId,
+        status: 'assigned',
+        stage_status: 'assigned',
+        stage_updated_at: now,
+        updated_at: now,
+      })
+      .eq('id', orderId)
+  }
+
+  if (retry.error) {
+    retry = await supabaseAdmin
+      .from('orders')
+      .update({
+        status: 'assigned',
+        stage_status: 'assigned',
+        stage_updated_at: now,
+        updated_at: now,
+      })
+      .eq('id', orderId)
+  }
+
+  if (retry.error) {
+    console.warn('[AvailableJobs] Failed to update order assignment:', retry.error.message)
+  }
+}
+
+async function createUserNotification(userId: string, payload: {
+  type: string
+  title: string
+  message: string
+  data?: JsonRecord
+}) {
+  const { error } = await supabaseAdmin
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      type: payload.type,
+      title: payload.title,
+      message: payload.message,
+      data: payload.data || {},
+      read: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+  if (error) {
+    console.warn('[AvailableJobs] Failed to create notification:', error.message)
+  }
+}
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const employeeId = searchParams.get('employeeId')
-  const status = searchParams.get('status') || 'available'
-  const limit = searchParams.get('limit') || '20'
-  
-  if (!employeeId) {
-    return NextResponse.json({ error: 'Missing employeeId parameter' }, { status: 400 })
+  const auth = await getAuthenticatedUser(request)
+  if (auth.error && auth.error !== 'Missing authorization token') {
+    return NextResponse.json({ success: false, error: auth.error }, { status: 401 })
   }
-  
+
+  const { searchParams } = new URL(request.url)
+  const employeeId = searchParams.get('employeeId') || auth.userId
+  const status = searchParams.get('status') || 'available'
+  const limit = Math.min(Number(searchParams.get('limit') || 20), 50)
+
+  if (!employeeId) {
+    return NextResponse.json({ success: false, error: 'Missing employeeId parameter' }, { status: 400 })
+  }
+
+  if (auth.userId && employeeId !== auth.userId) {
+    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+  }
+
   try {
-    // Fetch available jobs (not yet accepted by this employee)
-    const { data, error } = await supabaseAdmin
+    const { data: jobs, error } = await supabaseAdmin
       .from('pro_jobs')
       .select('*')
       .eq('status', status)
-      .is('pro_id', null) // Only show jobs not yet accepted
+      .is('pro_id', null)
       .order('created_at', { ascending: false })
-      .limit(parseInt(limit))
-    
+      .limit(limit)
+
     if (error) {
-      console.error('Jobs fetch error:', error)
-      return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 })
+      console.error('[AvailableJobs] Fetch error:', error)
+      return NextResponse.json({ success: false, error: 'Failed to fetch jobs' }, { status: 500 })
     }
-    
-    // Filter out jobs that the employee has denied
-    const filteredData = data?.filter(job => {
-      if (!job.order_id) return true
-      
-      // We'll filter these client-side after fetching order denied_by
-      return true
-    }) || []
-    
-    // Get order details to check denied_by list
-    const finalData = []
-    for (const job of filteredData) {
-      const { data: orderData } = await supabaseAdmin
+
+    const result = []
+
+    for (const job of jobs || []) {
+      const { data: order } = await supabaseAdmin
         .from('orders')
-        .select('denied_by')
+        .select('*')
         .eq('id', job.order_id)
         .maybeSingle()
-      
-      let deniedByList = []
-      if (orderData?.denied_by) {
-        try {
-          deniedByList = typeof orderData.denied_by === 'string' 
-            ? JSON.parse(orderData.denied_by) 
-            : orderData.denied_by
-        } catch {
-          deniedByList = []
-        }
+
+      if (!order) continue
+
+      const deniedBy = parseDeniedBy(order.denied_by)
+      if (deniedBy.includes(employeeId)) continue
+
+      const items = parseItems(order.items)
+      const totalPrice = readNumber(order, ['total_price', 'totalPrice'])
+      const weight = readNumber(order, ['weight', 'weight_kg'], readNumber(items, ['weight', 'estimatedWeight'], 10))
+      const pickupAddress = readString(order, ['pickup_address', 'pickupAddress'])
+
+      let customerName = readString(order, ['customer_name', 'customerName'])
+      if (!customerName && order.user_id) {
+        const { data: customer } = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .eq('id', order.user_id)
+          .maybeSingle()
+        customerName = readString(customer, ['full_name', 'name', 'first_name'], 'Customer')
       }
-      
-      // Only include job if employee hasn't denied it
-      if (!deniedByList.includes(employeeId)) {
-        finalData.push(job)
-      }
+
+      result.push({
+        id: job.id,
+        jobId: job.id,
+        order_id: job.order_id,
+        orderId: job.order_id,
+        status: job.status,
+        posted_at: job.posted_at || job.created_at,
+        created_at: job.created_at,
+        customerName,
+        customer_name: customerName,
+        pickupAddress,
+        pickup_address: pickupAddress,
+        scheduledPickupDate: order.scheduled_pickup_date || order.pickup_date || items.pickupDate,
+        pickup_date: order.scheduled_pickup_date || order.pickup_date || items.pickupDate,
+        deliveryDate: order.scheduled_delivery_date || order.delivery_date || items.deliveryDate,
+        delivery_time_slot: order.delivery_time_slot || items.deliveryTimeSlot,
+        serviceType: order.service_type || items.service_type,
+        deliverySpeed: order.delivery_speed || items.delivery_speed,
+        protectionPlan: order.protection_plan || items.protection_plan,
+        weight,
+        weight_kg: weight,
+        estimatedWeight: weight,
+        totalPrice,
+        total_price: totalPrice,
+        estimatedEarnings: estimatedProEarnings(totalPrice),
+        earnings: estimatedProEarnings(totalPrice),
+      })
     }
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       success: true,
-      data: finalData || [],
-      count: finalData?.length || 0
+      data: result,
+      count: result.length,
     })
   } catch (error) {
-    console.error('Jobs fetch error:', error)
-    return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 })
+    console.error('[AvailableJobs] Route error:', error)
+    return NextResponse.json({ success: false, error: 'Failed to fetch jobs' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await getAuthenticatedUser(request)
+  if (auth.error && auth.error !== 'Missing authorization token') {
+    return NextResponse.json({ success: false, error: auth.error }, { status: 401 })
+  }
+
   try {
     const { jobId, employeeId, action } = await request.json()
-    
+
     if (!jobId || !employeeId || !action) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: jobId, employeeId, action' 
-      }, { status: 400 })
+      return NextResponse.json(
+        { success: false, error: 'Missing required fields: jobId, employeeId, action' },
+        { status: 400 }
+      )
     }
-    
-    if (action === 'accept') {
-      // First, get the job to find the associated order_id
-      const { data: jobData, error: jobFetchError } = await supabaseAdmin
-        .from('pro_jobs')
-        .select('id, order_id')
-        .eq('id', jobId)
-        .single()
-      
-      if (jobFetchError || !jobData) {
-        console.error('Error fetching job:', jobFetchError)
-        return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-      }
 
-      // Get the order to find customer_id and order details
-      const { data: orderData, error: orderFetchError } = await supabaseAdmin
+    if (auth.userId && employeeId !== auth.userId) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { data: jobData, error: jobFetchError } = await resolveJob(String(jobId))
+    if (jobFetchError || !jobData) {
+      console.error('[AvailableJobs] Job lookup failed:', jobFetchError)
+      return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 })
+    }
+
+    const { data: orderData, error: orderFetchError } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('id', jobData.order_id)
+      .single()
+
+    if (orderFetchError || !orderData) {
+      console.error('[AvailableJobs] Order lookup failed:', orderFetchError)
+      return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 })
+    }
+
+    if (action === 'reject') {
+      const deniedBy = Array.from(new Set([...parseDeniedBy(orderData.denied_by), employeeId]))
+      const { error } = await supabaseAdmin
         .from('orders')
-        .select('id, user_id, total_price, status')
-        .eq('id', jobData.order_id)
-        .single()
-      
-      if (orderFetchError || !orderData) {
-        console.error('Error fetching order:', orderFetchError)
-        return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+        .update({ denied_by: deniedBy, updated_at: new Date().toISOString() })
+        .eq('id', orderData.id)
+
+      if (error) {
+        console.warn('[AvailableJobs] Could not persist denied_by:', error.message)
       }
 
-      // Get pro (employee) details
-      const { data: proData, error: proFetchError } = await supabaseAdmin
-        .from('employees')
-        .select('id, name, email, phone')
-        .eq('id', employeeId)
-        .single()
-      
-      // Get customer details
-      const { data: customerData, error: customerFetchError } = await supabaseAdmin
-        .from('users')
-        .select('email, full_name, phone')
-        .eq('id', orderData.user_id)
-        .single()
+      return NextResponse.json({
+        success: true,
+        message: 'Job declined',
+      })
+    }
 
-      // Accept the job in pro_jobs table
-      const { data, error } = await supabaseAdmin
+    if (action !== 'accept') {
+      return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 })
+    }
+
+    if (jobData.status !== 'available' || jobData.pro_id) {
+      return NextResponse.json(
+        { success: false, error: 'This job has already been claimed' },
+        { status: 409 }
+      )
+    }
+
+    let accepted = await supabaseAdmin
+      .from('pro_jobs')
+      .update({
+        pro_id: employeeId,
+        status: 'accepted',
+        stage: 'assigned',
+        accepted_at: new Date().toISOString(),
+        stage_updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', jobData.id)
+      .eq('status', 'available')
+      .is('pro_id', null)
+      .select()
+      .single()
+
+    if (accepted.error?.code === '23503') {
+      console.warn('[AvailableJobs] pro_id FK rejected, recording accepted status only:', accepted.error.message)
+      accepted = await supabaseAdmin
         .from('pro_jobs')
         .update({
-          pro_id: employeeId,
           status: 'accepted',
+          stage: 'assigned',
           accepted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          stage_updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', jobId)
+        .eq('id', jobData.id)
+        .eq('status', 'available')
         .select()
-      
-      if (error) {
-        // If FK constraint fails, just update the status
-        if (error.code === '23503') {
-          console.warn('FK constraint on pro_id, updating status only:', error.message)
-          const { data: statusData, error: statusError } = await supabaseAdmin
-            .from('pro_jobs')
-            .update({
-              status: 'accepted',
-              accepted_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', jobId)
-            .select()
-          
-          if (statusError) {
-            console.error('Job accept error:', statusError)
-            return NextResponse.json({ error: 'Failed to accept job' }, { status: 500 })
-          }
-          
-          return NextResponse.json({ 
-            success: true,
-            message: 'Job accepted successfully',
-            data: statusData[0],
-            note: 'Pro assignment pending - requires employees table setup'
-          })
-        }
-        
-        console.error('Job accept error:', error)
-        return NextResponse.json({ error: 'Failed to accept job' }, { status: 500 })
-      }
-
-      // Also update the corresponding order in the orders table with the pro_id
-      if (jobData.order_id) {
-        const { error: orderError } = await supabaseAdmin
-          .from('orders')
-          .update({
-            pro_id: employeeId,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobData.order_id)
-        
-        if (orderError) {
-          console.warn('Error updating order with pro_id:', orderError)
-          // Don't fail the whole operation if order update fails
-        }
-      }
-
-      // Send email to customer with pro details
-      if (customerData && proData) {
-        try {
-          await sendProAcceptedJobEmail({
-            to: customerData.email,
-            customerName: customerData.full_name || 'Valued Customer',
-            proName: proData.name || 'Your Washlee Pro',
-            proPhone: proData.phone || 'Contact via email',
-            proEmail: proData.email || 'support@washlee.com',
-            orderAmount: orderData.total_price || 0,
-            orderId: orderData.id,
-          })
-          console.log('[Accept Job] ✓ Pro accepted email sent to customer:', customerData.email)
-        } catch (emailError) {
-          console.error('[Accept Job] Failed to send pro details email:', emailError)
-          // Don't fail the job acceptance if email fails
-        }
-      } else {
-        console.warn('[Accept Job] Could not send email - missing customer or pro data')
-      }
-      
-      return NextResponse.json({ 
-        success: true,
-        message: 'Job accepted successfully',
-        data: data[0] 
-      })
-    } else if (action === 'reject') {
-      // Reject/decline the job (just don't accept it)
-      return NextResponse.json({ 
-        success: true,
-        message: 'Job declined'
-      })
+        .single()
     }
-    
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+
+    if (accepted.error || !accepted.data) {
+      console.error('[AvailableJobs] Accept failed:', accepted.error)
+      return NextResponse.json({ success: false, error: 'Failed to accept job' }, { status: 500 })
+    }
+
+    await updateOrderAssignment(orderData.id, employeeId)
+
+    const { data: proData } = await supabaseAdmin
+      .from('employees')
+      .select('*')
+      .eq('id', employeeId)
+      .maybeSingle()
+
+    const { data: customerData } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', orderData.user_id)
+      .maybeSingle()
+
+    await createUserNotification(orderData.user_id, {
+      type: 'order_assigned',
+      title: 'Your order has a Washlee Pro',
+      message: `${readString(proData, ['name', 'first_name'], 'Your Washlee Pro')} accepted your order.`,
+      data: {
+        orderId: orderData.id,
+        jobId: jobData.id,
+        proId: employeeId,
+      },
+    })
+
+    await createUserNotification(employeeId, {
+      type: 'job_claimed',
+      title: 'Job claimed',
+      message: 'This pickup is now in your jobs list.',
+      data: {
+        orderId: orderData.id,
+        jobId: jobData.id,
+      },
+    })
+
+    if (customerData?.email && proData) {
+      try {
+        await sendProAcceptedJobEmail({
+          to: customerData.email,
+          customerName: readString(customerData, ['full_name', 'name'], 'Valued Customer'),
+          proName: readString(proData, ['name', 'first_name'], 'Your Washlee Pro'),
+          proPhone: readString(proData, ['phone'], 'Contact via email'),
+          proEmail: readString(proData, ['email'], 'support@washlee.com'),
+          orderAmount: readNumber(orderData, ['total_price']),
+          orderId: orderData.id,
+        })
+      } catch (emailError) {
+        console.error('[AvailableJobs] Customer email failed:', emailError)
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Job accepted successfully',
+      data: accepted.data,
+    })
   } catch (error) {
-    console.error('Job action error:', error)
-    return NextResponse.json({ error: 'Failed to process job action' }, { status: 500 })
+    console.error('[AvailableJobs] Job action error:', error)
+    return NextResponse.json({ success: false, error: 'Failed to process job action' }, { status: 500 })
   }
 }

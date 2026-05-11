@@ -1,17 +1,17 @@
 import { Resend } from 'resend'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   console.log('[RESEND TEST] ==========================================')
   console.log('[RESEND TEST] Resend Test Endpoint Called')
   
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFromEmail = process.env.RESEND_FROM_EMAIL
+  const resendFromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
 
   console.log('[RESEND TEST] RESEND_API_KEY:', resendApiKey ? '✅ Present' : '❌ Missing')
   console.log('[RESEND TEST] RESEND_FROM_EMAIL:', resendFromEmail || '❌ Missing')
   
-  if (!resendApiKey || !resendFromEmail) {
+  if (!resendApiKey) {
     console.error('[RESEND TEST] ❌ Resend not fully configured!')
     return NextResponse.json(
       { error: 'Resend not fully configured', success: false },

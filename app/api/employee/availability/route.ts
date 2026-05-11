@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getServerSession } from 'next-auth'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-const supabaseAnonKey = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 // Default availability template
@@ -43,7 +37,8 @@ export async function GET(request: NextRequest) {
     if (data) {
       return NextResponse.json({ 
         success: true,
-        data: data.availability_schedule || DEFAULT_AVAILABILITY 
+        data: data.availability_schedule || DEFAULT_AVAILABILITY,
+        serviceRadiusKm: data.service_radius_km || 15,
       })
     }
     
@@ -55,6 +50,7 @@ export async function GET(request: NextRequest) {
         .insert({
           employee_id: employeeId,
           availability_schedule: DEFAULT_AVAILABILITY,
+          service_radius_km: 15,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -62,6 +58,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ 
         success: true,
         data: DEFAULT_AVAILABILITY,
+        serviceRadiusKm: 15,
         isDefault: true 
       })
     }
@@ -72,19 +69,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ 
         success: true,
         data: DEFAULT_AVAILABILITY,
+        serviceRadiusKm: 15,
         isDefault: true 
       })
     }
     
     return NextResponse.json({ 
       success: true,
-      data: DEFAULT_AVAILABILITY 
+      data: DEFAULT_AVAILABILITY,
+      serviceRadiusKm: 15,
     })
   } catch (error) {
     console.error('Availability fetch error:', error)
     return NextResponse.json({ 
       error: 'Failed to fetch availability',
       data: DEFAULT_AVAILABILITY,
+      serviceRadiusKm: 15,
       isDefault: true 
     }, { status: 200 })
   }
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { employeeId, availability } = await request.json()
+    const { employeeId, availability, serviceRadiusKm } = await request.json()
     
     if (!employeeId) {
       return NextResponse.json({ error: 'Missing employeeId' }, { status: 400 })
@@ -102,20 +102,42 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Missing availability data' }, { status: 400 })
     }
     
-    // Upsert the availability record
-    const { data, error } = await supabaseAdmin
+    const radius = Number(serviceRadiusKm)
+    const payload = {
+      employee_id: employeeId,
+      availability_schedule: availability,
+      service_radius_km: Number.isFinite(radius) ? Math.min(Math.max(radius, 1), 50) : 15,
+      updated_at: new Date().toISOString()
+    }
+
+    let { data, error } = await supabaseAdmin
       .from('employee_availability')
       .upsert(
-        {
-          employee_id: employeeId,
-          availability_schedule: availability,
-          updated_at: new Date().toISOString()
-        },
+        payload,
         {
           onConflict: 'employee_id'
         }
       )
       .select()
+
+    if (error && error.message?.includes('service_radius_km')) {
+      const retry = await supabaseAdmin
+        .from('employee_availability')
+        .upsert(
+          {
+            employee_id: payload.employee_id,
+            availability_schedule: payload.availability_schedule,
+            updated_at: payload.updated_at,
+          },
+          {
+            onConflict: 'employee_id'
+          }
+        )
+        .select()
+
+      data = retry.data
+      error = retry.error
+    }
     
     if (error) {
       console.error('Availability update error:', error)
@@ -124,7 +146,8 @@ export async function PATCH(request: NextRequest) {
     
     return NextResponse.json({ 
       success: true,
-      data: data[0]?.availability_schedule || availability 
+      data: data?.[0]?.availability_schedule || availability,
+      serviceRadiusKm: data?.[0]?.service_radius_km || payload.service_radius_km,
     })
   } catch (error) {
     console.error('Availability update error:', error)

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { trackWashleeEvent } from '@/lib/analytics/client'
 import type { User } from '@supabase/supabase-js'
 
 interface UserData {
@@ -156,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userType: 'customer' | 'pro'
   ) => {
     try {
+      trackWashleeEvent('signup_started', { metadata: { route: window.location.pathname } })
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -164,23 +166,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) {
         const errorData = await response.json()
+        trackWashleeEvent('signup_failed', { metadata: { route: window.location.pathname, status: 'signup_failed' } })
         return { success: false, error: errorData.error }
       }
 
+      trackWashleeEvent('signup_completed', { metadata: { route: window.location.pathname } })
       return { success: true }
     } catch (error: any) {
+      trackWashleeEvent('signup_failed', { metadata: { route: window.location.pathname, status: 'signup_error' } })
       return { success: false, error: error.message }
     }
   }
 
   const login = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      trackWashleeEvent('login_started', { metadata: { route: window.location.pathname } })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
+        trackWashleeEvent('login_failed', { metadata: { route: window.location.pathname, status: 'auth_error' } })
         return { success: false, error: error.message }
       }
+      trackWashleeEvent('login_success', { userId: data.user?.id || null, metadata: { route: window.location.pathname } })
       return { success: true }
     } catch (error: any) {
+      trackWashleeEvent('login_failed', { metadata: { route: window.location.pathname, status: 'exception' } })
       return { success: false, error: error.message }
     }
   }

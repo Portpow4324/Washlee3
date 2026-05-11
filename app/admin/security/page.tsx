@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import {
   AlertTriangle,
   AlertCircle,
@@ -38,8 +38,8 @@ import { findResolution } from '@/lib/issueResolutions'
 type FilterType = 'all' | 'critical' | 'high' | 'unresolved'
 
 export default function AdminSecurityDashboard() {
-  const { user, userData, loading: authLoading } = useAuth()
   const router = useRouter()
+  const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [errors, setErrors] = useState<ErrorDetails[]>([])
   const [stats, setStats] = useState<any>(null)
   const [filter, setFilter] = useState<FilterType>('all')
@@ -47,36 +47,15 @@ export default function AdminSecurityDashboard() {
   const [selectedError, setSelectedError] = useState<ErrorDetails | null>(null)
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [hasOwnerAccess, setHasOwnerAccess] = useState(false)
-
-  // Check admin access
-  useEffect(() => {
-    const ownerAccess = sessionStorage.getItem('ownerAccess') === 'true'
-    setHasOwnerAccess(ownerAccess)
-
-    if (authLoading) return
-
-    if (ownerAccess) return
-
-    if (!user) {
-      console.log('[AdminSecurity] Not logged in, redirecting to login')
-      router.push('/auth/login')
-      return
-    }
-
-    if (!userData?.is_admin) {
-      console.error('[AdminSecurity] User is not admin. Current user:', user.email)
-      router.push('/')
-      return
-    }
-  }, [user, userData, authLoading, router])
 
   // Load errors on mount and refresh
   useEffect(() => {
+    if (!hasAdminAccess) return
+
     refreshErrors()
     const interval = setInterval(refreshErrors, 5000)
     return () => clearInterval(interval)
-  }, [filter, searchQuery])
+  }, [filter, searchQuery, hasAdminAccess])
 
   const refreshErrors = () => {
     try {
@@ -142,7 +121,7 @@ export default function AdminSecurityDashboard() {
     setExpandedErrors(newExpanded)
   }
 
-  if (authLoading || (loading && !hasOwnerAccess)) {
+  if (checkingAdminAccess || loading) {
     return (
       <>
         <Header />

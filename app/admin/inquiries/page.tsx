@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
@@ -46,7 +46,7 @@ interface Inquiry {
 
 export default function InquiriesManagement() {
   const router = useRouter()
-  const { user, userData, loading: authLoading } = useAuth()
+  const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null)
@@ -56,15 +56,9 @@ export default function InquiriesManagement() {
   const [actionLoading, setActionLoading] = useState(false)
 
   useEffect(() => {
-    // Check if user is admin/manager
-    if (!authLoading && (!user || !userData?.is_admin)) {
-      console.error('[AdminInquiries] User is not admin. Current user:', user?.email)
-      router.push('/')
-      return
-    }
-
+    if (!hasAdminAccess) return
     loadInquiries()
-  }, [authLoading, user, userData, router])
+  }, [hasAdminAccess])
 
   const loadInquiries = async () => {
     try {
@@ -91,8 +85,8 @@ export default function InquiriesManagement() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inquiryId: selectedInquiry.id,
-          adminId: user?.id,
-          adminName: userData?.name || 'Admin',
+          adminId: 'password-admin',
+          adminName: 'Admin',
         }),
       })
 
@@ -127,8 +121,8 @@ export default function InquiriesManagement() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inquiryId: selectedInquiry.id,
-          adminId: user?.id,
-          adminName: userData?.name || 'Admin',
+          adminId: 'password-admin',
+          adminName: 'Admin',
           rejectionReason: rejectionReason,
         }),
       })
@@ -181,7 +175,7 @@ export default function InquiriesManagement() {
     }
   }
 
-  if (authLoading) {
+  if (checkingAdminAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Spinner />

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { ChevronLeft, Search, Filter, MoreVertical } from 'lucide-react'
 import Link from 'next/link'
 
@@ -34,26 +33,15 @@ export default function OrdersPage() {
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          user_id,
-          status,
-          total_price,
-          created_at,
-          delivery_address,
-          tracking_code,
-          users(name, email)
-        `)
-        .order('created_at', { ascending: false })
+      const response = await fetch('/api/admin/orders', { cache: 'no-store' })
+      const result = await response.json()
 
-      if (fetchError) {
-        setError(fetchError.message)
+      if (!response.ok || !result.success) {
+        setError(result.error || 'Failed to load orders')
         return
       }
 
-      const transformed: Order[] = (data || []).map((item: any) => ({
+      const transformed: Order[] = (result.orders || []).map((item: any) => ({
         id: item.id,
         user_id: item.user_id,
         status: item.status,

@@ -2,6 +2,63 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceRoleClient } from '@/lib/supabaseClientFactory'
 import { getClientIP, checkSignupRateLimit, logSignupAttempt, getRateLimitErrorResponse } from '@/lib/rateLimitUtil'
 
+type ErrorLike = Record<string, unknown>
+type SupabaseInsertResult = {
+  data?: unknown
+  error?: {
+    message?: string
+    details?: string
+    code?: string
+  } | null
+}
+type SupabaseInsertClient = {
+  from: (table: string) => {
+    insert: (payload: Record<string, unknown>) => {
+      select: () => PromiseLike<SupabaseInsertResult>
+    }
+  }
+}
+
+function asRecord(error: unknown): ErrorLike {
+  return error && typeof error === 'object' ? error as ErrorLike : {}
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : String(error || fallback)
+}
+
+async function insertWithColumnFallback(supabase: SupabaseInsertClient, table: string, payload: Record<string, unknown>) {
+  let currentPayload = { ...payload }
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const result = await supabase
+      .from(table)
+      .insert(currentPayload)
+      .select()
+
+    if (!result.error) return result
+
+    const message = result.error.message || ''
+    const missingColumn =
+      message.match(/'([^']+)' column/)?.[1] ||
+      message.match(/column "([^"]+)"/)?.[1]
+
+    if (!missingColumn || !(missingColumn in currentPayload)) {
+      return result
+    }
+
+    console.warn(`[SIGNUP] ${table} column missing, retrying without ${missingColumn}`)
+    const nextPayload = { ...currentPayload }
+    delete nextPayload[missingColumn]
+    currentPayload = nextPayload
+  }
+
+  return supabase
+    .from(table)
+    .insert(currentPayload)
+    .select()
+}
+
 export async function POST(request: NextRequest) {
   console.log('[SIGNUP] ==========================================')
   console.log('[SIGNUP] POST /api/auth/signup called')
@@ -13,13 +70,14 @@ export async function POST(request: NextRequest) {
   
   try {
     supabase = getServiceRoleClient()
-  } catch (initError: any) {
+  } catch (initError: unknown) {
+    const initMessage = getErrorMessage(initError, 'Cannot initialize Supabase')
     console.error('[SIGNUP] ❌ CRITICAL: Failed to initialize Supabase client')
-    console.error('[SIGNUP] Init error message:', initError?.message)
+    console.error('[SIGNUP] Init error message:', initMessage)
     console.error('[SIGNUP] Init error:', initError)
     return NextResponse.json(
       { 
-        error: 'Server configuration error: ' + (initError?.message || 'Cannot initialize Supabase'),
+        error: 'Server configuration error: ' + initMessage,
         code: 'INIT_ERROR'
       },
       { status: 500 }
@@ -35,7 +93,7 @@ export async function POST(request: NextRequest) {
       hasPassword: !!body.password
     })
 
-    const { email, password, name, phone, userType, state, personalUse, address, city, postcode, country } = body
+    const { email, password, name, phone, userType, state, personalUse, address, city, postcode, country, latitude, longitude, serviceRadiusKm } = body
 
     // Validate input
     if (!email || !password || !name || !userType) {
@@ -251,11 +309,26 @@ export async function POST(request: NextRequest) {
       console.log('[SIGNUP] Creating pro/employee record for user_id:', userId)
       console.log('[SIGNUP] Employee data:', { email, firstName, lastName, address, city, state, postcode })
       
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .insert({
+      const serviceAreas = address || postcode || latitude || longitude
+        ? [{
+            address: address || '',
+            suburb: city || '',
+            state: state || '',
+            postcode: postcode || '',
+            country: country || 'Australia',
+            lat: typeof latitude === 'number' ? latitude : null,
+            lng: typeof longitude === 'number' ? longitude : null,
+            radiusKm: serviceRadiusKm || 15,
+          }]
+        : []
+
+      const { data: employeeData, error: employeeError } = await insertWithColumnFallback(
+        supabase,
+        'employees',
+        {
           id: userId,
           email,
+          name,
           first_name: firstName,
           last_name: lastName,
           phone: phone || null,
@@ -264,8 +337,17 @@ export async function POST(request: NextRequest) {
           city: city || null,
           postcode: postcode || null,
           country: country || 'Australia',
-        })
-        .select()
+          latitude: typeof latitude === 'number' ? latitude : null,
+          longitude: typeof longitude === 'number' ? longitude : null,
+          service_areas: serviceAreas,
+          availability_status: 'available',
+          account_status: 'active',
+          status: 'active',
+          role: 'employee',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      )
 
       if (employeeError) {
         console.error('[SIGNUP] ❌ Pro record creation failed:', employeeError.message)
@@ -283,6 +365,27 @@ export async function POST(request: NextRequest) {
       } else {
         console.log('[SIGNUP] ✓ Pro record created:', employeeData)
       }
+
+      await supabase
+        .from('employee_availability')
+        .upsert(
+          {
+            employee_id: userId,
+            service_radius_km: serviceRadiusKm || 15,
+            availability_schedule: {
+              monday: { available: true, start: '09:00', end: '17:00' },
+              tuesday: { available: true, start: '09:00', end: '17:00' },
+              wednesday: { available: true, start: '09:00', end: '17:00' },
+              thursday: { available: true, start: '09:00', end: '17:00' },
+              friday: { available: true, start: '09:00', end: '17:00' },
+              saturday: { available: true, start: '10:00', end: '14:00' },
+              sunday: { available: false, start: '00:00', end: '00:00' },
+            },
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'employee_id' }
+        )
 
       // Create customer record for pros so they can also make purchases
       console.log('[SIGNUP] Creating customer record for pro user_id:', userId)
@@ -331,10 +434,9 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Send verification email via SendGrid (bypassing Supabase rate limit)
-    console.log('[SIGNUP] Sending verification email via SendGrid...')
+    // Send verification email via Resend-backed email service (bypassing Supabase rate limit)
+    console.log('[SIGNUP] Sending verification email via Resend...')
     let verificationCode = ''
-    let emailSent = false
     
     try {
       verificationCode = Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -402,7 +504,6 @@ export async function POST(request: NextRequest) {
         // Don't fail signup if email fails - user can request resend
       } else {
         console.log('[SIGNUP] ✓ Verification email sent successfully')
-        emailSent = true
       }
     } catch (emailError) {
       console.error('[SIGNUP] Error in email section:', emailError instanceof Error ? emailError.message : String(emailError))
@@ -450,28 +551,29 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorRecord = asRecord(error)
+    const errorMessage = getErrorMessage(error, 'Signup failed')
     console.error('[SIGNUP] ==========================================')
     console.error('[SIGNUP] ❌ UNEXPECTED ERROR IN SIGNUP')
     console.error('[SIGNUP] ==========================================')
-    console.error('[SIGNUP] Error name:', error?.name)
-    console.error('[SIGNUP] Error message:', error?.message)
-    console.error('[SIGNUP] Error status:', error?.status)
-    console.error('[SIGNUP] Error code:', error?.code)
+    console.error('[SIGNUP] Error name:', errorRecord.name)
+    console.error('[SIGNUP] Error message:', errorMessage)
+    console.error('[SIGNUP] Error status:', errorRecord.status)
+    console.error('[SIGNUP] Error code:', errorRecord.code)
     console.error('[SIGNUP] Full error object:', JSON.stringify(error, null, 2))
-    console.error('[SIGNUP] Error stack:', error?.stack)
+    console.error('[SIGNUP] Error stack:', errorRecord.stack)
     console.error('[SIGNUP] Error type:', typeof error)
-    console.error('[SIGNUP] Error keys:', Object.keys(error || {}))
+    console.error('[SIGNUP] Error keys:', Object.keys(errorRecord))
     console.error('[SIGNUP] ==========================================')
     
-    const errorMessage = error?.message || error?.toString?.() || 'Signup failed'
     console.error('[SIGNUP] Returning error response:', { error: errorMessage })
     
     return NextResponse.json(
       { 
         error: errorMessage || 'An unexpected error occurred during signup',
         code: 'SIGNUP_ERROR',
-        details: process.env.NODE_ENV === 'development' ? error?.toString?.() : undefined
+        details: process.env.NODE_ENV === 'development' ? String(error) : undefined
       },
       { status: 500 }
     )
@@ -487,8 +589,8 @@ export async function GET(request: NextRequest) {
   
   try {
     supabase = getServiceRoleClient()
-  } catch (initError: any) {
-    console.error('[SIGNUP-GET] Failed to initialize Supabase:', initError?.message)
+  } catch (initError: unknown) {
+    console.error('[SIGNUP-GET] Failed to initialize Supabase:', getErrorMessage(initError, 'Cannot initialize Supabase'))
     return NextResponse.json(
       { error: 'Server configuration error' },
       { status: 500 }
@@ -523,8 +625,8 @@ export async function GET(request: NextRequest) {
       exists: users && users.length > 0,
       email,
     })
-  } catch (error: any) {
-    console.error('[SIGNUP-GET] Error:', error.message)
+  } catch (error: unknown) {
+    console.error('[SIGNUP-GET] Error:', getErrorMessage(error, 'Failed to check email availability'))
     return NextResponse.json(
       { error: 'Failed to check email availability' },
       { status: 500 }

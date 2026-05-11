@@ -10,6 +10,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { sendEmail } from './emailService'
 
 // Lazy initialization to avoid build-time credential requirements
 let supabaseAdminClient: SupabaseClient | null = null
@@ -348,6 +349,123 @@ export async function ensureUserProfile(userId: string, customerData?: { name?: 
   }
 }
 
+function rowString(row: Record<string, any> | null | undefined, keys: string[], fallback = '') {
+  if (!row) return fallback
+  for (const key of keys) {
+    const value = row[key]
+    if (value === null || value === undefined) continue
+    const text = String(value).trim()
+    if (text) return text
+  }
+  return fallback
+}
+
+function jobEarnings(totalPrice: number) {
+  if (!Number.isFinite(totalPrice) || totalPrice <= 0) return 0
+  return Math.round(totalPrice * 0.75 * 100) / 100
+}
+
+function isEligibleForJobNotification(employee: Record<string, any>) {
+  const userId = rowString(employee, ['user_id', 'id'])
+  if (!userId) return false
+
+  const accountStatus = rowString(employee, ['account_status', 'status']).toLowerCase()
+  const availabilityStatus = rowString(employee, ['availability_status']).toLowerCase()
+  const approvalStatus = rowString(employee, ['approval_status', 'application_status', 'verification_status']).toLowerCase()
+
+  if (['rejected', 'suspended', 'disabled', 'inactive'].includes(accountStatus)) return false
+  if (['offline', 'unavailable', 'busy'].includes(availabilityStatus)) return false
+  if (employee.approved === false || employee.is_approved === false) return false
+  if (approvalStatus && !['approved', 'verified', 'active'].includes(approvalStatus)) return false
+
+  return true
+}
+
+async function notifyProsAboutAvailableJob(params: {
+  jobId: string
+  orderId: string
+  pickupAddress?: string
+  serviceType?: string
+  totalPrice: number
+  weight: number
+  pickupDate?: string
+}) {
+  try {
+    const { data: employees, error } = await supabaseAdmin
+      .from('employees')
+      .select('*')
+      .limit(50)
+
+    if (error) {
+      console.warn('[AdminClient] Could not load pros for job notifications:', error.message)
+      return
+    }
+
+    const recipients = (employees || [])
+      .filter(isEligibleForJobNotification)
+      .slice(0, 25)
+
+    if (recipients.length === 0) {
+      console.log('[AdminClient] No eligible pros found for job notification')
+      return
+    }
+
+    const address = params.pickupAddress || 'Pickup address available in app'
+    const earnings = jobEarnings(params.totalPrice)
+    const message = `${params.weight.toFixed(1)} kg pickup available. Estimated earnings: $${earnings.toFixed(2)}.`
+
+    const notificationRows = recipients.map((employee: Record<string, any>) => ({
+      user_id: rowString(employee, ['user_id', 'id']),
+      type: 'available_job',
+      title: 'New Washlee job available',
+      message,
+      data: {
+        jobId: params.jobId,
+        orderId: params.orderId,
+        pickupAddress: address,
+        serviceType: params.serviceType,
+        estimatedEarnings: earnings,
+        weight: params.weight,
+        pickupDate: params.pickupDate,
+      },
+      read: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }))
+
+    const { error: notificationError } = await supabaseAdmin
+      .from('notifications')
+      .insert(notificationRows)
+
+    if (notificationError) {
+      console.warn('[AdminClient] Failed to create pro job notifications:', notificationError.message)
+    } else {
+      console.log(`[AdminClient] ✓ Created ${notificationRows.length} pro job notifications`)
+    }
+
+    await Promise.allSettled(
+      recipients
+        .filter((employee: Record<string, any>) => rowString(employee, ['email']))
+        .slice(0, 25)
+        .map((employee: Record<string, any>) => sendEmail({
+          to: rowString(employee, ['email']),
+          subject: 'New Washlee job available',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #1f2d2b;">New Washlee job available</h2>
+              <p>${message}</p>
+              <p><strong>Pickup:</strong> ${address}</p>
+              <p><strong>Order:</strong> ${params.orderId}</p>
+              <p>Open the Washlee Pro app to review and claim this job.</p>
+            </div>
+          `,
+        }))
+    )
+  } catch (error) {
+    console.error('[AdminClient] Pro job notification fanout failed:', error)
+  }
+}
+
 /**
  * Create order in database
  */
@@ -362,6 +480,9 @@ export async function createOrder(orderData: {
   status?: string
   pickup_date?: string
   delivery_date?: string
+  pickupDate?: string
+  deliveryDate?: string
+  deliveryTimeSlot?: string
   notes?: string
   pickupAddress?: string
   deliveryAddress?: string
@@ -377,6 +498,7 @@ export async function createOrder(orderData: {
   additionalRequests?: string
   deliveryInstructions?: string
   hangDry?: boolean
+  pricingQuote?: Record<string, any>
   addOns?: {
     hangDry?: boolean
     delicatesCare?: boolean
@@ -404,10 +526,14 @@ export async function createOrder(orderData: {
       additionalRequests,
       deliveryInstructions,
       hangDry,
+      pricingQuote,
       addOns,
       customerName,
       customerEmail,
       customerPhone,
+      pickupDate,
+      deliveryDate,
+      deliveryTimeSlot,
     } = orderData
 
     // Ensure user profile exists with customer data (create if missing, update if incomplete)
@@ -418,13 +544,23 @@ export async function createOrder(orderData: {
     })
 
     // Calculate weight from bagCount if not provided
-    const calculatedWeight = weight ? parseFloat(weight.toString()) : (bagCount || 0) * 10
+    const quotedWeight = Number(pricingQuote?.estimatedWeight)
+    const calculatedWeight = Number.isFinite(quotedWeight) && quotedWeight > 0
+      ? quotedWeight
+      : weight
+        ? parseFloat(weight.toString())
+        : (bagCount || 0) * 5
 
     // Prepare the order data for the orders table
     const orderRecord: any = {
       user_id,
       total_price: parseFloat(total_price.toString()),
       status: 'confirmed',
+      service_type,
+      delivery_speed,
+      protection_plan,
+      weight_kg: calculatedWeight,
+      pricing_quote: pricingQuote || null,
       // created_at and updated_at will be set by database defaults
     }
 
@@ -432,6 +568,8 @@ export async function createOrder(orderData: {
     if (pickupAddress) orderRecord.pickup_address = pickupAddress
     if (deliveryAddress) orderRecord.delivery_address = deliveryAddress
     if (notes) orderRecord.notes = notes
+    if (pickupDate) orderRecord.scheduled_pickup_date = pickupDate
+    if (deliveryDate) orderRecord.scheduled_delivery_date = deliveryDate
     
     // Add booking preference fields
     if (pickupSpot) orderRecord.pickup_spot = pickupSpot
@@ -450,6 +588,10 @@ export async function createOrder(orderData: {
       service_type,
       delivery_speed,
       protection_plan,
+      pickupDate: pickupDate || null,
+      pickupTimeStatus: 'pro_to_confirm',
+      deliveryDate: deliveryDate || null,
+      deliveryTimeSlot: deliveryTimeSlot || null,
       addOns
     }
     
@@ -473,25 +615,53 @@ export async function createOrder(orderData: {
       .single()
 
     if (error) throw error
+
+    const optionalSchedulingUpdate: Record<string, string> = {}
+    if (pickupDate) optionalSchedulingUpdate.pickup_date = pickupDate
+    if (deliveryDate) optionalSchedulingUpdate.delivery_date = deliveryDate
+    if (deliveryTimeSlot) optionalSchedulingUpdate.delivery_time_slot = deliveryTimeSlot
+    optionalSchedulingUpdate.scheduled_at = new Date().toISOString()
+
+    if (Object.keys(optionalSchedulingUpdate).length > 1) {
+      const { error: scheduleError } = await supabaseAdmin
+        .from('orders')
+        .update(optionalSchedulingUpdate)
+        .eq('id', data.id)
+
+      if (scheduleError) {
+        console.warn('[AdminClient] Optional scheduling columns were not updated:', scheduleError.message)
+      }
+    }
     
     console.log(`[AdminClient] ✓ Created order ${data.id} for user ${user_id}`)
     console.log(`[AdminClient] Order details - Weight: ${calculatedWeight}kg, Price: $${total_price}`)
     
     // Create a pro_job record so pros can see this as an available job
     if (data && data.id) {
-      const { error: jobError } = await supabaseAdmin
+      const { data: jobData, error: jobError } = await supabaseAdmin
         .from('pro_jobs')
         .insert({
           order_id: data.id,
           status: 'available',
           posted_at: new Date().toISOString()
         })
+        .select()
+        .single()
       
       if (jobError) {
         console.error('[AdminClient] Failed to create pro_job for order:', jobError)
         // Don't throw - the order was created successfully, job creation is secondary
       } else {
         console.log(`[AdminClient] ✓ Created available job for order ${data.id}`)
+        await notifyProsAboutAvailableJob({
+          jobId: jobData.id,
+          orderId: data.id,
+          pickupAddress,
+          serviceType: service_type,
+          totalPrice: parseFloat(total_price.toString()),
+          weight: calculatedWeight,
+          pickupDate: pickupDate || undefined,
+        })
       }
     }
     
@@ -762,12 +932,16 @@ export async function createNotification(userId: string, notificationData: {
   data?: Record<string, any>
 }) {
   try {
+    const { body, ...rest } = notificationData
     const { data, error } = await supabaseAdmin
       .from('notifications')
       .insert({
         user_id: userId,
-        ...notificationData,
+        ...rest,
+        message: body,
+        read: false,
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single()

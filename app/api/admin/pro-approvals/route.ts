@@ -162,7 +162,8 @@ export async function PATCH(request: NextRequest) {
         // Create employee record in employees table (if it exists)
         const { error: employeeError } = await supabase
           .from('employees')
-          .insert({
+          .upsert({
+            id: userId,
             user_id: userId,
             employee_id: employeeId,
             first_name: proInquiryData.first_name,
@@ -173,7 +174,7 @@ export async function PATCH(request: NextRequest) {
             status: 'active',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          })
+          }, { onConflict: 'id' })
 
         if (employeeError) {
           // Check if error is because table doesn't exist or employee already exists

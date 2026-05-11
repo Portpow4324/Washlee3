@@ -5,6 +5,7 @@ import { AuthProvider } from '@/lib/AuthContext'
 import { AdminSessionProvider } from '@/lib/adminSessionContext'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import Script from 'next/script'
+import WashleeAnalyticsTracker from '@/components/analytics/WashleeAnalyticsTracker'
 
 export const metadata: Metadata = {
   title: 'Washlee - Laundry Done for You',
@@ -28,6 +29,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <AuthProvider>
             <AdminSessionProvider>
+              <WashleeAnalyticsTracker />
               {children}
               <CookieBanner />
             </AdminSessionProvider>

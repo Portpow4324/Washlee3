@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { fetchCollectionData, subscribeToCollection, ADMIN_COLLECTIONS } from '@/lib/supabaseAdminSync'
 import { ChevronLeft, Search, Filter, MoreVertical } from 'lucide-react'
 import Link from 'next/link'
 
@@ -34,24 +32,15 @@ export default function SubscriptionsPage() {
       setLoading(true)
       setError(null)
 
-      // Fetch all subscriptions
-      const { data, error: fetchError } = await supabase
-        .from('customers')
-        .select(`
-          id,
-          subscription_plan,
-          subscription_status,
-          subscription_active,
-          users(email, name)
-        `)
-        .order('updated_at', { ascending: false })
+      const response = await fetch('/api/admin/collections?name=subscriptions', { cache: 'no-store' })
+      const result = await response.json()
 
-      if (fetchError) {
-        setError(fetchError.message)
+      if (!response.ok || !result.success) {
+        setError(result.error || 'Failed to load subscriptions')
         return
       }
 
-      const transformed: Subscription[] = (data || []).map((item: any) => ({
+      const transformed: Subscription[] = (result.data || []).map((item: any) => ({
         id: item.id,
         user_id: item.id,
         plan_name: item.subscription_plan || 'Basic',

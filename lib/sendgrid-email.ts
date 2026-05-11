@@ -1,8 +1,10 @@
 /**
- * SendGrid Email Service for Washlee
+ * Legacy email compatibility service for Washlee
  * Handles transactional and marketing emails
- * Uses placeholders until real SendGrid API key is added
+ * Sends through the shared Resend-backed email service
  */
+
+import { sendEmail as sendResendEmail } from './emailService'
 
 interface EmailTemplate {
   id: string
@@ -145,34 +147,27 @@ const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
 }
 
 /**
- * Send email using SendGrid or log placeholder
+ * Send email through Resend.
  */
 export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string }> {
   const { to, subject, htmlBody, templateId, variables } = options
 
-  // Check if SendGrid is configured
-  const apiKey = process.env.SENDGRID_API_KEY
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@washlee.com'
-
-  if (!apiKey || !fromEmail) {
-    // Placeholder mode: log the email
-    console.warn('[SENDGRID] Using placeholder credentials')
-    console.log(`[EMAIL] To: ${to}`)
-    console.log(`[EMAIL] Subject: ${subject}`)
-    console.log(`[EMAIL] Template ID: ${templateId || 'N/A'}`)
-    return {
-      success: true,
-      messageId: `mock_${Date.now()}`,
-    }
-  }
-
   try {
-    // In production, this would call SendGrid API
-    // For now, return success
-    console.log(`[SENDGRID] Email sent to ${to}`)
+    console.log(`[EMAIL] Sending legacy-template email to ${to}`)
+    console.log(`[EMAIL] Template ID: ${templateId || 'N/A'}`)
+    if (variables) {
+      console.log(`[EMAIL] Variables: ${Object.keys(variables).join(', ')}`)
+    }
+
+    const result = await sendResendEmail({
+      to,
+      subject,
+      html: htmlBody,
+    })
+
     return {
-      success: true,
-      messageId: `sgm_${Date.now()}`,
+      success: result.success,
+      messageId: result.messageId,
     }
   } catch (error) {
     console.error('Error sending email:', error)

@@ -68,6 +68,11 @@ export default function EmployeeOrders() {
 
         // Fetch customer details for each order via API endpoint
         if (data && data.length > 0) {
+          const { data: sessionData } = await supabase.auth.getSession()
+          const authHeaders = sessionData.session?.access_token
+            ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+            : undefined
+
           const ordersWithCustomers = await Promise.all(
             data.map(async (order: any) => {
               console.log('[Employee Orders] Processing order:', order.id, 'with user_id:', order.user_id)
@@ -85,7 +90,9 @@ export default function EmployeeOrders() {
               
               try {
                 // Fetch customer data via API endpoint (server-side, bypasses RLS)
-                const response = await fetch(`/api/customers/profile?userId=${order.user_id}`)
+                const response = await fetch(`/api/customers/profile?userId=${order.user_id}`, {
+                  headers: authHeaders,
+                })
                 const customerData = await response.json()
 
                 if (response.ok && customerData.name && customerData.name !== 'Unknown') {

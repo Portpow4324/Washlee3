@@ -1,8 +1,8 @@
 'use client'
 
 import { useRouter, useParams } from 'next/navigation'
-import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import {
   ArrowLeft,
   Copy,
@@ -19,36 +19,9 @@ import { getResolutionsByCategory, issueResolutions } from '@/lib/issueResolutio
 export default function ResolutionGuidePage() {
   const router = useRouter()
   const params = useParams()
-  const { user, userData, loading: authLoading } = useAuth()
+  const { checkingAdminAccess } = useRequireAdminAccess()
   const [resolution, setResolution] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
   const [copiedCode, setCopiedCode] = useState<number | null>(null)
-  const [hasOwnerAccess, setHasOwnerAccess] = useState(false)
-
-  // Check admin access
-  useEffect(() => {
-    const ownerAccess = sessionStorage.getItem('ownerAccess') === 'true'
-    setHasOwnerAccess(ownerAccess)
-
-    if (authLoading) return
-
-    if (ownerAccess) {
-      setLoading(false)
-      return
-    }
-
-    if (!user) {
-      router.push('/auth/login')
-      return
-    }
-
-    if (!userData?.is_admin) {
-      router.push('/')
-      return
-    }
-
-    setLoading(false)
-  }, [user, userData, authLoading, router])
 
   // Find resolution
   useEffect(() => {
@@ -62,7 +35,7 @@ export default function ResolutionGuidePage() {
     setTimeout(() => setCopiedCode(null), 2000)
   }
 
-  if (authLoading || loading) {
+  if (checkingAdminAccess) {
     return (
       <>
         <Header />

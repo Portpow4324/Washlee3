@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { sendEmail } from '@/lib/email-service'
+import { getBearerUser, hasAdminSession } from '@/lib/security/apiAuth'
+import { cleanString } from '@/lib/security/validation'
 
 interface CancellationRequest {
   orderId: string
@@ -21,13 +23,25 @@ const REASON_LABELS: Record<string, string> = {
 export async function POST(request: NextRequest) {
   try {
     const body: CancellationRequest = await request.json()
-    const { orderId, userId, reason, notes = '' } = body
+    const orderId = cleanString(body.orderId, 100)
+    const userId = cleanString(body.userId, 80)
+    const reason = cleanString(body.reason, 80)
+    const notes = cleanString(body.notes, 1000)
 
     if (!orderId || !userId || !reason) {
       return NextResponse.json(
         { error: 'Missing required fields: orderId, userId, reason' },
         { status: 400 }
       )
+    }
+
+    const [authenticatedUser, adminSession] = await Promise.all([
+      getBearerUser(request),
+      hasAdminSession(request),
+    ])
+
+    if (!adminSession && (!authenticatedUser || authenticatedUser.id !== userId)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     console.log('[Cancel API] Processing cancellation:', { orderId, userId, reason })
@@ -80,7 +94,7 @@ export async function POST(request: NextRequest) {
         .from('pro_jobs')
         .update({ status: 'cancelled' })
         .eq('order_id', orderId)
-    } catch (err: any) {
+    } catch (err) {
       console.error('[Cancel API] Failed to cancel pro_jobs:', err)
       // Don't fail - order was already cancelled
     }
@@ -97,8 +111,8 @@ export async function POST(request: NextRequest) {
           refund_status: 'pending',
           created_at: new Date().toISOString(),
         })
-    } catch (err: any) {
-      if (!err.message?.includes('does not exist')) {
+    } catch (err) {
+      if (!(err instanceof Error) || !err.message.includes('does not exist')) {
         console.error('[Cancel API] Failed to create cancellation record:', err)
       }
     }
@@ -182,10 +196,10 @@ export async function POST(request: NextRequest) {
       message: 'Order cancelled successfully. You will receive a confirmation email shortly.',
       orderId,
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Cancel API] Error:', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }

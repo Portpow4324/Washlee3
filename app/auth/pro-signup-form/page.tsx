@@ -814,6 +814,24 @@ function ProSignupFormContent() {
               availability: formData.availability,
               applicationStep: 1,
             } as any)
+            await fetch('/api/employee/profile', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                employeeId: authUser.id,
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                phone: formData.phone,
+                address: formData.workAddress,
+                city: formData.workSuburb,
+                state: formData.state,
+                postcode: formData.workPostcode,
+                country: formData.workCountry || 'Australia',
+                latitude: workAddressCoordinates?.lat ?? null,
+                longitude: workAddressCoordinates?.lng ?? null,
+                serviceRadiusKm: 15,
+              }),
+            })
             console.log('[Signup] Customer profile created for existing user')
             
             // Auto-accept terms and email for logged-in users
@@ -879,6 +897,9 @@ function ProSignupFormContent() {
             city: formData.workSuburb || null,
             postcode: formData.workPostcode || null,
             country: formData.workCountry || 'Australia',
+            latitude: workAddressCoordinates?.lat ?? null,
+            longitude: workAddressCoordinates?.lng ?? null,
+            serviceRadiusKm: 15,
           })
         })
 

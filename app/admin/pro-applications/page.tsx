@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
+import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
@@ -68,7 +68,7 @@ interface ProApplication {
 
 export default function ProApplicationsPage() {
   const router = useRouter()
-  const { user, userData, loading: authLoading } = useAuth()
+  const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [applications, setApplications] = useState<ProApplication[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedApp, setSelectedApp] = useState<ProApplication | null>(null)
@@ -88,21 +88,12 @@ export default function ProApplicationsPage() {
   const [employeeIdGenerated, setEmployeeIdGenerated] = useState(false)
   const [generatedEmployeeId, setGeneratedEmployeeId] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [hasAdminAccess, setHasAdminAccess] = useState(false)
 
   useEffect(() => {
-    // Check for password-based admin access from sessionStorage
-    const ownerAccess = sessionStorage.getItem('ownerAccess') === 'true'
-    setHasAdminAccess(ownerAccess)
-    
-    if (!ownerAccess) {
-      console.error('[ProApplications] Admin access denied. Redirecting to login.')
-      router.push('/admin/login')
-      return
-    }
+    if (!hasAdminAccess) return
 
     loadApplications()
-  }, [router, statusFilter])
+  }, [hasAdminAccess, statusFilter])
 
   const loadApplications = async () => {
     try {
@@ -293,7 +284,7 @@ export default function ProApplicationsPage() {
     }
   }
 
-  if (authLoading) {
+  if (checkingAdminAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Spinner />

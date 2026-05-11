@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import { useAuth } from '@/lib/AuthContext'
-import { MapPin, Phone, Mail, Package, DollarSign, Calendar, Navigation, ArrowLeft, Loader } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
+import { MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, Navigation, ArrowLeft, Loader } from 'lucide-react'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import EmployeeOrderMap from '@/components/EmployeeOrderMap'
@@ -19,6 +20,18 @@ interface OrderData {
   deliveryAddress: string
   serviceAddress?: string
   scheduledPickupDate: string
+  scheduledDeliveryDate?: string
+  deliveryTimeSlot?: string
+  pickupTimeStatus?: string
+  createdAt?: string
+  updatedAt?: string
+  job?: {
+    id: string
+    status: string
+    postedAt?: string
+    acceptedAt?: string
+    updatedAt?: string
+  } | null
   customer?: {
     first_name?: string
     last_name?: string
@@ -67,7 +80,12 @@ export default function EmployeeOrderDetails() {
     const fetchOrder = async () => {
       try {
         setOrderLoading(true)
-        const response = await fetch(`/api/orders/details?orderId=${orderId}`)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const response = await fetch(`/api/orders/details?orderId=${orderId}`, {
+          headers: sessionData.session?.access_token
+            ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+            : undefined,
+        })
         
         if (!response.ok) {
           const data = await response.json()
@@ -180,6 +198,30 @@ export default function EmployeeOrderDetails() {
   }
 
   const itemsData = parseItems(order.items)
+  const deliveryDate = order.scheduledDeliveryDate || itemsData?.deliveryDate
+  const deliveryWindow = order.deliveryTimeSlot || itemsData?.deliveryTimeSlot
+
+  const formatDate = (value?: string) => {
+    if (!value) return 'Not provided'
+    return new Date(`${value}T00:00:00`).toLocaleDateString('en-AU', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return 'Not provided'
+    return new Date(value).toLocaleString('en-AU', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+  }
 
   return (
     <>
@@ -263,13 +305,9 @@ export default function EmployeeOrderDetails() {
                     <Calendar size={14} /> Scheduled Pickup
                   </p>
                   <p className="text-white font-semibold">
-                    {new Date(order.scheduledPickupDate).toLocaleDateString('en-AU', {
-                      weekday: 'short',
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
+                    {formatDate(order.scheduledPickupDate)}
                   </p>
+                  <p className="text-gray text-xs mt-1">Pickup time: pro to confirm with customer</p>
                 </div>
               )}
             </Card>
@@ -286,6 +324,17 @@ export default function EmployeeOrderDetails() {
                 </div>
               </div>
               <p className="text-white text-sm leading-relaxed">{order.serviceAddress || 'Not provided'}</p>
+              {(deliveryDate || deliveryWindow) && (
+                <div className="mt-4 pt-4 border-t border-slate-700">
+                  <p className="text-gray text-sm uppercase flex items-center gap-2">
+                    <Calendar size={14} /> Scheduled Delivery
+                  </p>
+                  <p className="text-white font-semibold">
+                    {deliveryDate ? formatDate(deliveryDate) : 'Date not provided'}
+                    {deliveryWindow ? `, ${deliveryWindow}` : ''}
+                  </p>
+                </div>
+              )}
             </Card>
           </div>
 
@@ -371,6 +420,36 @@ export default function EmployeeOrderDetails() {
               <p className="text-gray text-sm uppercase">Order ID</p>
               <p className="text-white font-mono text-sm break-all">{order.id}</p>
             </div>
+            <div className="border-t border-slate-700 pt-4">
+              <p className="text-gray text-sm uppercase flex items-center gap-2">
+                <Clock size={14} /> Created
+              </p>
+              <p className="text-white font-semibold text-sm">{formatDateTime(order.createdAt)}</p>
+            </div>
+            {order.updatedAt && (
+              <div className="border-t border-slate-700 pt-4">
+                <p className="text-gray text-sm uppercase flex items-center gap-2">
+                  <Clock size={14} /> Last Updated
+                </p>
+                <p className="text-white font-semibold text-sm">{formatDateTime(order.updatedAt)}</p>
+              </div>
+            )}
+            {order.job?.postedAt && (
+              <div className="border-t border-slate-700 pt-4">
+                <p className="text-gray text-sm uppercase flex items-center gap-2">
+                  <Clock size={14} /> Job Posted
+                </p>
+                <p className="text-white font-semibold text-sm">{formatDateTime(order.job.postedAt)}</p>
+              </div>
+            )}
+            {order.job?.acceptedAt && (
+              <div className="border-t border-slate-700 pt-4">
+                <p className="text-gray text-sm uppercase flex items-center gap-2">
+                  <Clock size={14} /> Accepted
+                </p>
+                <p className="text-white font-semibold text-sm">{formatDateTime(order.job.acceptedAt)}</p>
+              </div>
+            )}
             <div className="border-t border-slate-700 pt-4">
               <p className="text-gray text-sm uppercase">Status</p>
               <div className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(order.status)}`}>

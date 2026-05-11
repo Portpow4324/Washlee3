@@ -1,13 +1,13 @@
 /**
  * Unified Email Service for Washlee
  * ====================================
- * Uses Resend (primary) or SendGrid (fallback) for email sending
+ * Uses Resend for email sending
  * 
  * Configuration:
- * - RESEND_API_KEY: Your Resend API key (primary)
- * - RESEND_FROM_EMAIL: Email to send from via Resend
- * - SENDGRID_API_KEY: Your SendGrid API key (fallback)
- * - GMAIL_ADDRESS: Your Gmail address (fallback sender)
+ * - RESEND_API_KEY: Your Resend API key
+ * - RESEND_FROM_EMAIL: Email to send from via Resend.
+ *   Defaults to onboarding@resend.dev for testing until a domain is verified.
+ * - RESEND_REPLY_TO_EMAIL: Optional reply-to address
  */
 
 import { Resend } from 'resend'
@@ -419,13 +419,12 @@ export const EMAIL_TEMPLATES = {
 }
 
 /**
- * Main email sending function using SendGrid
+ * Main email sending function using Resend
  */
 export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFromEmail = process.env.RESEND_FROM_EMAIL
-  const sendgridApiKey = process.env.SENDGRID_API_KEY
-  const sendgridFromEmail = process.env.SENDGRID_FROM_EMAIL || 'support@washlee.com.au'
+  const resendFromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
+  const resendReplyToEmail = process.env.RESEND_REPLY_TO_EMAIL || resendFromEmail
 
   console.log('[EMAIL] ========================================')
   console.log('[EMAIL] sendEmail called')
@@ -433,67 +432,17 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
   console.log('[EMAIL] Subject:', options.subject)
   console.log('[EMAIL] ========================================')
 
-  // Try SendGrid first (more reliable for production)
-  if (sendgridApiKey) {
-    console.log('[EMAIL] Attempting to send via SendGrid...')
-    console.log('[EMAIL] SendGrid API Key present:', !!sendgridApiKey)
-    console.log('[EMAIL] SendGrid From Email:', sendgridFromEmail)
-    try {
-      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${sendgridApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: options.to }] }],
-          from: { email: sendgridFromEmail },
-          subject: options.subject,
-          content: [{ type: 'text/html', value: options.html }],
-          reply_to: { email: options.replyTo || sendgridFromEmail },
-        }),
-      })
-
-      console.log('[EMAIL] SendGrid response status:', response.status)
-
-      if (response.ok) {
-        const messageId = response.headers.get('x-message-id') || `sendgrid_${Date.now()}`
-        console.log(`[EMAIL] ✅ Email sent via SendGrid to ${options.to}`)
-        console.log(`[EMAIL] Message ID:`, messageId)
-        return {
-          success: true,
-          messageId,
-        }
-      } else {
-        const errorText = await response.text()
-        console.error('[EMAIL] SendGrid failed with status', response.status)
-        console.error('[EMAIL] SendGrid error response:', errorText)
-        return {
-          success: false,
-          error: `SendGrid failed: ${response.status} - ${errorText}`,
-        }
-      }
-    } catch (error: any) {
-      console.error('[EMAIL] SendGrid exception:', error.message)
-      return {
-        success: false,
-        error: `SendGrid exception: ${error.message}`,
-      }
-    }
-  }
-
-  // Try Resend as fallback
   if (resendApiKey) {
     try {
       const resend = new Resend(resendApiKey)
 
       console.log('[EMAIL] Sending via Resend from:', resendFromEmail)
       const response = await resend.emails.send({
-        from: resendFromEmail || 'noreply@washlee.com',
+        from: resendFromEmail,
         to: options.to,
         subject: options.subject,
         html: options.html,
-        replyTo: options.replyTo || resendFromEmail || 'noreply@washlee.com',
+        replyTo: options.replyTo || resendReplyToEmail,
       })
 
       if (response.error) {
@@ -510,11 +459,12 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
           messageId: response.data?.id || `resend_${Date.now()}`,
         }
       }
-    } catch (error: any) {
-      console.error('[EMAIL] Resend exception:', error.message)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('[EMAIL] Resend exception:', message)
       return {
         success: false,
-        error: `Resend failed: ${error.message}`,
+        error: `Resend failed: ${message}`,
       }
     }
   }
@@ -523,7 +473,7 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
   console.error('[EMAIL] ❌ No email service configured!')
   return {
     success: false,
-    error: 'Email service not configured. Please set SENDGRID_API_KEY or RESEND_API_KEY.',
+    error: 'Email service not configured. Please set RESEND_API_KEY.',
   }
 }
 
@@ -813,7 +763,7 @@ export async function sendPasswordReset(
   })
 }
 
-export default {
+const emailService = {
   sendEmail,
   sendTemplateEmail,
   sendWelcomeEmail,
@@ -830,6 +780,8 @@ export default {
   sendPaymentFailed,
   sendPasswordReset,
 }
+
+export default emailService
 
 /**
  * Send branded email confirmation
@@ -848,6 +800,6 @@ export async function sendBrandedConfirmationEmail(
     to: email,
     subject: template.subject,
     html: html,
-    replyTo: process.env.GMAIL_ADDRESS || process.env.SENDGRID_FROM_EMAIL
+    replyTo: process.env.RESEND_REPLY_TO_EMAIL || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
   })
 }
