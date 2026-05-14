@@ -126,6 +126,7 @@ const navItems: NavItem[] = [
   { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { label: 'Monitoring', href: '/admin/monitoring', icon: Activity },
   { label: 'Security', href: '/admin/security', icon: ShieldCheck },
+  { label: 'Employee codes', href: '/admin/employee-codes', icon: Key },
 ]
 
 const initialState: DashboardState = {
@@ -225,17 +226,17 @@ async function fetchJson<T>(input: string, init: RequestInit = {}, timeoutMs = 7
 
 function MetricCard({ label, value, detail }: { label: string; value: string | number; detail: ReactNode }) {
   return (
-    <div className="rounded-lg border border-[#dce5e2] bg-white px-7 py-6 shadow-sm">
-      <p className="text-sm font-semibold uppercase text-[#6d7c78]">{label}</p>
-      <p className="mt-5 text-5xl font-bold leading-none text-[#1f2d2b]">{value}</p>
-      <div className="mt-4 text-lg font-semibold text-[#147f70]">{detail}</div>
+    <div className="rounded-xl border border-[#e5ebea] bg-white p-3.5 shadow-sm">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[#6b7b78]">{label}</p>
+      <p className="mt-2 text-[22px] font-bold leading-none text-[#1f2d2b]">{value}</p>
+      <div className="mt-1.5 text-[10px] font-semibold leading-none text-[#1f8473]">{detail}</div>
     </div>
   )
 }
 
 function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-[#dce5e2] bg-white/60 p-8 text-center text-sm font-semibold text-[#6d7c78]">
+    <div className="rounded-xl border border-dashed border-[#d8dedc] bg-white p-10 text-center text-[12px] font-semibold text-[#6b7b78]">
       {children}
     </div>
   )
@@ -253,14 +254,14 @@ function AdminRail({ onLogout }: { onLogout: () => void }) {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col bg-[#0b221d] text-[#aebbb7] md:flex">
-        <div className="flex h-[198px] items-center justify-center border-b border-white/10">
-          <Link href="/admin" className="flex h-[108px] w-[108px] items-center justify-center rounded-3xl bg-[#4acbb8] text-white shadow-sm" aria-label="Washlee admin dashboard">
-            <WashingMachine size={52} strokeWidth={2.2} />
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[88px] flex-col overflow-y-auto bg-[#0f1f1d] py-3.5 text-white md:flex">
+        <div className="mb-4 flex justify-center">
+          <Link href="/admin" className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#48c9b0] text-white shadow-sm" aria-label="Washlee admin dashboard">
+            <WashingMachine size={20} strokeWidth={2.2} />
           </Link>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-5">
+        <nav className="flex-1 overflow-y-auto">
           {navItems.map((item) => {
             const active = item.match ? item.match(pathname) : pathname.startsWith(item.href)
             const Icon = item.icon
@@ -268,14 +269,14 @@ function AdminRail({ onLogout }: { onLogout: () => void }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex h-[74px] flex-col items-center justify-center gap-2 border-l-4 text-sm font-semibold transition ${
+                className={`flex flex-col items-center gap-1 px-1 py-2.5 text-center font-medium transition ${
                   active
-                    ? 'border-[#75eadb] bg-[#173c34] text-[#75eadb]'
-                    : 'border-transparent text-[#aebbb7] hover:bg-white/5 hover:text-white'
+                    ? 'bg-[#7fe3cf]/10 text-[#7fe3cf]'
+                    : 'text-white/60 hover:bg-white/5 hover:text-white'
                 }`}
               >
-                <Icon size={27} strokeWidth={2.2} />
-                <span>{item.label}</span>
+                <Icon size={20} strokeWidth={2.2} />
+                <span className="text-[8px] leading-tight">{item.label}</span>
               </Link>
             )
           })}
@@ -284,10 +285,10 @@ function AdminRail({ onLogout }: { onLogout: () => void }) {
         <button
           type="button"
           onClick={onLogout}
-          className="flex h-[84px] flex-col items-center justify-center gap-2 border-t border-white/10 text-sm font-semibold text-[#aebbb7] transition hover:bg-white/5 hover:text-white"
+          className="mt-2 flex flex-col items-center justify-center gap-1 border-t border-white/10 px-1 py-2.5 text-center font-medium text-white/60 transition hover:bg-white/5 hover:text-white"
         >
-          <Key size={28} strokeWidth={2.2} />
-          <span>Logout</span>
+          <Key size={20} strokeWidth={2.2} />
+          <span className="text-[8px] leading-tight">Logout</span>
         </button>
       </aside>
 
@@ -470,67 +471,67 @@ export default function AdminOpsDashboard() {
   if (!hasAdminAccess) return null
 
   return (
-    <div className="min-h-screen bg-[#f4f8f6] text-[#1f2d2b] md:pl-[264px]">
+    <div className="min-h-screen bg-[#f7faf9] text-[#1f2d2b] md:pl-[88px]">
       <AdminRail onLogout={handleLogout} />
 
-      <header className="border-b border-[#dfe8e5] bg-white">
-        <div className="flex min-h-[188px] flex-col justify-center gap-6 px-5 py-8 sm:px-8 lg:px-16 xl:flex-row xl:items-center xl:justify-between">
+      <header className="border-b border-[#eef1f0] bg-white">
+        <div className="flex min-h-[63px] items-center gap-3 px-5 py-3.5 sm:px-[22px]">
           <div>
-            <h1 className="text-5xl font-bold leading-none text-[#1f2d2b]">Dashboard</h1>
-            <p className="mt-5 text-2xl text-[#6d7c78]">Today / Melbourne ops</p>
+            <h1 className="text-[16px] font-bold leading-tight text-[#1f2d2b]">Dashboard</h1>
+            <p className="mt-1 text-[11px] leading-none text-[#6b7b78]">Today / Melbourne ops</p>
           </div>
-          <div className="flex items-center gap-3">
-            {lastSync && <p className="hidden text-sm font-semibold text-[#6d7c78] sm:block">Synced {lastSync}</p>}
+          <div className="ml-auto flex items-center gap-2">
+            {lastSync && <p className="hidden text-[11px] font-semibold text-[#6b7b78] sm:block">Synced {lastSync}</p>}
             <button
               type="button"
               onClick={loadDashboard}
               disabled={refreshing}
-              className="flex h-12 w-12 items-center justify-center rounded-lg border border-[#dce5e2] bg-white text-[#1f2d2b] transition hover:bg-[#f4f8f6] disabled:opacity-60"
+              className="flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-[#d8dedc] bg-white text-[#1f2d2b] transition hover:bg-[#f7faf9] disabled:opacity-60"
               aria-label="Refresh dashboard"
             >
-              <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
+              <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
             </button>
-            <div className="flex h-[76px] w-[76px] items-center justify-center rounded-full bg-[#0d4a40] text-2xl font-bold text-white">
+            <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#0f4f46] text-[12px] font-semibold text-white">
               WH
             </div>
           </div>
         </div>
       </header>
 
-      <main className="px-5 py-8 sm:px-8 lg:px-16">
+      <main className="px-5 py-5 sm:px-[22px]">
         {loadError && (
-          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+          <div className="mb-3.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-semibold text-amber-900">
             {loadError}
           </div>
         )}
 
-        <section className="grid gap-5 xl:grid-cols-4">
+        <section className="mb-[18px] grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Orders today" value={loading ? '--' : todayOrders.length} detail={activeOrders.length > 0 ? `${activeOrders.length} live now` : 'No live orders'} />
           <MetricCard label="Revenue today" value={loading ? '--' : formatCurrency(todayRevenue)} detail={dashboard.analytics?.totalRevenue ? `${formatCurrency(dashboard.analytics.totalRevenue)} all time` : 'Awaiting orders'} />
           <MetricCard label="Active pros" value={loading ? '--' : approvedPros} detail={pendingApplications.length > 0 ? `${pendingApplications.length} pending` : 'Queue clear'} />
           <MetricCard label="Open tickets" value={loading ? '--' : openTickets.length} detail={stuckOrders.length > 0 ? <span className="text-red-700">{stuckOrders.length} stuck order(s)</span> : 'Support clear'} />
         </section>
 
-        <section className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,2fr)_minmax(360px,0.8fr)]">
+        <section className="grid gap-3.5 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
           <div>
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <h2 className="text-2xl font-bold uppercase text-[#6d7c78]">Live orders</h2>
-              <Link href="/admin/orders" className="text-sm font-bold text-[#147f70] hover:underline">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7b78]">Live orders</h2>
+              <Link href="/admin/orders" className="text-[11px] font-bold text-[#1f8473] hover:underline">
                 View all
               </Link>
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-[#dce5e2] bg-white shadow-sm">
-              <div className="grid grid-cols-[1.1fr_1fr_1fr_1fr_0.7fr] gap-4 border-b border-[#e6eeeb] bg-[#f8fbfa] px-6 py-5 text-sm font-bold uppercase text-[#6d7c78] max-lg:hidden">
+            <div className="overflow-hidden rounded-[10px] border border-[#e5ebea] bg-white">
+              <div className="grid grid-cols-5 gap-3 bg-[#f7faf9] px-3.5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#6b7b78] max-lg:hidden">
                 <span>Order</span>
                 <span>Customer</span>
                 <span>Status</span>
                 <span>Pro</span>
-                <span className="text-right">Total</span>
+                <span>Total</span>
               </div>
 
               {loading ? (
-                <div className="flex items-center justify-center py-16">
+                <div className="flex items-center justify-center py-10">
                   <Spinner />
                 </div>
               ) : liveOrders.length === 0 ? (
@@ -541,20 +542,20 @@ export default function AdminOpsDashboard() {
                     <Link
                       key={order.id}
                       href={`/tracking/${order.id}`}
-                      className="grid gap-3 px-6 py-5 text-lg transition hover:bg-[#f8fbfa] lg:grid-cols-[1.1fr_1fr_1fr_1fr_0.7fr] lg:items-center"
+                      className="grid gap-2 px-3.5 py-3 text-[12px] font-medium leading-snug transition hover:bg-[#f7faf9] lg:grid-cols-5 lg:items-center"
                     >
                       <div>
-                        <p className="font-bold text-[#1f2d2b]">{orderDisplayId(order)}</p>
-                        <p className="mt-1 text-xs font-semibold uppercase text-[#6d7c78] lg:hidden">Order</p>
+                        <p className="font-semibold text-[#1f2d2b]">{orderDisplayId(order)}</p>
+                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#6b7b78] lg:hidden">Order</p>
                       </div>
-                      <div className="font-semibold text-[#1f2d2b]">{getCustomerName(order)}</div>
+                      <div className="font-medium text-[#1f2d2b]">{getCustomerName(order)}</div>
                       <div>
-                        <span className={`inline-flex rounded-full px-4 py-2 text-sm font-bold ${statusClass(order.status)}`}>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold leading-tight ${statusClass(order.status)}`}>
                           {titleStatus(order.status)}
                         </span>
                       </div>
-                      <div className="font-semibold text-[#1f2d2b]">{getProName(order)}</div>
-                      <div className="font-bold text-[#1f2d2b] lg:text-right">{formatCurrency(orderTotal(order), 2)}</div>
+                      <div className="font-medium text-[#1f2d2b]">{getProName(order)}</div>
+                      <div className="font-semibold text-[#1f2d2b]">{formatCurrency(orderTotal(order), 2)}</div>
                     </Link>
                   ))}
                 </div>
@@ -563,50 +564,32 @@ export default function AdminOpsDashboard() {
           </div>
 
           <aside>
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <h2 className="text-2xl font-bold uppercase text-[#6d7c78]">Alerts</h2>
-              <Link href="/admin/monitoring" className="text-sm font-bold text-[#147f70] hover:underline">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#6b7b78]">Alerts</h2>
+              <Link href="/admin/monitoring" className="text-[11px] font-bold text-[#1f8473] hover:underline">
                 Monitor
               </Link>
             </div>
 
-            <div className="space-y-5">
+            <div className="flex flex-col gap-2">
               {visibleAlerts.map((alert) => {
                 const Icon = alert.icon
                 return (
                   <Link
                     key={`${alert.title}-${alert.detail}`}
                     href={alert.href}
-                    className="flex gap-5 rounded-lg border border-[#dce5e2] bg-white p-6 shadow-sm transition hover:border-[#75eadb]"
+                    className="flex gap-2.5 rounded-[10px] border border-[#e5ebea] bg-white p-3 transition hover:border-[#7fe3cf]"
                   >
-                    <Icon size={34} className={`mt-1 shrink-0 ${alertToneClasses(alert.tone)}`} />
+                    <Icon size={18} className={`mt-0.5 shrink-0 ${alertToneClasses(alert.tone)}`} />
                     <span>
-                      <span className="block text-xl font-bold text-[#1f2d2b]">{alert.title}</span>
-                      <span className="mt-2 block text-lg font-medium text-[#6d7c78]">{alert.detail}</span>
+                      <span className="block text-[12px] font-semibold leading-tight text-[#1f2d2b]">{alert.title}</span>
+                      <span className="mt-0.5 block text-[11px] font-normal leading-snug text-[#6b7b78]">{alert.detail}</span>
                     </span>
                   </Link>
                 )
               })}
             </div>
           </aside>
-        </section>
-
-        <section className="mt-10 grid gap-5 lg:grid-cols-3">
-          <Link href="/admin/analytics" className="rounded-lg border border-[#dce5e2] bg-white p-6 shadow-sm transition hover:border-[#75eadb]">
-            <p className="text-sm font-bold uppercase text-[#6d7c78]">Platform</p>
-            <p className="mt-3 text-3xl font-bold">{dashboard.analytics?.totalOrders?.toLocaleString() || dashboard.orders.length.toLocaleString()}</p>
-            <p className="mt-2 text-sm font-semibold text-[#6d7c78]">Total orders tracked</p>
-          </Link>
-          <Link href="/admin/users" className="rounded-lg border border-[#dce5e2] bg-white p-6 shadow-sm transition hover:border-[#75eadb]">
-            <p className="text-sm font-bold uppercase text-[#6d7c78]">Customers</p>
-            <p className="mt-3 text-3xl font-bold">{dashboard.analytics?.activeUsers?.toLocaleString() || 0}</p>
-            <p className="mt-2 text-sm font-semibold text-[#6d7c78]">Active users from analytics</p>
-          </Link>
-          <Link href="/admin/security" className="rounded-lg border border-[#dce5e2] bg-white p-6 shadow-sm transition hover:border-[#75eadb]">
-            <p className="text-sm font-bold uppercase text-[#6d7c78]">Security</p>
-            <p className="mt-3 text-3xl font-bold">{dashboard.monitoring?.overview?.authFailuresToday || 0}</p>
-            <p className="mt-2 text-sm font-semibold text-[#6d7c78]">Login failures today</p>
-          </Link>
         </section>
       </main>
     </div>
