@@ -1,13 +1,5 @@
-'use client'
-import Link from 'next/link'
-export default function WashClubOnboardingPage() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white flex items-center justify-center p-4">
-      <div className="max-w-md w-full text-center">
-        <h1 className="text-3xl font-bold text-[#1f2d2b] mb-4">Wash Club</h1>
-        <p className="text-[#6b7b78] mb-6">Wash Club onboarding coming soon</p>
-        <Link href="/" className="text-[#48C9B0] hover:text-[#7FE3D3]">← Home</Link>
-      </div>
-    </div>
-  )
+import { redirect } from 'next/navigation'
+
+export default function WashClubOnboardingRedirect() {
+  redirect('/wash-club')
 }

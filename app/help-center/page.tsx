@@ -108,7 +108,7 @@ export default function HelpCenter() {
     },
     {
       question: "Can I schedule recurring orders?",
-      answer: "Not yet, but recurring orders are coming soon! For now, you can book orders as needed. WASH Club members get discounted rates on all orders."
+      answer: "Recurring orders are not live yet. For now, book when you need a wash. Wash Club is free loyalty, so you can earn points on completed orders without a paid membership."
     },
     {
       question: "What if there's an issue with my order?",

@@ -167,7 +167,7 @@ export default function ProHeader() {
                   <p className="text-xs text-gray">{user?.email}</p>
                 </div>
                 <Link
-                  href="/pro/settings"
+                  href="/employee/settings"
                   className="block w-full px-4 py-3 text-dark hover:bg-primary/10 transition font-semibold border-b border-gray-200 flex items-center gap-2"
                   onClick={() => setShowUserMenu(false)}
                 >

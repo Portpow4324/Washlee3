@@ -71,5 +71,13 @@ export async function startWashleeOAuth({
     },
   })
 
-  if (error) throw error
+  if (error) {
+    const message = error.message || ''
+    if (message.includes('Unsupported provider') || message.includes('provider is not enabled')) {
+      throw new Error(
+        `${provider === 'apple' ? 'Apple' : 'Google'} sign in is coded, but the provider is not enabled in Supabase yet. Enable it in Supabase Authentication > Providers, then try again.`
+      )
+    }
+    throw error
+  }
 }

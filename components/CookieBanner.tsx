@@ -1,37 +1,43 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 export default function CookieBanner() {
-  const [isVisible, setIsVisible] = useState(false)
+  const pathname = usePathname()
+  const isAdminRoute = pathname?.startsWith('/admin') || pathname === '/admin-login' || pathname === '/admin-setup'
+  const [hasChoice, setHasChoice] = useState(true)
 
   useEffect(() => {
-    // Check if user has already accepted or dismissed cookies
-    const cookieConsent = localStorage.getItem('cookieConsent')
-    if (!cookieConsent) {
-      setIsVisible(true)
-    }
-  }, [])
+    if (isAdminRoute) return
+
+    const timer = window.setTimeout(() => {
+      setHasChoice(Boolean(localStorage.getItem('cookieConsent')))
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [isAdminRoute])
 
   const handleAccept = () => {
     localStorage.setItem('cookieConsent', 'accepted')
     window.dispatchEvent(new Event('washlee-cookie-consent-changed'))
-    setIsVisible(false)
+    setHasChoice(true)
   }
 
   const handleReject = () => {
     localStorage.setItem('cookieConsent', 'rejected')
     window.dispatchEvent(new Event('washlee-cookie-consent-changed'))
-    setIsVisible(false)
+    setHasChoice(true)
   }
 
   const handleDismiss = () => {
-    setIsVisible(false)
+    setHasChoice(true)
   }
 
-  if (!isVisible) return null
+  if (isAdminRoute || hasChoice) return null
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-primary shadow-2xl z-40">
