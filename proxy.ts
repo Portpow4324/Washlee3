@@ -22,6 +22,20 @@ const TRUSTED_APP_ORIGINS = new Set([
   process.env.FRONTEND_URL,
 ].filter(Boolean) as string[])
 
+const API_CORS_HEADERS: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Requested-With',
+  'Access-Control-Max-Age': '86400',
+}
+
+function applyApiCors(response: NextResponse) {
+  for (const [key, value] of Object.entries(API_CORS_HEADERS)) {
+    response.headers.set(key, value)
+  }
+  return response
+}
+
 function securityHeaders(request: NextRequest) {
   const headers = new Headers()
   headers.set('X-Content-Type-Options', 'nosniff')
@@ -45,6 +59,11 @@ function applySecurityHeaders(response: NextResponse, request: NextRequest) {
   return response
 }
 
+function decorateResponse(response: NextResponse, request: NextRequest) {
+  const withSecurity = applySecurityHeaders(response, request)
+  return request.nextUrl.pathname.startsWith('/api/') ? applyApiCors(withSecurity) : withSecurity
+}
+
 function getClientIp(request: NextRequest) {
   const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
   return forwardedFor || request.headers.get('x-real-ip') || 'local'
@@ -53,8 +72,16 @@ function getClientIp(request: NextRequest) {
 function getRateLimitConfig(pathname: string, method: string): RateLimitConfig | null {
   if (!pathname.startsWith('/api/')) return null
 
-  if (pathname.startsWith('/api/admin/session')) {
+  if (pathname === '/api/admin/session' && method === 'POST') {
     return { limit: 5, windowMs: 5 * 60 * 1000 }
+  }
+
+  if (pathname === '/api/admin/session') {
+    return { limit: 120, windowMs: 60 * 1000 }
+  }
+
+  if (pathname === '/api/security/report') {
+    return { limit: 30, windowMs: 60 * 1000 }
   }
 
   if (
@@ -206,13 +233,18 @@ async function hasAdminSession(request: NextRequest) {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // CORS preflight for /api/* — respond immediately so browsers can dispatch the real request.
+  if (pathname.startsWith('/api/') && request.method === 'OPTIONS') {
+    return new NextResponse(null, { status: 204, headers: API_CORS_HEADERS })
+  }
+
   const rateLimitResult = rateLimit(request)
   if (rateLimitResult instanceof NextResponse) {
-    return applySecurityHeaders(rateLimitResult, request)
+    return decorateResponse(rateLimitResult, request)
   }
 
   if (!isSameOriginUnsafeRequest(request)) {
-    return applySecurityHeaders(
+    return decorateResponse(
       NextResponse.json({ success: false, error: 'Invalid request origin' }, { status: 403 }),
       request
     )
@@ -223,12 +255,12 @@ export async function proxy(request: NextRequest) {
     process.env.ALLOW_TEST_ENDPOINTS !== 'true' &&
     isDebugOrTestPath(pathname)
   ) {
-    return applySecurityHeaders(NextResponse.json({ success: false, error: 'Not found' }, { status: 404 }), request)
+    return decorateResponse(NextResponse.json({ success: false, error: 'Not found' }, { status: 404 }), request)
   }
 
   if (requiresAdminSession(pathname, request.method) && pathname !== '/api/admin/session') {
     if (!(await hasAdminSession(request))) {
-      return applySecurityHeaders(
+      return decorateResponse(
         NextResponse.json({ success: false, error: 'Admin session required' }, { status: 401 }),
         request
       )
@@ -239,14 +271,14 @@ export async function proxy(request: NextRequest) {
     if (!(await hasAdminSession(request))) {
       const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('next', pathname)
-      return applySecurityHeaders(NextResponse.redirect(loginUrl), request)
+      return decorateResponse(NextResponse.redirect(loginUrl), request)
     }
   }
 
   if (PROTECTED_DASHBOARD_ROUTES.some((route) => pathname.startsWith(route))) {
     const authToken = request.cookies.get('authToken')?.value
     if (!authToken) {
-      return applySecurityHeaders(NextResponse.redirect(new URL('/auth/login', request.url)), request)
+      return decorateResponse(NextResponse.redirect(new URL('/auth/login', request.url)), request)
     }
   }
 
@@ -255,7 +287,7 @@ export async function proxy(request: NextRequest) {
     rateLimitResult.forEach((value, key) => response.headers.set(key, value))
   }
 
-  return applySecurityHeaders(response, request)
+  return decorateResponse(response, request)
 }
 
 export const config = {

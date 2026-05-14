@@ -21,13 +21,13 @@ export interface ErrorDetails {
     method?: string
     endpoint?: string
     statusCode?: number
-    requestBody?: any
-    responseBody?: any
+    requestBody?: unknown
+    responseBody?: unknown
     componentStack?: string
     file?: string
     line?: number
     column?: number
-    [key: string]: any
+    [key: string]: unknown
   }
   resolutionSteps: string[]
   resolutionCategory: string
@@ -94,7 +94,7 @@ export function logError(
   const type = determineErrorType(message, options?.type)
   const severity = determineSeverity(message, options?.severity, type)
   const resolutionCategory = getResolutionCategory(type)
-  const resolutionSteps = getResolutionSteps(type, title, message)
+  const resolutionSteps = getResolutionSteps(type)
 
   const errorEntry: ErrorDetails = {
     id: generateErrorId(),
@@ -118,6 +118,7 @@ export function logError(
 
   errors.push(errorEntry)
   saveErrorStore(errors)
+  reportErrorToSecurity(errorEntry)
 
   console.error('[ADMIN-LOGGER] Error logged:', {
     id: errorEntry.id,
@@ -263,6 +264,42 @@ function generateErrorId(): string {
   return `ERR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
+function reportErrorToSecurity(error: ErrorDetails) {
+  if (typeof window === 'undefined') return
+
+  const payload = {
+    id: error.id,
+    timestamp: error.timestamp,
+    type: error.type,
+    severity: error.severity,
+    title: error.title,
+    message: error.message,
+    stack: error.stack,
+    context: {
+      url: error.context.url,
+      endpoint: error.context.endpoint,
+      method: error.context.method,
+      statusCode: error.context.statusCode,
+      file: error.context.file,
+      line: error.context.line,
+      column: error.context.column,
+      componentStack: error.context.componentStack,
+    },
+  }
+
+  const json = JSON.stringify(payload)
+  const blob = new Blob([json], { type: 'application/json' })
+
+  if (navigator.sendBeacon?.('/api/security/report', blob)) return
+
+  fetch('/api/security/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: json,
+    keepalive: true,
+  }).catch(() => undefined)
+}
+
 function determineErrorType(
   message: string,
   override?: ErrorDetails['type']
@@ -360,11 +397,7 @@ function getResolutionCategory(type: ErrorDetails['type']): string {
   return categories[type] || 'General'
 }
 
-function getResolutionSteps(
-  type: ErrorDetails['type'],
-  title: string,
-  message: string
-): string[] {
+function getResolutionSteps(type: ErrorDetails['type']): string[] {
   const common = [
     'Check browser console for detailed error stack trace',
     'Verify network connection is stable',

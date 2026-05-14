@@ -3,24 +3,55 @@
 import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Footer from '@/components/Footer'
-import Card from '@/components/Card'
-import Spinner from '@/components/Spinner'
-import Button from '@/components/Button'
 import CancellationModal from '@/components/CancellationModal'
 import RemoveOrderWarningModal from '@/components/RemoveOrderWarningModal'
 import Toast from '@/components/Toast'
 import Link from 'next/link'
-import { Package, MapPin, Calendar, DollarSign, Eye, ChevronRight, X } from 'lucide-react'
+import {
+  Package,
+  Calendar,
+  ChevronRight,
+  X,
+  AlertCircle,
+  ArrowRight,
+  RotateCcw,
+  Trash2,
+} from 'lucide-react'
 
 interface Order {
   id: string
   status: string
   total_price: number
   created_at: string
-  delivery_address?: any
+  delivery_address?: unknown
   scheduled_pickup_date?: string
-  items?: any
+  items?: unknown
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  confirmed: 'bg-mint text-primary-deep',
+  pending_payment: 'bg-amber-100 text-amber-800',
+  in_progress: 'bg-blue-100 text-blue-800',
+  picked_up: 'bg-blue-100 text-blue-800',
+  washing: 'bg-blue-100 text-blue-800',
+  out_for_delivery: 'bg-blue-100 text-blue-800',
+  completed: 'bg-emerald-100 text-emerald-800',
+  cancelled: 'bg-red-100 text-red-700',
+}
+
+function getOrderWeight(order: Order): number {
+  if (!order.items) return 0
+  try {
+    const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items
+    return (items as { weight?: number })?.weight ?? 0
+  } catch {
+    return 0
+  }
+}
+
+function formatStatus(status: string): string {
+  const cleaned = status.replace(/_/g, ' ')
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
 }
 
 export default function OrdersPage() {
@@ -39,11 +70,44 @@ export default function OrdersPage() {
   const [removingOrderId, setRemovingOrderId] = useState<string | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
 
-  const getOrderWeight = (order: Order) => {
-    if (!order.items) return 0
-    const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items
-    return items.weight || 0
-  }
+  useEffect(() => {
+    if (authLoading || !user) return
+
+    const loadOrders = async () => {
+      try {
+        setIsLoading(true)
+        setError('')
+
+        const queryTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Orders query timeout')), 10000)
+        )
+
+        const ordersPromise = supabase
+          .from('orders')
+          .select('id, status, created_at, total_price, delivery_address, scheduled_pickup_date, items')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50)
+
+        const result = (await Promise.race([ordersPromise, queryTimeout])) as Awaited<typeof ordersPromise>
+
+        if (result.error) {
+          console.error('[Orders] Query error:', result.error.message)
+          setOrders([])
+        } else {
+          setOrders((result.data ?? []) as Order[])
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load orders'
+        console.error('[Orders] Error loading orders:', message)
+        setOrders([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadOrders()
+  }, [user, authLoading])
 
   const handleOpenCancellationModal = (orderId: string) => {
     setCancellingOrderId(orderId)
@@ -55,64 +119,6 @@ export default function OrdersPage() {
     setShowCancellationModal(false)
   }
 
-  const handleRemoveOrder = async (orderId: string) => {
-    if (!user) {
-      setToast({
-        message: 'You must be logged in to remove orders',
-        type: 'error',
-      })
-      return
-    }
-
-    try {
-      setIsRemoving(true)
-      console.log('[Remove Order] Calling API for order:', orderId)
-      const response = await fetch('/api/orders/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId,
-          userId: user.id,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to remove order')
-      }
-
-      console.log('[Remove Order] API success, removing from UI:', orderId)
-      // Remove order from list
-      setOrders(orders.filter((o) => o.id !== orderId))
-      setShowRemoveModal(false)
-      setRemovingOrderId(null)
-      setToast({
-        message: 'Order removed from your dashboard',
-        type: 'success',
-      })
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to remove order'
-      console.error('[Remove Order] Error:', errorMessage)
-      setToast({
-        message: errorMessage,
-        type: 'error',
-      })
-    } finally {
-      setIsRemoving(false)
-    }
-  }
-
-  const openRemoveModal = (orderId: string) => {
-    setRemovingOrderId(orderId)
-    setShowRemoveModal(true)
-  }
-
-  const closeRemoveModal = () => {
-    setShowRemoveModal(false)
-    setRemovingOrderId(null)
-  }
-
   const handleSubmitCancellation = async (reason: string, notes: string) => {
     if (!cancellingOrderId || !user) return
 
@@ -122,7 +128,9 @@ export default function OrdersPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+          ...(sessionData.session?.access_token
+            ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+            : {}),
         },
         body: JSON.stringify({
           orderId: cancellingOrderId,
@@ -133,24 +141,17 @@ export default function OrdersPage() {
       })
 
       const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to cancel order')
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to cancel order')
-      }
-
-      // Remove order from list
-      setOrders(orders.filter((o) => o.id !== cancellingOrderId))
+      setOrders((prev) => prev.filter((o) => o.id !== cancellingOrderId))
       handleCloseCancellationModal()
       setToast({
-        message: 'Order cancelled successfully! Check your email for details.',
+        message: 'Order cancelled. Check your email for details.',
         type: 'success',
       })
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to cancel order'
-      setToast({
-        message: errorMessage,
-        type: 'error',
-      })
+      const message = err instanceof Error ? err.message : 'Failed to cancel order'
+      setToast({ message, type: 'error' })
       throw err
     }
   }
@@ -167,7 +168,6 @@ export default function OrdersPage() {
         ? { Authorization: `Bearer ${sessionData.session.access_token}` }
         : {}
 
-      // Cancel all orders that are not already completed or cancelled
       for (const order of orders) {
         if (order.status !== 'completed' && order.status !== 'cancelled') {
           try {
@@ -181,50 +181,39 @@ export default function OrdersPage() {
                 notes: 'Cancelled via Cancel All button',
               }),
             })
-
             if (response.ok) {
               cancelledOrderIds.push(order.id)
             } else {
               failedOrderIds.push(order.id)
             }
-          } catch (err) {
+          } catch {
             failedOrderIds.push(order.id)
           }
         }
       }
 
-      // Remove cancelled orders from list
-      setOrders(orders.filter((o) => !cancelledOrderIds.includes(o.id)))
+      setOrders((prev) => prev.filter((o) => !cancelledOrderIds.includes(o.id)))
       setShowCancelAllConfirm(false)
 
       if (failedOrderIds.length === 0) {
-        setToast({
-          message: `Successfully cancelled ${cancelledOrderIds.length} order(s)!`,
-          type: 'success',
-        })
+        setToast({ message: `Cancelled ${cancelledOrderIds.length} order(s).`, type: 'success' })
       } else {
         setToast({
-          message: `Cancelled ${cancelledOrderIds.length} order(s). Failed to cancel ${failedOrderIds.length} order(s).`,
+          message: `Cancelled ${cancelledOrderIds.length}. Failed: ${failedOrderIds.length}.`,
           type: 'error',
         })
       }
-    } catch (err) {
-      setToast({
-        message: 'Error cancelling orders',
-        type: 'error',
-      })
+    } catch {
+      setToast({ message: 'Error cancelling orders', type: 'error' })
     } finally {
       setIsCancellingAll(false)
     }
   }
 
   const handleClearCancelledOrders = () => {
-    setOrders(orders.filter((o) => o.status !== 'cancelled'))
+    setOrders((prev) => prev.filter((o) => o.status !== 'cancelled'))
     setIsClearingCancelled(false)
-    setToast({
-      message: 'Cancelled orders cleared from view',
-      type: 'success',
-    })
+    setToast({ message: 'Cancelled orders cleared from view.', type: 'success' })
   }
 
   const handleInitiateRefund = async (orderId: string) => {
@@ -236,279 +225,268 @@ export default function OrdersPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+          ...(sessionData.session?.access_token
+            ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+            : {}),
         },
-        body: JSON.stringify({
-          orderId,
-          userId: user.id,
-        }),
+        body: JSON.stringify({ orderId, userId: user.id }),
       })
 
       if (response.ok) {
-        const data = await response.json()
         setToast({
           message: 'Refund request initiated. Check your email for payment details.',
           type: 'success',
         })
         setShowInitiateRefund(null)
       } else {
-        setToast({
-          message: 'Failed to initiate refund',
-          type: 'error',
-        })
+        setToast({ message: 'Failed to initiate refund.', type: 'error' })
       }
-    } catch (err) {
-      setToast({
-        message: 'Error initiating refund',
-        type: 'error',
-      })
+    } catch {
+      setToast({ message: 'Error initiating refund.', type: 'error' })
     }
   }
 
-  useEffect(() => {
-    if (authLoading || !user) return
-
-    const loadOrders = async () => {
-      try {
-        setIsLoading(true)
-        setError('')
-        
-        // Add timeout to prevent infinite loading
-        const queryTimeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Orders query timeout')), 10000)
-        )
-
-        const ordersPromise = supabase
-          .from('orders')
-          .select('id, status, created_at, total_price, delivery_address, scheduled_pickup_date, items')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(50)
-
-        const { data, error: queryError } = await Promise.race([
-          ordersPromise,
-          queryTimeout as any
-        ]) as any
-
-        if (queryError) {
-          console.error('[Orders] Query error:', queryError.message)
-          // Show empty state instead of error
-          setOrders([])
-        } else {
-          setOrders(data || [])
-        }
-      } catch (err: any) {
-        console.error('[Orders] Error loading orders:', err.message)
-        // On timeout or error, just show empty orders
-        setOrders([])
-      } finally {
-        setIsLoading(false)
-      }
+  const handleRemoveOrder = async (orderId: string) => {
+    if (!user) {
+      setToast({ message: 'You must be signed in to remove orders.', type: 'error' })
+      return
     }
 
-    loadOrders()
-  }, [user, authLoading])
+    try {
+      setIsRemoving(true)
+      const response = await fetch('/api/orders/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, userId: user.id }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to remove order')
+
+      setOrders((prev) => prev.filter((o) => o.id !== orderId))
+      setShowRemoveModal(false)
+      setRemovingOrderId(null)
+      setToast({ message: 'Order removed from your dashboard.', type: 'success' })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to remove order'
+      setToast({ message, type: 'error' })
+    } finally {
+      setIsRemoving(false)
+    }
+  }
+
+  const openRemoveModal = (orderId: string) => {
+    setRemovingOrderId(orderId)
+    setShowRemoveModal(true)
+  }
+
+  const closeRemoveModal = () => {
+    setShowRemoveModal(false)
+    setRemovingOrderId(null)
+  }
 
   if (authLoading || isLoading) {
     return (
-      <>
-        <div className="min-h-screen flex items-center justify-center">
-          <Spinner />
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-gray">
+          <div className="animate-spin h-8 w-8 rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm">Loading your orders…</p>
         </div>
-        <Footer />
-      </>
+      </div>
     )
   }
 
   if (!user) {
     return (
-      <>
-        <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white flex items-center justify-center p-4">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-[#1f2d2b] mb-4">Sign In Required</h1>
-            <p className="text-[#6b7b78] mb-6">Please sign in to view your orders</p>
-            <Link href="/auth/login" className="text-[#48C9B0] hover:text-[#7FE3D3] font-medium">
-              Sign In →
-            </Link>
-          </div>
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="surface-card max-w-md w-full p-8 text-center">
+          <h1 className="text-2xl font-bold text-dark mb-2">Sign in required</h1>
+          <p className="text-gray mb-5">Please sign in to view your orders.</p>
+          <Link href="/auth/login" className="btn-primary inline-flex">
+            Sign in
+            <ArrowRight size={16} />
+          </Link>
         </div>
-        <Footer />
-      </>
+      </div>
     )
   }
 
+  const cancellableCount = orders.filter(
+    (o) => o.status !== 'completed' && o.status !== 'cancelled'
+  ).length
+  const cancelledCount = orders.filter((o) => o.status === 'cancelled').length
+
   return (
-    <>
-      <main className="min-h-screen bg-gradient-to-b from-[#E8FFFB] to-white py-12 px-4">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="mb-8 flex items-start justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-[#1f2d2b] mb-2">My Orders</h1>
-              <p className="text-[#6b7b78]">Track and manage your laundry orders</p>
-            </div>
-            <div className="flex gap-2">
-              {orders.length > 1 && orders.some(o => o.status === 'cancelled') && (
-                <button
-                  onClick={() => setIsClearingCancelled(true)}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition"
-                >
-                  Clear Cancelled
-                </button>
-              )}
-              {orders.length > 1 && orders.some(o => o.status !== 'completed' && o.status !== 'cancelled') && (
-                <button
-                  onClick={() => setShowCancelAllConfirm(true)}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isCancellingAll}
-                >
-                  {isCancellingAll ? 'Cancelling...' : 'Cancel All'}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {error && (
-            <Card className="p-6 mb-8 bg-red-50 border border-red-200">
-              <p className="text-red-700">{error}</p>
-            </Card>
+    <div className="px-4 sm:px-6 lg:px-8 py-8 sm:py-10 max-w-5xl mx-auto w-full">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-dark mb-1">My orders</h1>
+          <p className="text-gray text-sm sm:text-base">Track, cancel, and manage your laundry orders.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {cancelledCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsClearingCancelled(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-amber-900 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition"
+            >
+              <Trash2 size={14} />
+              Clear cancelled
+            </button>
           )}
+          {cancellableCount > 1 && (
+            <button
+              type="button"
+              onClick={() => setShowCancelAllConfirm(true)}
+              disabled={isCancellingAll}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <X size={14} />
+              {isCancellingAll ? 'Cancelling…' : 'Cancel all'}
+            </button>
+          )}
+          <Link href="/booking" className="btn-primary text-sm">
+            New order
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+      </div>
 
-          {orders.length === 0 ? (
-            <Card className="p-12 text-center">
-              <Package size={48} className="mx-auto mb-4 text-[#6b7b78]" />
-              <h2 className="text-xl font-semibold text-[#1f2d2b] mb-2">No Orders Yet</h2>
-              <p className="text-[#6b7b78] mb-6">Get started by booking your first laundry pickup</p>
-              <Link href="/booking">
-                <Button size="lg">Book Now</Button>
-              </Link>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {orders.map((order) => (
-                <div key={order.id} className="group relative">
-                  <Link href={`/tracking?orderId=${order.id}`}>
-                    <Card className="p-6 hover:shadow-lg transition cursor-pointer">
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
-                        {/* Order ID & Status */}
-                        <div>
-                          <p className="text-xs text-[#6b7b78] uppercase tracking-wide mb-1">Order ID</p>
-                          <p className="font-semibold text-[#1f2d2b] font-mono text-sm">{order.id.slice(0, 8)}</p>
-                          <div className="mt-2">
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                              order.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                              order.status === 'pending_payment' ? 'bg-yellow-100 text-yellow-700' :
-                              order.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                              order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
-                              {order.status.replace(/_/g, ' ').charAt(0).toUpperCase() + order.status.replace(/_/g, ' ').slice(1)}
-                            </span>
-                          </div>
-                        </div>
+      {error && (
+        <div className="surface-card p-4 mb-6 bg-red-50 border-red-200 flex gap-2">
+          <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
 
-                        {/* Weight & Details */}
-                        <div>
-                          <p className="text-xs text-[#6b7b78] uppercase tracking-wide mb-1">Details</p>
-                          <p className="font-semibold text-[#1f2d2b]">{getOrderWeight(order)}kg • N/A</p>
-                        </div>
+      {orders.length === 0 ? (
+        <div className="surface-card p-10 sm:p-14 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-mint mb-4">
+            <Package size={22} className="text-primary-deep" />
+          </div>
+          <h2 className="text-xl font-bold text-dark mb-1">No orders yet</h2>
+          <p className="text-gray mb-6 max-w-sm mx-auto">
+            Book your first pickup — Standard from $7.50/kg with free pickup &amp; delivery.
+          </p>
+          <Link href="/booking" className="btn-primary inline-flex">
+            Book a pickup
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {orders.map((order) => {
+            const weight = getOrderWeight(order)
+            const badgeClass = STATUS_BADGE[order.status] ?? 'bg-line text-dark'
+            return (
+              <div key={order.id} className="surface-card p-5 sm:p-6">
+                <Link href={`/tracking?orderId=${order.id}`} className="block group">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:items-center">
+                    <div className="sm:col-span-3">
+                      <p className="text-[11px] text-gray-soft uppercase tracking-wider mb-1">Order</p>
+                      <p className="font-mono text-sm font-semibold text-dark">{order.id.slice(0, 8)}</p>
+                      <span
+                        className={`inline-flex items-center mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${badgeClass}`}
+                      >
+                        {formatStatus(order.status)}
+                      </span>
+                    </div>
 
-                      {/* Date */}
-                      <div>
-                        <p className="text-xs text-[#6b7b78] uppercase tracking-wide mb-1">Ordered</p>
-                        <div className="flex items-center gap-2">
-                          <Calendar size={16} className="text-[#48C9B0]" />
-                          <p className="font-semibold text-[#1f2d2b]">
-                            {new Date(order.created_at).toLocaleDateString('en-AU', {
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Price & Action */}
-                      <div className="text-right">
-                        <p className="text-xs text-[#6b7b78] uppercase tracking-wide mb-1">Total</p>
-                        <p className="text-2xl font-bold text-[#48C9B0] mb-3">
-                          ${(order.total_price || 0).toFixed(2)}
+                    <div className="sm:col-span-3">
+                      <p className="text-[11px] text-gray-soft uppercase tracking-wider mb-1">Details</p>
+                      <p className="text-sm font-semibold text-dark">{weight ? `${weight}kg` : '—'}</p>
+                      {order.scheduled_pickup_date && (
+                        <p className="text-xs text-gray mt-0.5">
+                          Pickup{' '}
+                          {new Date(order.scheduled_pickup_date).toLocaleDateString('en-AU', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
                         </p>
-                        <div className="flex items-center justify-end gap-1 text-[#48C9B0] group-hover:translate-x-1 transition">
-                          View <ChevronRight size={16} />
-                        </div>
+                      )}
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <p className="text-[11px] text-gray-soft uppercase tracking-wider mb-1">Ordered</p>
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-dark">
+                        <Calendar size={14} className="text-primary-deep" />
+                        {new Date(order.created_at).toLocaleDateString('en-AU', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
                       </div>
                     </div>
-                  </Card>
+
+                    <div className="sm:col-span-3 sm:text-right">
+                      <p className="text-[11px] text-gray-soft uppercase tracking-wider mb-1">Total</p>
+                      <p className="text-2xl font-bold text-primary-deep">
+                        ${(order.total_price || 0).toFixed(2)}
+                      </p>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary-deep mt-1 group-hover:translate-x-0.5 transition">
+                        View order <ChevronRight size={14} />
+                      </span>
+                    </div>
+                  </div>
                 </Link>
 
-                {/* Cancelled Order Alert */}
                 {order.status === 'cancelled' && (
-                  <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm font-semibold text-red-700 mb-2">⚠️ Order Cancelled</p>
-                    <p className="text-xs text-red-600 mb-3">
-                      This order will be automatically removed from your dashboard in 24 hours. Check your email for cancellation details.
+                  <div className="mt-4 rounded-xl bg-red-50 border border-red-200 p-4">
+                    <p className="text-sm font-semibold text-red-800 mb-1">Order cancelled</p>
+                    <p className="text-xs text-red-700 mb-3">
+                      We&rsquo;ll auto-remove this from your dashboard in 24 hours. Check your email for details.
                     </p>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          setShowInitiateRefund(order.id)
-                        }}
-                        className="flex-1 px-3 py-2 text-xs font-semibold bg-[#48C9B0] hover:bg-[#3da089] text-white rounded transition"
+                        type="button"
+                        onClick={() => setShowInitiateRefund(order.id)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-full bg-primary text-white hover:bg-primary-deep transition"
                       >
-                        Request Refund
+                        <RotateCcw size={12} />
+                        Request refund
                       </button>
                       <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          openRemoveModal(order.id)
-                        }}
-                        className="flex-1 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 rounded transition"
+                        type="button"
+                        onClick={() => openRemoveModal(order.id)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-full border border-line text-dark hover:bg-light transition"
                       >
-                        Remove from List
+                        <Trash2 size={12} />
+                        Remove from list
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* Cancel Button - Only show for non-completed orders */}
                 {order.status !== 'completed' && order.status !== 'cancelled' && (
-                  <div className="flex justify-end mt-2">
+                  <div className="flex justify-end mt-3">
                     <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        handleOpenCancellationModal(order.id)
-                      }}
+                      type="button"
+                      onClick={() => handleOpenCancellationModal(order.id)}
                       disabled={cancellingOrderId === order.id}
-                      className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 rounded-full transition disabled:opacity-50"
                     >
-                      <X size={16} />
-                      {cancellingOrderId === order.id ? 'Opening...' : 'Cancel Order'}
+                      <X size={14} />
+                      {cancellingOrderId === order.id ? 'Opening…' : 'Cancel order'}
                     </button>
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-          )}
-
-          {/* Help Section */}
-          <Card className="mt-12 p-6 bg-[#E8FFFB]">
-            <h3 className="font-semibold text-[#1f2d2b] mb-3">Need Help?</h3>
-            <p className="text-sm text-[#6b7b78] mb-4">
-              Can't find your order or have questions about a delivery?
-            </p>
-            <Link href="/support">
-              <Button variant="outline">Contact Support</Button>
-            </Link>
-          </Card>
+            )
+          })}
         </div>
-      </main>
+      )}
 
-      {/* Cancellation Modal */}
+      {/* Help card */}
+      <div className="surface-card mt-8 p-6 bg-mint/40">
+        <h3 className="font-semibold text-dark mb-1">Need a hand?</h3>
+        <p className="text-sm text-gray mb-4">Can&rsquo;t find an order, or have a question about a delivery?</p>
+        <Link href="/dashboard/support" className="btn-outline text-sm">
+          Open support
+          <ArrowRight size={14} />
+        </Link>
+      </div>
+
+      {/* Cancellation modal */}
       <CancellationModal
         orderId={cancellingOrderId || ''}
         isOpen={showCancellationModal}
@@ -517,139 +495,118 @@ export default function OrdersPage() {
         onSubmit={handleSubmitCancellation}
       />
 
-      {/* Cancel All Confirmation Modal */}
       {showCancelAllConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-md w-full">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold text-[#1f2d2b] mb-2">Cancel All Orders?</h2>
-              <p className="text-[#6b7b78] mb-6">
-                This will cancel all active orders. Completed and already cancelled orders will not be affected.
+          <div className="surface-card max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-dark mb-2">Cancel all open orders?</h2>
+            <p className="text-sm text-gray mb-5">
+              Completed and already-cancelled orders aren&rsquo;t affected.
+            </p>
+            <div className="rounded-xl bg-red-50 border border-red-200 p-3 mb-5">
+              <p className="text-sm text-red-800">
+                <span className="font-semibold">{cancellableCount}</span> order(s) will be cancelled.
               </p>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-red-700">
-                  <span className="font-semibold">
-                    {orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length}
-                  </span>
-                  {' '}order(s) will be cancelled
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCancelAllConfirm(false)}
-                  disabled={isCancellingAll}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-[#1f2d2b] rounded-lg font-semibold hover:bg-gray-50 transition disabled:opacity-50"
-                >
-                  Keep Orders
-                </button>
-                <button
-                  onClick={handleCancelAll}
-                  disabled={isCancellingAll}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isCancellingAll ? 'Cancelling...' : 'Yes, Cancel All'}
-                </button>
-              </div>
             </div>
-          </Card>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelAllConfirm(false)}
+                disabled={isCancellingAll}
+                className="btn-outline flex-1 disabled:opacity-50"
+              >
+                Keep orders
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelAll}
+                disabled={isCancellingAll}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-red-600 hover:bg-red-700 transition min-h-[48px] disabled:opacity-50"
+              >
+                {isCancellingAll ? 'Cancelling…' : 'Cancel all'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Clear Cancelled Orders Confirmation Modal */}
       {isClearingCancelled && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-md w-full">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold text-[#1f2d2b] mb-2">Clear Cancelled Orders?</h2>
-              <p className="text-[#6b7b78] mb-6">
-                This will remove all cancelled orders from your dashboard view. This action cannot be undone.
+          <div className="surface-card max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-dark mb-2">Clear cancelled orders?</h2>
+            <p className="text-sm text-gray mb-5">
+              This only hides them from your dashboard view. Records stay in your account.
+            </p>
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 mb-5">
+              <p className="text-sm text-amber-800">
+                <span className="font-semibold">{cancelledCount}</span> cancelled order(s) will be hidden.
               </p>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-yellow-700">
-                  <span className="font-semibold">
-                    {orders.filter(o => o.status === 'cancelled').length}
-                  </span>
-                  {' '}cancelled order(s) will be removed
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setIsClearingCancelled(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-[#1f2d2b] rounded-lg font-semibold hover:bg-gray-50 transition"
-                >
-                  Keep Them
-                </button>
-                <button
-                  onClick={handleClearCancelledOrders}
-                  className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition"
-                >
-                  Clear All
-                </button>
-              </div>
             </div>
-          </Card>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsClearingCancelled(false)}
+                className="btn-outline flex-1"
+              >
+                Keep them
+              </button>
+              <button
+                type="button"
+                onClick={handleClearCancelledOrders}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-amber-600 hover:bg-amber-700 transition min-h-[48px]"
+              >
+                Clear all
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Initiate Refund Confirmation Modal */}
       {showInitiateRefund && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-md w-full">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold text-[#1f2d2b] mb-2">Request Refund</h2>
-              <p className="text-[#6b7b78] mb-6">
-                You will receive a secure payment link via email to process your refund through Stripe or PayPal. The refund will be sent back to your original payment method within 3-5 business days.
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-blue-700 font-semibold">Refund Process:</p>
-                <ul className="text-xs text-blue-600 mt-2 space-y-1">
-                  <li>✓ You'll receive a secure payment link</li>
-                  <li>✓ Choose your preferred payment method</li>
-                  <li>✓ Refund issued to original payment method</li>
-                  <li>✓ 3-5 business days to appear in your account</li>
-                </ul>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowInitiateRefund(null)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-[#1f2d2b] rounded-lg font-semibold hover:bg-gray-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleInitiateRefund(showInitiateRefund)}
-                  className="flex-1 px-4 py-2 bg-[#48C9B0] hover:bg-[#3da089] text-white rounded-lg font-semibold transition"
-                >
-                  Request Refund
-                </button>
-              </div>
+          <div className="surface-card max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-dark mb-2">Request a refund</h2>
+            <p className="text-sm text-gray mb-5">
+              We&rsquo;ll email you a secure payment link. Refunds go back to your original payment method within 3–5 business days.
+            </p>
+            <ul className="rounded-xl bg-mint/50 border border-primary/15 p-4 mb-5 space-y-1.5 text-sm text-dark">
+              <li>• Secure payment link by email</li>
+              <li>• Choose your preferred method</li>
+              <li>• Refund issued to original payment</li>
+              <li>• 3–5 business days to appear</li>
+            </ul>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowInitiateRefund(null)}
+                className="btn-outline flex-1"
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInitiateRefund(showInitiateRefund)}
+                className="btn-primary flex-1"
+              >
+                Request refund
+              </button>
             </div>
-          </Card>
+          </div>
         </div>
       )}
 
-      {/* Toast Notification */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <RemoveOrderWarningModal
         isOpen={showRemoveModal}
-        orderAmount={removingOrderId ? (orders.find(o => o.id === removingOrderId)?.total_price || 0) : 0}
+        orderAmount={
+          removingOrderId ? orders.find((o) => o.id === removingOrderId)?.total_price || 0 : 0
+        }
         onConfirm={() => {
-          if (removingOrderId) {
-            handleRemoveOrder(removingOrderId)
-          }
+          if (removingOrderId) handleRemoveOrder(removingOrderId)
         }}
         onCancel={closeRemoveModal}
         isLoading={isRemoving}
       />
-
-      <Footer />
-    </>
+    </div>
   )
 }

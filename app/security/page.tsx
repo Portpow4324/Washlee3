@@ -178,11 +178,11 @@ export default function SecurityPage() {
               <h3 className="text-2xl font-bold text-dark mb-3">Data Protection Methods:</h3>
               <ul className="space-y-2 text-gray">
                 {[
-                  '✓ End-to-end encryption for messages',
-                  '✓ PCI DSS Level 1 compliance for payments',
-                  '✓ GDPR and CCPA compliant',
-                  '✓ Regular security audits',
-                  '✓ 24/7 fraud monitoring',
+                  '✓ Encrypted in transit and at rest',
+                  '✓ PCI DSS Level 1 payments via Stripe',
+                  '✓ Aligned with the Australian Privacy Act 1988 and APPs',
+                  '✓ Regular security reviews',
+                  '✓ Continuous fraud monitoring',
                 ].map((item, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <Check size={18} className="text-primary flex-shrink-0 mt-0.5" />
@@ -219,14 +219,14 @@ export default function SecurityPage() {
           <h2 className="text-4xl font-bold text-dark text-center mb-12">Trusted & Certified</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {[
-              { logo: '🔒', name: 'SSL Certified' },
-              { logo: '✓', name: 'PCI DSS L1' },
-              { logo: '🛡️', name: 'GDPR Compliant' },
-              { logo: '📋', name: 'CCPA Compliant' },
-              { logo: '⭐', name: '4.9★ Rating' },
-              { logo: '👥', name: '50K+ Users' },
-              { logo: '🏆', name: 'Best Service' },
-              { logo: '💯', name: 'Guaranteed' },
+              { logo: '🔒', name: 'SSL encryption' },
+              { logo: '✓', name: 'PCI DSS L1 (Stripe)' },
+              { logo: '🛡️', name: 'Privacy Act 1988' },
+              { logo: '📋', name: 'Australian Privacy Principles' },
+              { logo: '🔁', name: 'Backups &amp; recovery' },
+              { logo: '🇦🇺', name: 'Melbourne-based team' },
+              { logo: '👁️', name: '24/7 monitoring' },
+              { logo: '💬', name: 'In-app support' },
             ].map((badge, i) => (
               <Card key={i}>
                 <div className="text-4xl mb-2">{badge.logo}</div>
@@ -279,13 +279,13 @@ export default function SecurityPage() {
           <h2 className="text-4xl font-bold text-dark mb-6">Security Questions?</h2>
           <p className="text-lg text-gray mb-8">Our security team is here to help.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="mailto:security@washlee.com" className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:shadow-lg transition">
+            <a href="mailto:security@washlee.com.au" className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:shadow-lg transition">
               <Mail size={20} />
-              Email Security Team
+              Email security team
             </a>
-            <a href="tel:+18883339000" className="flex items-center justify-center gap-2 px-6 py-3 bg-gray/10 text-dark rounded-lg font-semibold hover:bg-gray/20 transition">
+            <a href="mailto:support@washlee.com.au" className="flex items-center justify-center gap-2 px-6 py-3 bg-gray/10 text-dark rounded-lg font-semibold hover:bg-gray/20 transition">
               <Phone size={20} />
-              Call Support
+              General support
             </a>
           </div>
         </div>

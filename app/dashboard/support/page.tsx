@@ -12,13 +12,12 @@ export default function Support() {
   const [searchQuery, setSearchQuery] = useState('')
 
   const categories = [
-    { id: 'all', label: 'All Articles', count: 24 },
-    { id: 'orders', label: 'Orders & Tracking', count: 5 },
-    { id: 'account', label: 'Account & Billing', count: 4 },
-    { id: 'pricing', label: 'Pricing & Plans', count: 3 },
-    { id: 'delivery', label: 'Delivery & Pickup', count: 4 },
-    { id: 'care', label: 'Laundry Care', count: 5 },
-    { id: 'technical', label: 'Technical Issues', count: 3 },
+    { id: 'all', label: 'All articles', count: 18 },
+    { id: 'orders', label: 'Orders & tracking', count: 5 },
+    { id: 'account', label: 'Account & billing', count: 4 },
+    { id: 'pricing', label: 'Pricing & Wash Club', count: 3 },
+    { id: 'delivery', label: 'Pickup & delivery', count: 3 },
+    { id: 'care', label: 'Laundry care', count: 3 },
   ]
 
   const articles = [
@@ -27,35 +26,35 @@ export default function Support() {
       category: 'orders',
       title: 'How do I place an order?',
       content:
-        'Visit our website or mobile app, select your pickup time, add your laundry, and checkout. Our drivers will arrive during your selected window.',
+        'Use the website or mobile app to choose your service, bag size, pickup address, and time window. Standard wash & fold is $7.50/kg, express is $12.50/kg, and the minimum order is $75.',
     },
     {
       id: 2,
       category: 'orders',
       title: 'Can I modify my order after placing it?',
       content:
-        'Yes, you can modify orders within 1 hour of placing them. Go to your dashboard, find the order, and click Edit. After 1 hour, please contact support.',
+        'Open the order from your dashboard. If the order has not progressed too far, you can request a change or contact support. Once a Pro is already on the way or the order is being processed, changes may be limited.',
     },
     {
       id: 3,
       category: 'orders',
       title: 'How can I track my order?',
       content:
-        'Once your order is confirmed, you can track it in real-time through the "Tracking" page or in your dashboard. You\'ll receive SMS and email updates too.',
+        'Open Tracking or the order detail page from your dashboard. You will see the current status, timeline steps, and any available proof or delivery details.',
     },
     {
       id: 4,
       category: 'orders',
       title: 'What happens if my driver is late?',
       content:
-        'Our drivers arrive within a 60-minute window. If they\'re more than 15 minutes late, you receive a $5 credit automatically. Contact support for additional assistance.',
+        'Pickup windows can shift because Pros are independent contractors working across Melbourne traffic. If your pickup is running late, check the tracking page first, then contact support if you need help.',
     },
     {
       id: 5,
       category: 'orders',
-      title: 'Can I request a specific time?',
+      title: 'Can I cancel my order?',
       content:
-        'Yes, during checkout you can select your preferred time window. Premium members get priority scheduling for specific times.',
+        'Yes, where the order status allows it. Open the order and use the cancellation option. If payment has already been taken, support may need to review refund handling.',
     },
     {
       id: 6,
@@ -76,42 +75,42 @@ export default function Support() {
       category: 'account',
       title: 'How do I delete my account?',
       content:
-        'Go to Settings > Account > Delete Account. Your data will be permanently deleted after 30 days. You can still view order history during this period.',
+        'Use account settings where available, or contact support@washlee.com.au. We will guide you through account deletion and any order-history or legal retention requirements.',
     },
     {
       id: 9,
       category: 'account',
       title: 'How do I update my payment method?',
       content:
-        'Visit your dashboard and go to Payment Methods. You can add, remove, or update cards anytime. Changes take effect immediately.',
+        'Go to the payments section in your dashboard or update payment details during checkout. Never send card details through chat or email.',
     },
     {
       id: 10,
       category: 'pricing',
       title: 'What is included in the pricing?',
       content:
-        'Our pricing includes pickup, delivery, washing, drying, and folding. Add-ons like hand washing or express service can be selected during checkout.',
+        'Pricing includes pickup, delivery, washing, drying, and folding in the Melbourne service area. Standard is $7.50/kg, express is $12.50/kg, and the minimum order is $75.',
     },
     {
       id: 11,
       category: 'pricing',
-      title: 'Do you offer student discounts?',
+      title: 'Is Wash Club a paid membership?',
       content:
-        'Yes! Students get 15% off their first 3 orders. Verify with your .edu email and the discount applies automatically.',
+        'No. Wash Club is a free loyalty/rewards program. Washlee is pay-per-order, and there are no paid Wash Club membership fees.',
     },
     {
       id: 12,
       category: 'pricing',
       title: 'Can I get a refund?',
       content:
-        'We offer a 100% money-back guarantee if you\'re not satisfied. Contact support within 24 hours of delivery with photos of any issues.',
+        'If something went wrong, open the order and contact support with photos and details. Refunds, credits, and protection claims are reviewed against the order and protection policy.',
     },
     {
       id: 13,
       category: 'delivery',
       title: 'What areas do you deliver to?',
       content:
-        'Enter your address during checkout to see if we deliver to your area. Currently serving the Bay Area, Los Angeles, and San Diego.',
+        'Enter your address during booking to confirm we cover your suburb. We currently service Greater Melbourne and are expanding regularly.',
     },
     {
       id: 14,
@@ -123,72 +122,30 @@ export default function Support() {
     {
       id: 15,
       category: 'delivery',
-      title: 'How do I schedule a recurring order?',
+      title: 'Can I use a different pickup and delivery address?',
       content:
-        'Premium subscribers can set recurring weekly or bi-weekly pickups. Enable this in your subscription settings. Orders can be skipped anytime.',
+        'Yes, where the booking flow allows it. Add both addresses and make sure the delivery address is inside the active Melbourne service area.',
     },
     {
       id: 16,
-      category: 'delivery',
-      title: 'Is there an extra charge for multiple addresses?',
+      category: 'care',
+      title: 'Do you handle delicate items?',
       content:
-        'No! Save multiple addresses in your profile and select which one for each order. No extra charges for pickups from different locations.',
+        'Select delicates / special care and add notes during booking. Delicates are charged at the standard $7.50/kg rate, but dry-clean-only items should be flagged before sending.',
     },
     {
       id: 17,
       category: 'care',
-      title: 'Do you handle delicate items?',
+      title: 'How do you treat stains?',
       content:
-        'Absolutely! We offer hand-washing for delicates, silk, and wool. Select "Delicate Care" during checkout. Premium for $3 extra per order.',
+        'Add stain notes during booking so the load can be reviewed properly. Common stains may be pre-treated, but stain removal cannot be guaranteed.',
     },
     {
       id: 18,
       category: 'care',
-      title: 'How do you treat stains?',
-      content:
-        'Our professional cleaners treat common stains free of charge. For difficult stains, select "Stain Treatment" ($2 extra). Note any specific stains in delivery instructions.',
-    },
-    {
-      id: 19,
-      category: 'care',
       title: 'Can I request hang-drying?',
       content:
-        'Yes! Select "Hang Dry" during checkout for an additional $2. Perfect for delicate fabrics or items that shouldn\'t go in the dryer.',
-    },
-    {
-      id: 20,
-      category: 'care',
-      title: 'Do you wash bedding?',
-      content:
-        'Yes, including sheets, pillowcases, and comforters. Select "Bedding" as the item type. Comforters have a $5 surcharge due to special handling.',
-    },
-    {
-      id: 21,
-      category: 'care',
-      title: 'What detergent do you use?',
-      content:
-        'We use hypoallergenic, eco-friendly detergent. For sensitive skin, select "Hypoallergenic Only" in preferences. We also offer fragrance-free options.',
-    },
-    {
-      id: 22,
-      category: 'technical',
-      title: 'The app won\'t let me place an order',
-      content:
-        'Try clearing app cache, updating to the latest version, or restarting your phone. Still having issues? Contact support with a screenshot of the error.',
-    },
-    {
-      id: 23,
-      category: 'technical',
-      title: 'I\'m not receiving notifications',
-      content:
-        'Check your phone settings to ensure notifications are enabled for the Washlee app. Go to app Settings > Notifications and toggle on all notification types.',
-    },
-    {
-      id: 24,
-      category: 'technical',
-      title: 'The website is running slow',
-      content:
-        'Clear your browser cache and cookies, disable browser extensions, and try a different browser. Contact support if issues persist.',
+        'Yes. Select Hang Dry during checkout for +$16.50. It is useful for delicate fabrics or items that should not be tumble dried.',
     },
   ]
 
@@ -328,7 +285,7 @@ export default function Support() {
       <div>
         <h2 className="text-lg font-bold text-dark mb-4">Can't find what you're looking for?</h2>
         <Card>
-          <p className="text-gray mb-4">Our support team typically responds within 2 hours during business hours (9 AM - 6 PM PT, Mon-Fri).</p>
+          <p className="text-gray mb-4">Our support team reviews messages during Melbourne business hours. For urgent order issues, include your order number and photos where relevant.</p>
           <div className="flex gap-3">
             <Button>Email Support</Button>
             <button className="px-6 py-2 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-mint transition">

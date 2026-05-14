@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { syncBookingAddresses } from '@/lib/addressSync'
 import { getCustomerPresets, trackPresetUsage, createDefaultPresetFromFirstOrder } from '@/lib/orderPresets'
 import { getDeliveryMetrics, calculateDeliveryWindows, suggestDeliverySpeed, type DeliveryMetrics, type DeliveryWindow } from '@/lib/deliveryService'
+import { getAttributionMetadata, trackWashleeEvent } from '@/lib/analytics/client'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
@@ -93,7 +94,6 @@ export default function BookingHybrid() {
     // Step 4: Bag Count & Custom Weight
     bagCount: 1,
     customWeight: 10,
-    oversizedItems: 0,
 
     // Step 5: Delivery Speed
     deliverySpeed: 'standard',
@@ -124,10 +124,8 @@ export default function BookingHybrid() {
 
   const services = [
     { id: 'standard', name: 'Standard Wash', price: '$7.50/kg', icon: '👕', desc: 'Regular washing for everyday clothes' },
-    { id: 'delicate', name: 'Delicate Fabrics', price: '$7.50/kg', icon: '✨', desc: 'Gentle care for silk, satin & linen' },
+    { id: 'delicate', name: 'Delicates / Special Care', price: '$7.50/kg', icon: '✨', desc: 'Gentle handling for care-note items' },
     { id: 'express', name: 'Express Service', price: '$12.50/kg', icon: '⚡', desc: 'Same-day turnaround available' },
-    { id: 'comforter', name: 'Comforter & Bedding', price: '$6.00/item', icon: '☁️', desc: 'For large items like comforters' },
-    { id: 'handwash', name: 'Hand Wash Premium', price: '$7.50/kg', icon: '🧤', desc: 'Ultimate care for precious items' },
   ]
 
   const pickupSpots = [
@@ -367,9 +365,6 @@ export default function BookingHybrid() {
     if (bookingData.protectionPlan === 'premium') total += 3.50
     if (bookingData.protectionPlan === 'premium-plus') total += 8.50
     
-    // Oversized items ($8 each)
-    total += bookingData.oversizedItems * 8.0
-    
     // Enforce minimum $75 AUD
     return Math.max(total, 75.0)
   }
@@ -386,7 +381,6 @@ export default function BookingHybrid() {
       hangDry: bookingData.hangDry ? 16.50 : 0,
       protectionPlan: 0,
       protectionPlanName: 'None',
-      oversizedItems: bookingData.oversizedItems * 8.0,
       subtotal: 0,
       total: 0,
     }
@@ -401,7 +395,7 @@ export default function BookingHybrid() {
     }
 
     // Calculate subtotal
-    breakdown.subtotal = breakdown.laundryBase + breakdown.hangDry + breakdown.protectionPlan + breakdown.oversizedItems
+    breakdown.subtotal = breakdown.laundryBase + breakdown.hangDry + breakdown.protectionPlan
     
     // Apply minimum
     breakdown.total = Math.max(breakdown.subtotal, 75.0)
@@ -417,7 +411,6 @@ export default function BookingHybrid() {
         protectionPlanCost: breakdown.protectionPlan,
         protectionPlanName: breakdown.protectionPlanName,
         hangDry: breakdown.hangDry,
-        oversizedItems: breakdown.oversizedItems,
         subtotal: breakdown.subtotal,
         total: breakdown.total,
       })
@@ -513,6 +506,13 @@ export default function BookingHybrid() {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
+      trackWashleeEvent('booking_step_completed', {
+        metadata: {
+          step: currentStep,
+          step_title: steps[currentStep - 1]?.title || `Step ${currentStep}`,
+        },
+      })
+
       // Show express warning before proceeding from step 3 with express delivery
       if (currentStep === 3 && bookingData.deliverySpeed === 'express') {
         setShowExpressWarning(true)
@@ -522,6 +522,9 @@ export default function BookingHybrid() {
       if (currentStep < 8) {
         setCurrentStep(currentStep + 1)
       } else {
+        trackWashleeEvent('checkout_started', {
+          metadata: { step: currentStep, source: 'booking_review' },
+        })
         handleSubmitOrder()
       }
       setError('')
@@ -530,8 +533,6 @@ export default function BookingHybrid() {
 
   const validateStep = (step: number) => {
     const estimatedWeight = (bookingData as any).customWeight || bookingData.bagCount * 10
-    const userPlan = userData?.subscription?.plan || 'free'
-    
     switch (step) {
       case 1:
         if (!bookingData.selectedService) {
@@ -552,9 +553,9 @@ export default function BookingHybrid() {
           setError('Minimum order is 1 bag (10kg) for $75')
           return false
         }
-        // Check weight restrictions for free plan (max 25kg per load)
-        if (estimatedWeight > 25 && userPlan === 'free') {
-          setError('Loads over 25kg require a Professional or Washlee Premium plan. Upgrade to unlock larger loads.')
+        // Loads over 45kg need pre-booking
+        if (estimatedWeight > 45) {
+          setError('Loads over 45kg need to be pre-booked — please contact support to arrange a pickup.')
           return false
         }
         return true
@@ -613,12 +614,14 @@ export default function BookingHybrid() {
       const deliveryState = bookingData.deliveryAddressDetails?.state || ''
       const deliveryPostcode = bookingData.deliveryAddressDetails?.postcode || ''
       const deliveryCountry = bookingData.deliveryAddressDetails?.country || 'Australia'
+      const marketingAttribution = getAttributionMetadata()
 
       const orderPayload = {
         uid: user.id,
         customerName: userData?.name || 'Customer',
         customerEmail: user.email,
         customerPhone: userData?.phone || '',
+        marketingAttribution,
         bookingData: {
           ...bookingData,
           // Use custom detergent if selected, otherwise use the preset choice
@@ -632,6 +635,7 @@ export default function BookingHybrid() {
           deliveryState,
           deliveryPostcode,
           deliveryCountry,
+          marketingAttribution,
         },
         orderTotal,
       }
@@ -682,6 +686,15 @@ export default function BookingHybrid() {
       }
       
       setOrderId(createdOrderId)
+      if (createdOrderId) {
+        trackWashleeEvent('order_created', {
+          metadata: {
+            order_id: createdOrderId,
+            service_type: bookingData.selectedService,
+            delivery_speed: bookingData.deliverySpeed,
+          },
+        })
+      }
       
       // Sync pickup and delivery addresses to customer_addresses table
       console.log('[BOOKING] Syncing addresses to customer_addresses table...')
@@ -701,6 +714,7 @@ export default function BookingHybrid() {
         name: userData?.name || 'Customer',
         orderId: createdOrderId,
         protectionPlan: bookingData.protectionPlan,
+        marketingAttribution,
         bookingDetails: {
           ...bookingData,
           estimatedWeight,
@@ -710,6 +724,7 @@ export default function BookingHybrid() {
           deliveryState,
           deliveryPostcode,
           deliveryCountry,
+          marketingAttribution,
         },
       }
 
@@ -722,6 +737,13 @@ export default function BookingHybrid() {
       })
 
       console.log('[BOOKING] Step 4: Calling /api/checkout-simple (no auth)...')
+      trackWashleeEvent('payment_started', {
+        metadata: {
+          order_id: createdOrderId,
+          amount: orderTotal,
+          payment_provider: 'stripe_checkout',
+        },
+      })
       const checkoutResponse = await fetch('/api/checkout-simple', {
         method: 'POST',
         headers: {
@@ -764,6 +786,13 @@ export default function BookingHybrid() {
         // Order was created but checkout failed - still show confirmation
         setOrderConfirmed(true)
         const errorMsg = errorData?.error || errorText || `Failed to create checkout session (${checkoutResponse.status})`
+        trackWashleeEvent('payment_failed', {
+          metadata: {
+            order_id: createdOrderId,
+            status: checkoutResponse.status,
+            reason: errorMsg.slice(0, 120),
+          },
+        })
         throw new Error(errorMsg)
       }
 
@@ -968,11 +997,6 @@ export default function BookingHybrid() {
               <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p>{error}</p>
-                {error.includes('Professional or Washlee Premium plan') && (
-                  <Link href="/pricing" className="text-red-700 underline hover:text-red-800 font-semibold mt-2 inline-block">
-                    View plans →
-                  </Link>
-                )}
               </div>
             </div>
           </div>
@@ -1402,8 +1426,8 @@ export default function BookingHybrid() {
                       onClick={() => {
                         const newCount = bookingData.bagCount + 1
                         const newWeight = newCount * 10
-                        if (newWeight > 25 && (userData?.subscription?.plan || 'free') === 'free') {
-                          setError('Loads over 25kg require a Professional or Washlee Premium plan. Upgrade to unlock larger loads.')
+                        if (newWeight > 45) {
+                          setError('Loads over 45kg need to be pre-booked. Contact support to arrange.')
                         } else {
                           setBookingData({ ...bookingData, bagCount: newCount })
                           setError('')
@@ -1414,8 +1438,8 @@ export default function BookingHybrid() {
                       +
                     </button>
                   </div>
-                  <p className={`text-sm font-semibold mt-2 ${(bookingData.bagCount * 10) > 25 && (userData?.subscription?.plan || 'free') === 'free' ? 'text-red-600' : 'text-primary'}`}>
-                    ≈ {(bookingData.bagCount * 10).toFixed(1)} kg {(userData?.subscription?.plan || 'free') === 'free' && '(max 25kg)'}
+                  <p className="text-sm font-semibold mt-2 text-primary">
+                    ≈ {(bookingData.bagCount * 10).toFixed(1)} kg
                   </p>
 
                   {/* Slider */}
@@ -1429,8 +1453,8 @@ export default function BookingHybrid() {
                       onChange={(e) => {
                         const newWeight = parseFloat(e.target.value)
                         setBookingData({ ...bookingData, customWeight: newWeight })
-                        if (newWeight > 25 && (userData?.subscription?.plan || 'free') === 'free') {
-                          setError('Loads over 25kg require a Professional or Washlee Premium plan.')
+                        if (newWeight > 45) {
+                          setError('Loads over 45kg need to be pre-booked. Contact support to arrange.')
                         } else {
                           setError('')
                         }
@@ -1453,8 +1477,8 @@ export default function BookingHybrid() {
                         if (val) {
                           const newWeight = Math.max(10, Math.min(45, parseFloat(val)))
                           setBookingData({ ...bookingData, customWeight: newWeight })
-                          if (newWeight > 25 && (userData?.subscription?.plan || 'free') === 'free') {
-                            setError('Loads over 25kg require a Professional or Washlee Premium plan.')
+                          if (newWeight > 45) {
+                            setError('Loads over 45kg need to be pre-booked. Contact support to arrange.')
                           } else {
                             setError('')
                           }
@@ -1472,25 +1496,6 @@ export default function BookingHybrid() {
                   </div>
                 </div>
 
-                <div>
-                  <p className="font-semibold text-dark mb-4">Oversized Items</p>
-                  <p className="text-xs text-gray mb-3">Comforters, bedding, etc. (+$8 each)</p>
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => setBookingData({ ...bookingData, oversizedItems: Math.max(0, bookingData.oversizedItems - 1) })}
-                      className="w-10 h-10 rounded-full bg-dark text-white font-bold hover:bg-dark/90"
-                    >
-                      −
-                    </button>
-                    <span className="text-2xl font-bold text-dark w-8 text-center">{bookingData.oversizedItems}</span>
-                    <button
-                      onClick={() => setBookingData({ ...bookingData, oversizedItems: bookingData.oversizedItems + 1 })}
-                      className="w-10 h-10 rounded-full bg-dark text-white font-bold hover:bg-dark/90"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {calculateTotal() < 75 && (
@@ -1500,12 +1505,9 @@ export default function BookingHybrid() {
                 </div>
               )}
 
-              {(bookingData.bagCount * 10) > 25 && (userData?.subscription?.plan || 'free') === 'free' && (
+              {((bookingData as any).customWeight || bookingData.bagCount * 10) > 45 && (
                 <div className="mt-6 bg-amber-100 border border-amber-300 text-amber-700 p-4 rounded-lg text-sm">
-                  ⚠️ <strong>Weight limit reached:</strong> Loads over 25kg require a Professional or Washlee Premium plan.
-                  <Link href="/pricing" className="block mt-2 text-amber-700 underline hover:text-amber-800 font-semibold">
-                    Upgrade your plan →
-                  </Link>
+                  <strong>Large load:</strong> Loads over 45kg need to be pre-booked with support before pickup.
                 </div>
               )}
             </Card>
@@ -1692,13 +1694,6 @@ export default function BookingHybrid() {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray">{getDetailedPricing().protectionPlanName} Protection</span>
                     <span className="font-medium text-dark">${getDetailedPricing().protectionPlan.toFixed(2)}</span>
-                  </div>
-                )}
-
-                {bookingData.oversizedItems > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray">Oversized Items ({bookingData.oversizedItems}x)</span>
-                    <span className="font-medium text-dark">${getDetailedPricing().oversizedItems.toFixed(2)}</span>
                   </div>
                 )}
 
@@ -2008,8 +2003,8 @@ export default function BookingHybrid() {
                 <p className="font-semibold text-dark">Choose your coverage level:</p>
                 <ul className="space-y-3 ml-2">
                   <li><strong>Basic (FREE):</strong> $50/item, $300/order max</li>
-                  <li><strong>Premium ($2.50):</strong> $100/item, $500/order max</li>
-                  <li><strong>Premium+ ($5.75):</strong> $150/item, $1000/order max</li>
+                  <li><strong>Premium ($3.50):</strong> $100/item, $500/order max</li>
+                  <li><strong>Premium+ ($8.50):</strong> $150/item, $1000/order max</li>
                 </ul>
                 <p className="text-xs">All plans cover loss or damage during the laundry process with a 14-day claim window.</p>
               </div>
@@ -2107,8 +2102,8 @@ export default function BookingHybrid() {
                     <p>Choose a protection plan to cover your laundry in the rare event of loss or damage.</p>
                     <ul className="list-disc list-inside space-y-2 ml-2">
                       <li><strong>Basic (FREE):</strong> Up to $50/item, $300/order max</li>
-                      <li><strong>Premium ($2.50):</strong> Up to $100/item, $500/order max</li>
-                      <li><strong>Premium+ ($5.75):</strong> Up to $150/item, $1000/order max</li>
+                      <li><strong>Premium ($3.50):</strong> Up to $100/item, $500/order max</li>
+                      <li><strong>Premium+ ($8.50):</strong> Up to $150/item, $1000/order max</li>
                     </ul>
                     <p className="text-xs italic">All claims are processed within 14 days.</p>
                   </>

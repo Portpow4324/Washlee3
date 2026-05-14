@@ -98,7 +98,7 @@ export const WASH_CLUB_TIERS: Record<number, WashClubTier> = {
     bonusCredits: 100,
     perksPercentage: 5,
     priority: 3,
-    description: 'Premium members ($500+ annual spend)',
+    description: 'Gold loyalty members ($500+ annual spend)',
     benefits: [
       '12% credits back on every order',
       '5% discount on all orders',

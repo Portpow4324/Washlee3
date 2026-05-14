@@ -118,11 +118,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/orders', label: 'My Orders', icon: Package },
     { href: '/dashboard/addresses', label: 'Addresses', icon: MapPin },
     { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
-    { href: '/dashboard/subscriptions', label: 'Plans', icon: CreditCard },
+    { href: '/dashboard/subscriptions', label: 'Pay per order', icon: CreditCard },
     { href: '/dashboard/washclub', label: 'Wash Club', icon: Gift },
     { href: '/dashboard/security', label: 'Security', icon: Lock },
     { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
-    { href: '/dashboard/mobile', label: 'Mobile App', icon: Smartphone },
+    { href: '/mobile-app', label: 'Mobile app', icon: Smartphone },
   ]
 
   return (

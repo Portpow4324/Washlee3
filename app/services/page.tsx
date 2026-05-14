@@ -1,245 +1,236 @@
 'use client'
 
-import React from 'react'
-import Image from 'next/image'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import Button from '@/components/Button'
-import Card from '@/components/Card'
 import Link from 'next/link'
-import { CheckCircle, Clock, Sparkles, Shield, Truck, Users, Shirt, Cloud, Hand, Droplet } from 'lucide-react'
+import {
+  ArrowRight,
+  CheckCircle,
+  Clock,
+  Droplets,
+  Shirt,
+  Shield,
+  Sparkles,
+  Wind,
+} from 'lucide-react'
+
+const services = [
+  {
+    icon: Shirt,
+    name: 'Standard wash & fold',
+    price: '$7.50/kg',
+    description:
+      'Everyday laundry sorted, washed, dried, folded, and returned next business day.',
+    points: [
+      'Pickup and delivery included in the Melbourne service area',
+      'Eco detergent by default',
+      'Medium and large bag sizes supported',
+      '$75 minimum order',
+    ],
+    turnaround: 'Next business day',
+  },
+  {
+    icon: Sparkles,
+    name: 'Express same-day',
+    price: '$12.50/kg',
+    description:
+      'A faster turnaround for urgent loads. Order before noon and get it back by 7pm where capacity is available.',
+    points: [
+      'Priority pickup and processing',
+      'Same wash, dry, fold standard',
+      'Great for travel, workwear, or last-minute needs',
+      '$75 minimum order still applies',
+    ],
+    turnaround: 'Same day by 7pm',
+  },
+  {
+    icon: Droplets,
+    name: 'Delicates / special care',
+    price: '$7.50/kg',
+    description:
+      'Gentler handling for items that need extra attention. Add care notes at booking.',
+    points: [
+      'Same per-kg rate as standard wash',
+      'Care notes reviewed before washing',
+      'Best for gentle-cycle and special-instruction items',
+      'Dry-clean-only items are not treated as standard laundry',
+    ],
+    turnaround: 'Next business day',
+  },
+]
+
+const addOns = [
+  {
+    icon: Wind,
+    name: 'Hang dry',
+    price: '+$16.50',
+    description: 'Air-dried on racks instead of tumble dry.',
+  },
+  {
+    icon: Shield,
+    name: 'Premium protection',
+    price: '+$3.50',
+    description: 'Higher per-item and per-order cover for a single order.',
+  },
+  {
+    icon: Shield,
+    name: 'Premium+ protection',
+    price: '+$8.50',
+    description: 'Maximum cover for wardrobes with higher-value items.',
+  },
+]
+
+const notes = [
+  'Leather, suede, fur, hazardous items, and visibly unsafe garments cannot be accepted.',
+  'Dry-clean-only items must be flagged before booking so we can advise next steps.',
+  'Visible stains should be noted at booking. We will pre-treat common stains, but removal is not guaranteed.',
+]
 
 export default function ServicesPage() {
-  const services = [
-    {
-      id: 'standard',
-      name: 'Standard Wash',
-      description: 'Perfect for everyday clothes. Machine wash, machine dry, and professional folding.',
-      price: '$5.00/kg',
-      image: 'https://images.unsplash.com/photo-1582820529300-e3c99f60a85e?q=80&w=2070&auto=format&fit=crop',
-      features: [
-        'Machine wash in warm water',
-        'Machine dry on appropriate heat',
-        'Professional folding',
-        'Scent-free detergent',
-        'Ideal for cotton & blends',
-      ],
-      turnaround: '2-3 days',
-      icon: 'Shirt',
-    },
-    {
-      id: 'delicate',
-      name: 'Delicate Fabrics',
-      description: 'Gentle care for silk, satin, linen, and other delicate materials.',
-      price: '$5.00/kg',
-      image: 'https://images.unsplash.com/photo-1559062615-cd4628902d4a?q=80&w=2070&auto=format&fit=crop',
-      features: [
-        'Hand wash or delicate cycle',
-        'Cold water with delicate detergent',
-        'Gentle air dry',
-        'Special hanging care',
-        'Ideal for silk, satin, linen',
-      ],
-      turnaround: '3-4 days',
-      icon: 'Sparkles',
-    },
-    {
-      id: 'express',
-      name: 'Express Service',
-      description: 'Need your clothes fast? Same-day turnaround available.',
-      price: '$10.00/kg',
-      image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=2070&auto=format&fit=crop',
-      features: [
-        'Rush processing',
-        'Priority handling',
-        'Same-day turnaround available',
-        'Premium quality assured',
-        'Perfect for urgent needs',
-      ],
-      turnaround: '4-6 hours',
-      icon: Sparkles,
-    },
-    {
-      id: 'comforter',
-      name: 'Comforter & Bedding',
-      description: 'Specialized cleaning for large items like comforters, duvets, and quilts.',
-      price: '$6.00 per item',
-      image: 'https://images.unsplash.com/photo-1567286951697-e80fcf6baf10?q=80&w=2070&auto=format&fit=crop',
-      features: [
-        'Industrial-sized machines',
-        'Gentle wash for down & synthetic',
-        'Plump dry cycle',
-        'White glove folding & packaging',
-        'Keeps fill full & fluffy',
-      ],
-      turnaround: '2-3 days',
-      icon: Cloud,
-    },
-    {
-      id: 'handwash',
-      name: 'Hand Wash Premium',
-      description: 'Ultimate care with hand washing for your most precious items.',
-      price: '$5.00/kg',
-      image: 'https://images.unsplash.com/photo-1546703388-bb4293fe3c61?q=80&w=2070&auto=format&fit=crop',
-      features: [
-        ' 100% hand washed',
-        'Premium detergent only',
-        'Individual attention',
-        'Air dried on racks',
-        'Best for luxury items',
-      ],
-      turnaround: '3-4 days',
-      icon: Hand,
-    },
-    {
-      id: 'stain',
-      name: 'Stain Treatment',
-      description: 'Expert stain removal. Add-on or standalone service.',
-      price: '+$2.00 per item',
-      image: 'https://images.unsplash.com/photo-1599027615110-f8881c627b0b?q=80&w=2070&auto=format&fit=crop',
-      features: [
-        'Professional stain analysis',
-        'Pre-treat before washing',
-        'Specialized treatment solutions',
-        '85% stain removal guarantee',
-        'Add to any service',
-      ],
-      turnaround: 'Included in service',
-      icon: Droplet,
-    },
-  ]
-
   return (
     <>
       <Header />
 
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-mint to-white py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl sm:text-6xl font-bold text-dark mb-6">Services Tailored to You</h1>
-          <p className="text-xl text-gray max-w-2xl mx-auto mb-8">
-            From everyday basics to luxury garments, we have a service for every fabric and need.
+      <section className="bg-soft-hero">
+        <div className="container-page py-14 sm:py-24">
+          <div className="max-w-3xl">
+            <span className="pill mb-4">
+              <Shirt size={14} />
+              Washlee services
+            </span>
+            <h1 className="h1 text-dark text-balance mb-4">
+              Laundry pickup and delivery for everyday Melbourne loads.
+            </h1>
+            <p className="text-lg text-gray leading-relaxed mb-8">
+              Choose standard, express, or special-care handling. Pricing is simple:
+              $7.50/kg for standard wash & fold, $12.50/kg for express same-day,
+              and a $75 minimum order.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link href="/booking" className="btn-primary">
+                Book a pickup
+                <ArrowRight size={16} />
+              </Link>
+              <Link href="/pricing" className="btn-outline">
+                See pricing
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="container-page py-14">
+        <div className="text-center mb-10">
+          <h2 className="section-title">Choose your service</h2>
+          <p className="section-subtitle">
+            Three real options, all built around pickup, washing, folding, and delivery.
           </p>
-          <Link href="/booking">
-            <Button size="lg" className="bg-primary text-white">Get Started Today</Button>
-          </Link>
         </div>
-      </section>
 
-      {/* Services Grid */}
-      <section className="section bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-dark text-center mb-12">Choose Your Service</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {services.map((service) => (
-              <Card key={service.id} hoverable className="overflow-hidden flex flex-col">
-                <div className="relative h-48 overflow-hidden rounded-lg mb-4">
-                  <Image
-                    src={service.image}
-                    alt={service.name}
-                    width={400}
-                    height={300}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform"
-                  />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {services.map((service) => {
+            const Icon = service.icon
+            return (
+              <article key={service.name} className="surface-card p-6 sm:p-7 flex flex-col">
+                <div className="w-11 h-11 rounded-xl bg-mint flex items-center justify-center mb-4">
+                  <Icon size={20} className="text-primary-deep" />
                 </div>
-                <div className="flex-1 flex flex-col">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h3 className="text-2xl font-bold text-dark mb-1">{service.name}</h3>
-                      <p className="text-sm text-primary font-bold">{service.price}</p>
-                    </div>
-                    <span className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">{React.createElement(service.icon, { size: 24, className: 'text-primary' })}</span>
-                  </div>
-                  <p className="text-gray mb-4">{service.description}</p>
-                  <ul className="mb-6 flex-1">
-                    {service.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-2 mb-2 text-sm text-gray">
-                        <CheckCircle size={16} className="text-primary flex-shrink-0 mt-0.5" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="flex items-center gap-2 text-sm text-gray mb-4">
-                    <Clock size={16} className="text-primary" />
-                    <span>Turnaround: {service.turnaround}</span>
-                  </div>
-                  <Link href="/booking" className="w-full">
-                    <Button variant="primary" className="w-full">Select Service</Button>
-                  </Link>
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold text-dark mb-1">{service.name}</h3>
+                  <p className="text-2xl font-bold text-primary-deep">{service.price}</p>
                 </div>
-              </Card>
-            ))}
+                <p className="text-sm text-gray leading-relaxed mb-5">{service.description}</p>
+                <ul className="space-y-2 text-sm text-dark flex-1">
+                  {service.points.map((point) => (
+                    <li key={point} className="flex items-start gap-2">
+                      <CheckCircle size={15} className="text-primary-deep flex-shrink-0 mt-0.5" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-6 pt-5 border-t border-line flex items-center gap-2 text-sm text-gray">
+                  <Clock size={15} className="text-primary-deep" />
+                  <span>{service.turnaround}</span>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="bg-soft-mint">
+        <div className="container-page py-14">
+          <div className="text-center mb-10">
+            <h2 className="section-title">Optional add-ons</h2>
+            <p className="section-subtitle">Add these at checkout for a single order.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            {addOns.map((addon) => {
+              const Icon = addon.icon
+              return (
+                <div key={addon.name} className="surface-card p-6 text-center">
+                  <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center mx-auto mb-4">
+                    <Icon size={18} className="text-primary-deep" />
+                  </div>
+                  <h3 className="font-bold text-dark mb-1">{addon.name}</h3>
+                  <p className="text-xl font-bold text-primary-deep mb-2">{addon.price}</p>
+                  <p className="text-sm text-gray">{addon.description}</p>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
 
-      {/* Add-Ons Section */}
-      <section className="section bg-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-dark text-center mb-12">Premium Add-Ons</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { name: 'Stain Treatment', price: '+$2.00/item', desc: 'Professional stain removal' },
-              { name: 'Delicate Dry', price: '+$1.50', desc: 'Air dry instead of machine' },
-              { name: 'Scent Boost', price: '+$0.50', desc: 'Premium fragrance added' },
-              { name: 'Hang Dry', price: '+$2.00/item', desc: 'Keep from dryer damage' },
-              { name: 'Express Return', price: '+$3.00', desc: 'Next day delivery' },
-              { name: 'Sweater Care', price: '+$1.00/item', desc: 'Hand dry flat' },
-              { name: 'Premium Packaging', price: '+$1.50', desc: 'Luxury presentation' },
-              { name: 'Wrinkle Free', price: '+$2.00', desc: 'Steam press included' },
-            ].map((addon, i) => (
-              <Card key={i} className="text-center">
-                <h4 className="font-bold text-dark mb-1">{addon.name}</h4>
-                <p className="text-sm text-primary font-bold mb-2">{addon.price}</p>
-                <p className="text-xs text-gray">{addon.desc}</p>
-              </Card>
-            ))}
+      <section className="container-page py-14">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="surface-card p-6 sm:p-8">
+            <h2 className="h3 text-dark mb-3">What is included</h2>
+            <ul className="space-y-2 text-sm text-dark">
+              {[
+                'Pickup and delivery inside the current Melbourne service area',
+                'Sorting, washing, drying, folding, and order tracking',
+                'Basic damage protection on every order',
+                'Customer support if something needs attention',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <CheckCircle size={15} className="text-primary-deep flex-shrink-0 mt-0.5" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="surface-card p-6 sm:p-8 border-amber-200 bg-amber-50">
+            <h2 className="h3 text-dark mb-3">Before you book</h2>
+            <ul className="space-y-2 text-sm text-dark">
+              {notes.map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <CheckCircle size={15} className="text-amber-700 flex-shrink-0 mt-0.5" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
-      {/* Guarantees */}
-      <section className="section bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-dark text-center mb-12">Our Guarantees</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: <Shield size={40} className="text-primary" />,
-                title: 'Damage Protection',
-                description: 'If any damage occurs, we replace the item at no cost. No questions asked.',
-              },
-              {
-                icon: <Sparkles size={40} className="text-primary" />,
-                title: 'Quality Promise',
-                description: 'Not satisfied with quality? We re-wash for free or give you 100% back.',
-              },
-              {
-                icon: <Users size={40} className="text-primary" />,
-                title: 'Customer First',
-                description: 'Your satisfaction is guaranteed. We stand behind every wash.',
-              },
-            ].map((guarantee, i) => (
-              <Card key={i} className="text-center">
-                <div className="flex justify-center mb-4">{guarantee.icon}</div>
-                <h3 className="text-xl font-bold text-dark mb-3">{guarantee.title}</h3>
-                <p className="text-gray">{guarantee.description}</p>
-              </Card>
-            ))}
+      <section className="container-page pb-16">
+        <div className="surface-card p-8 sm:p-10 bg-gradient-to-br from-mint to-white text-center">
+          <h2 className="h3 text-dark mb-2">Ready for laundry day to feel lighter?</h2>
+          <p className="text-gray mb-6 max-w-xl mx-auto">
+            Book in the browser today, then use the Washlee app for faster repeat orders,
+            tracking, messages, and Wash Club rewards.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link href="/booking" className="btn-primary">
+              Book a pickup
+              <ArrowRight size={16} />
+            </Link>
+            <Link href="/mobile-app" className="btn-outline">
+              See the app
+            </Link>
           </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="bg-gradient-to-r from-primary to-accent py-20">
-        <div className="max-w-4xl mx-auto text-center px-4">
-          <h2 className="text-4xl font-bold text-white mb-6">Ready to Try Our Services?</h2>
-          <p className="text-lg text-white mb-8 opacity-90">Choose your service and schedule your first pickup today.</p>
-          <Link href="/booking">
-            <Button size="lg" className="bg-white text-primary font-bold">
-              Book Now - First Pickup FREE
-            </Button>
-          </Link>
         </div>
       </section>
 

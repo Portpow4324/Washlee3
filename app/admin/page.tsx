@@ -173,7 +173,7 @@ function StatTile({
     <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-gray-600">{label}</p>
-        <Icon className="h-5 w-5 text-[#48C9B0]" />
+        <Icon className="h-5 w-5 text-primary-deep" />
       </div>
       <p className="mt-3 text-3xl font-bold text-gray-950">{value}</p>
       <p className="mt-1 text-sm text-gray-500">{detail}</p>
@@ -190,7 +190,7 @@ function ActionGroup({ title, items }: { title: string; items: ActionItem[] }) {
           <a
             key={item.href}
             href={item.href}
-            className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3 transition hover:border-[#48C9B0] hover:bg-[#f4fffb]"
+            className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3 transition hover:border-primary hover:bg-mint"
           >
             <span className="flex min-w-0 items-center gap-3">
               <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
@@ -218,7 +218,7 @@ function FunnelStep({ label, count, max }: { label: string; count: number; max: 
         <span className="font-bold text-gray-950">{count}</span>
       </div>
       <div className="h-2 rounded-full bg-gray-100">
-        <div className="h-2 rounded-full bg-[#48C9B0]" style={{ width: `${width}%` }} />
+        <div className="h-2 rounded-full bg-primary" style={{ width: `${width}%` }} />
       </div>
     </div>
   )
@@ -368,7 +368,7 @@ export default function AdminDashboard() {
         <div className="mx-auto max-w-7xl">
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase tracking-wide text-[#48C9B0]">Washlee Admin</p>
+              <p className="text-sm font-bold uppercase tracking-wide text-primary-deep">Washlee Admin</p>
               <h1 className="text-4xl font-bold text-gray-950">Control Center</h1>
               <p className="mt-2 text-gray-600">Website, mobile app, orders and alerts in one place.</p>
             </div>
@@ -383,7 +383,7 @@ export default function AdminDashboard() {
               </button>
               <a
                 href="/admin/monitoring"
-                className="inline-flex items-center gap-2 rounded-lg bg-[#48C9B0] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#3aad9a]"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-primary-deep"
               >
                 <MonitorCheck className="h-4 w-4" />
                 Monitoring
@@ -410,9 +410,9 @@ export default function AdminDashboard() {
                 <div>
                   <p className="text-sm font-semibold text-gray-500">Business Health</p>
                   <p className="mt-2 text-5xl font-bold text-gray-950">{score}</p>
-                  <p className="mt-1 text-sm font-bold text-[#2b8f7d]">{statusCopy(score)}</p>
+                  <p className="mt-1 text-sm font-bold text-primary-deep">{statusCopy(score)}</p>
                 </div>
-                <div className="rounded-lg bg-[#ecfbf8] p-3 text-[#2b8f7d]">
+                <div className="rounded-lg bg-mint p-3 text-primary-deep">
                   <Bot className="h-6 w-6" />
                 </div>
               </div>
@@ -423,7 +423,7 @@ export default function AdminDashboard() {
                   href="http://127.0.0.1:8787"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 font-bold text-[#2b8f7d] hover:underline"
+                  className="inline-flex items-center gap-2 font-bold text-primary-deep hover:underline"
                 >
                   Open local AI agent
                   <ExternalLink className="h-4 w-4" />
@@ -499,7 +499,7 @@ export default function AdminDashboard() {
           <section className="grid gap-6 lg:grid-cols-2">
             <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-950">
-                <Activity className="h-5 w-5 text-[#48C9B0]" />
+                <Activity className="h-5 w-5 text-primary-deep" />
                 Top Website Pages
               </h2>
               <div className="space-y-3">
@@ -515,7 +515,7 @@ export default function AdminDashboard() {
 
             <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-950">
-                <Smartphone className="h-5 w-5 text-[#48C9B0]" />
+                <Smartphone className="h-5 w-5 text-primary-deep" />
                 Top Mobile Screens
               </h2>
               <div className="space-y-3">

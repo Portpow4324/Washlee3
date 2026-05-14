@@ -403,7 +403,7 @@ export function getWelcomeEmailHtml(firstName: string): string {
         </div>
         <div class="benefit-item">
           <span class="benefit-item-icon">✓</span>
-          <strong>Affordable Prices</strong> - Starting at just $3.00/kg
+          <strong>Clear Prices</strong> - Standard $7.50/kg, Express $12.50/kg, $75 minimum
         </div>
         <div class="benefit-item">
           <span class="benefit-item-icon">✓</span>

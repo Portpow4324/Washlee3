@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ChevronLeft, Search, MoreVertical, MessageCircle, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Search, MessageCircle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
 
 interface SupportTicket {
   id: string
@@ -174,25 +176,26 @@ export default function SupportTicketsPage() {
     .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
 
   return (
-    <div className="min-h-screen bg-light">
+    <>
+    <Header />
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray/10">
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-4 mb-4">
-            <Link
-              href="/admin"
-              className="p-2 hover:bg-light rounded-lg transition"
-            >
-              <ChevronLeft size={24} className="text-dark" />
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-dark flex items-center gap-2">
-                <MessageCircle size={32} className="text-primary" />
-                Support Tickets
-              </h1>
-              <p className="text-gray text-sm">Manage customer inquiries and support requests</p>
-            </div>
-          </div>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-3 hover:text-primary"
+          >
+            <ArrowLeft size={14} />
+            Control center
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-950 inline-flex items-center gap-2">
+            <MessageCircle size={26} className="text-primary-deep" />
+            Support tickets
+          </h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Customer inquiries from the contact form, the in-app help centre, and order support threads.
+          </p>
         </div>
       </div>
 
@@ -286,9 +289,6 @@ export default function SupportTicketsPage() {
                         </div>
                       </div>
                     </div>
-                    <button className="p-2 hover:bg-light rounded-lg transition">
-                      <MoreVertical size={18} className="text-gray" />
-                    </button>
                   </div>
 
                   <div className="mb-4 p-4 bg-light rounded-lg border border-gray/10">
@@ -355,7 +355,11 @@ export default function SupportTicketsPage() {
                       {selectedTicket?.id === ticket.id ? 'Close Note' : 'Add Note'}
                     </button>
                     <button
-                      onClick={() => updateStatus(ticket.id, 'closed')}
+                      onClick={() => {
+                        if (window.confirm(`Close ticket from ${ticket.name}? This marks it as closed and out of the queue.`)) {
+                          updateStatus(ticket.id, 'closed')
+                        }
+                      }}
                       className="px-4 py-2 border border-gray/20 text-dark rounded-lg font-semibold text-sm transition hover:bg-light"
                     >
                       Close Ticket
@@ -375,7 +379,7 @@ export default function SupportTicketsPage() {
           </div>
           <div className="bg-white rounded-lg shadow-sm p-6">
             <p className="text-gray text-sm font-semibold mb-2">Pending</p>
-            <p className="text-3xl font-bold text-yellow-600">
+            <p className="text-3xl font-bold text-amber-600">
               {tickets.filter(t => t.status === 'pending').length}
             </p>
           </div>
@@ -399,5 +403,7 @@ export default function SupportTicketsPage() {
         </div>
       </div>
     </div>
+    <Footer />
+    </>
   )
 }

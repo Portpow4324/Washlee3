@@ -143,10 +143,10 @@ export default function WashClubPage() {
                   Wash Club Rewards
                 </h1>
               </div>
-              <p className="text-xl text-gray max-w-2xl mx-auto mb-2">
-                Earn 1 point for every dollar spent. Simple, rewarding, and instantly valuable.
+              <p className="text-xl text-gray max-w-2xl mx-auto mb-3">
+                Earn 1 point for every dollar spent. Free to join, free forever — no membership fee, ever.
               </p>
-              <p className="text-sm text-gray/70">Just like Woolworths, but for laundry.</p>
+              <span className="pill"><Sparkles size={14} /> Pay-per-order. Wash Club just rewards you.</span>
             </div>
 
             {/* Auth CTA - Prominent */}
@@ -427,7 +427,7 @@ export default function WashClubPage() {
               Start Earning Points Today
             </h2>
             <p className="text-xl text-gray mb-12 max-w-2xl mx-auto">
-              Join thousands of loyal customers earning rewards on every wash. No fees, no catches—just pure savings.
+              Join Wash Club in seconds. No fees, no catches — just rewards that grow with every wash.
             </p>
 
             {!loading && !user ? (

@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore'
 
-export type SubscriptionPlan = 'payPerOrder' | 'starter' | 'pro' | 'premium'
+export type SubscriptionPlan = 'payPerOrder'
 export type SubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'expired'
 export type BillingCycle = 'monthly' | 'yearly'
 
@@ -26,48 +26,6 @@ export const planDetails: Record<SubscriptionPlan, { name: string; monthlyPrice:
       addOnDiscounts: false,
       advancedAnalytics: false,
       dedicatedAccount: false,
-    },
-  },
-  starter: {
-    name: 'Starter',
-    monthlyPrice: 4.99,
-    yearlyPrice: 59.88, // $4.99 * 12, could apply discount
-    monthlyOrders: 999999, // Unlimited
-    features: {
-      maxWeightPerLoad: 25,
-      expressDelivery: true,
-      prioritySupport: false,
-      addOnDiscounts: true,
-      advancedAnalytics: false,
-      dedicatedAccount: false,
-    },
-  },
-  pro: {
-    name: 'Pro',
-    monthlyPrice: 9.99,
-    yearlyPrice: 119.88, // $9.99 * 12, could apply discount
-    monthlyOrders: 999999, // Unlimited
-    features: {
-      maxWeightPerLoad: 45,
-      expressDelivery: true,
-      prioritySupport: false,
-      addOnDiscounts: true,
-      advancedAnalytics: false,
-      dedicatedAccount: false,
-    },
-  },
-  premium: {
-    name: 'Premium+',
-    monthlyPrice: 24.99,
-    yearlyPrice: 299.88, // $24.99 * 12, could apply discount
-    monthlyOrders: 999999, // Unlimited
-    features: {
-      maxWeightPerLoad: 45,
-      expressDelivery: true,
-      prioritySupport: true,
-      addOnDiscounts: true,
-      advancedAnalytics: true,
-      dedicatedAccount: true,
     },
   },
 }
@@ -167,26 +125,12 @@ export function isSubscriptionActive(subscription: Subscription): boolean {
   return subscription.status === 'active' && new Date() < new Date(subscription.currentPeriodEnd.toMillis())
 }
 
-export function canDowngrade(fromPlan: SubscriptionPlan): boolean {
-  // Can't downgrade from enterprise to free
-  const order = ['free', 'starter', 'pro', 'enterprise']
-  const fromIndex = order.indexOf(fromPlan)
-  return fromIndex > 0
+export function canDowngrade(_fromPlan: SubscriptionPlan): boolean {
+  return false
 }
 
 // Pro recommendations
-export function recommendUpgrade(ordersThisMonth: number, currentPlan: SubscriptionPlan): SubscriptionPlan | null {
-  const maxOrders = planDetails[currentPlan].monthlyOrders
-  const usagePercent = (ordersThisMonth / maxOrders) * 100
-
-  if (usagePercent > 80) {
-    const order: SubscriptionPlan[] = ['payPerOrder', 'starter', 'pro', 'premium']
-    const currentIndex = order.indexOf(currentPlan)
-    if (currentIndex < order.length - 1) {
-      return order[currentIndex + 1]
-    }
-  }
-
+export function recommendUpgrade(_ordersThisMonth: number, _currentPlan: SubscriptionPlan): SubscriptionPlan | null {
   return null
 }
 

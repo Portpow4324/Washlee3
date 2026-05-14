@@ -1,59 +1,46 @@
 'use client'
 
-import Image from 'next/image'
-import Button from '@/components/Button'
-import Spinner from '@/components/Spinner'
 import Link from 'next/link'
 import { useState, Suspense, useEffect } from 'react'
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, AlertCircle, CheckCircle, Sparkles } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import OAuthButtons from '@/components/OAuthButtons'
 
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams?.get('redirect')
-  
-  const [showForgotPassword, setShowForgotPassword] = useState(false)
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
-  const [resetEmail, setResetEmail] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isResetLoading, setIsResetLoading] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [resetSuccessMessage, setResetSuccessMessage] = useState('')
   const [emailNotConfirmedError, setEmailNotConfirmedError] = useState('')
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
-  // Check if user is already authenticated
+  // Already authenticated → bounce to dashboard / requested redirect.
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
-          console.log('[Login] User already authenticated, redirecting to dashboard')
-          // User is already logged in, redirect to dashboard
-          if (redirectTo) {
-            router.push(redirectTo)
-          } else {
-            router.push('/dashboard')
-          }
+          router.push(redirectTo || '/dashboard')
           return
         }
-      } catch (error) {
-        console.error('[Login] Error checking auth:', error)
+      } catch (err) {
+        console.error('[Login] Error checking auth:', err)
       } finally {
         setIsCheckingAuth(false)
       }
     }
-    
     checkAuth()
   }, [router, redirectTo])
 
-  // Load remember me credentials on mount
+  // Restore remember-me email if still in window.
   useEffect(() => {
     const storedEmail = localStorage.getItem('loginEmail')
     const rememberMeEnabled = localStorage.getItem('rememberMe') === 'true'
@@ -62,11 +49,9 @@ function LoginContent() {
     if (storedEmail && rememberMeEnabled && rememberMeExpiry) {
       const expiryDate = new Date(rememberMeExpiry)
       if (expiryDate > new Date()) {
-        // Remember me still valid
         setEmail(storedEmail)
         setRememberMe(true)
       } else {
-        // Remember me expired, clear it
         localStorage.removeItem('loginEmail')
         localStorage.removeItem('rememberMe')
         localStorage.removeItem('rememberMeExpiry')
@@ -74,100 +59,45 @@ function LoginContent() {
     }
   }, [])
 
-  const handleGoogleSignIn = async () => {
-    setError('')
-    setIsLoading(true)
-
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-      })
-
-      if (error) throw error
-
-      setSuccessMessage(`✅ Welcome! Signing you in with Google...`)
-
-      setTimeout(() => {
-        if (redirectTo) {
-          router.push(redirectTo)
-        } else {
-          router.push('/')
-        }
-      }, 1500)
-    } catch (err: any) {
-      console.error('Google sign in error:', err)
-      setError(err.message || 'Failed to sign in with Google')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setEmailNotConfirmedError('')
     setIsLoading(true)
 
-    console.log('[Login] Attempting login with email:', email)
-
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      console.log('[Login] Response:', { 
-        hasData: !!data, 
-        hasError: !!error,
-        errorMessage: error?.message,
-        userId: data?.user?.id,
-        emailConfirmed: data?.user?.email_confirmed_at
-      })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
-        console.error('[Login] Supabase error:', {
-          message: error.message,
-          status: error.status,
-          type: error.name
-        })
-        
-        // Check if error is due to email not confirmed
-        if (error.message && error.message.includes('Email not confirmed')) {
-          console.log('[Login] Email not confirmed:', email)
-          // Store email for the code verification page
+        if (error.message?.includes('Email not confirmed')) {
           localStorage.setItem('pendingVerificationEmail', email)
           setEmailNotConfirmedError(email)
           setIsLoading(false)
           return
         }
-        
         throw error
       }
 
-      // Check if email is confirmed
       if (data.user && !data.user.email_confirmed_at) {
-        console.log('[Login] Email not confirmed:', email)
         setEmailNotConfirmedError(email)
         setIsLoading(false)
         return
       }
 
-      console.log('[Login] ✅ Login successful for:', email)
-      setSuccessMessage(`✅ Welcome back! Logging you in...`)
+      setSuccessMessage('Welcome back. Logging you in…')
 
-      // Check if user needs phone verification
+      // Look up phone-verified flag for non-customer redirects.
       const { data: userData } = await supabase
         .from('users')
         .select('phone_verified, phone, user_type')
         .eq('id', data.user.id)
         .single()
 
-      // Store remember me if checked
       if (rememberMe) {
         localStorage.setItem('loginEmail', email)
         localStorage.setItem('rememberMe', 'true')
         const expiryDate = new Date()
-        expiryDate.setDate(expiryDate.getDate() + 7) // 7 days
+        expiryDate.setDate(expiryDate.getDate() + 7)
         localStorage.setItem('rememberMeExpiry', expiryDate.toISOString())
       } else {
         localStorage.removeItem('loginEmail')
@@ -175,32 +105,22 @@ function LoginContent() {
         localStorage.removeItem('rememberMeExpiry')
       }
 
-      // Check if phone verification is needed (only for non-customer accounts like pro/employee)
       if (userData && !userData.phone_verified && userData.user_type !== 'customer') {
-        console.log('[Login] Phone verification needed for:', email)
         setTimeout(() => {
           router.push(`/auth/phone-verification?email=${encodeURIComponent(email)}`)
         }, 1000)
       } else {
         setTimeout(() => {
-          if (redirectTo) {
-            router.push(redirectTo)
-          } else {
-            // Redirect to dashboard for customers by default
-            router.push('/dashboard')
-          }
+          router.push(redirectTo || '/dashboard')
         }, 1500)
       }
-    } catch (err: any) {
-      console.error('Login error:', {
-        message: err.message,
-        status: err.status,
-        fullError: err
-      })
-      if (err.message.includes('Invalid login credentials')) {
-        setError('❌ Incorrect email or password. Please try again.\n\nTip: If you signed up via Google, use "Sign in with Google" instead.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to sign in'
+      console.error('Login error:', err)
+      if (message.includes('Invalid login credentials')) {
+        setError('Incorrect email or password. If you signed up with Google or Apple, use that sign-in button instead.')
       } else {
-        setError(err.message || 'Failed to sign in')
+        setError(message)
       }
       setIsLoading(false)
     }
@@ -212,357 +132,224 @@ function LoginContent() {
       const response = await fetch('/api/auth/resend-confirmation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailNotConfirmedError })
+        body: JSON.stringify({ email: emailNotConfirmedError }),
       })
-
       const data = await response.json()
-
       if (!response.ok) {
-        setError(`Error: ${data.error}`)
+        setError(data.error || 'Could not resend confirmation email.')
         return
       }
-
-      setSuccessMessage('✅ Confirmation email sent! Check your inbox.')
+      setSuccessMessage('Confirmation email sent. Check your inbox.')
       setEmailNotConfirmedError('')
-      setTimeout(() => {
-        setSuccessMessage('')
-      }, 4000)
-    } catch (err: any) {
-      setError('Failed to resend confirmation email. Please try again.')
+      setTimeout(() => setSuccessMessage(''), 4000)
+    } catch (err) {
       console.error('Resend error:', err)
+      setError('Failed to resend confirmation email.')
     }
   }
 
-  const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setResetSuccessMessage('')
-    setError('')
-    setIsResetLoading(true)
-
-    try {
-      if (!resetEmail.trim()) {
-        setError('Please enter your email address')
-        setIsResetLoading(false)
-        return
-      }
-
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail)
-
-      if (error) throw error
-
-      setResetSuccessMessage(`✅ Password reset link sent to ${resetEmail}. Check your email!`)
-      setResetEmail('')
-      
-      setTimeout(() => {
-        setShowForgotPassword(false)
-        setResetSuccessMessage('')
-      }, 3000)
-    } catch (err: any) {
-      console.error('Password reset error:', err)
-      setError('Failed to send reset link. Please try again.')
-    } finally {
-      setIsResetLoading(false)
-    }
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-soft-hero">
+        <div className="flex flex-col items-center gap-3 text-gray">
+          <div className="animate-spin h-8 w-8 rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm font-medium">Checking your sign-in…</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
-      {/* Show loading state while checking authentication */}
-      {isCheckingAuth && (
-        <div className="flex flex-col items-center justify-center gap-4">
-          <Spinner />
-          <p className="text-gray font-semibold">Checking your login status...</p>
-        </div>
-      )}
-      
-      {!isCheckingAuth && (
-        <>
-          <button
-            onClick={() => router.back()}
-            className="absolute top-6 left-6 p-2 hover:bg-white rounded-full transition"
-            title="Go back"
-          >
-            <ArrowLeft size={24} className="text-primary" />
-          </button>
-          <Link href="/" className="absolute top-6 right-6 px-4 py-2 bg-white text-primary rounded-full font-semibold hover:shadow-lg transition">
-            Home
-          </Link>
-          <div className="w-full max-w-md">
-            {/* Logo */}
-            <div className="text-center mb-8">
-              <Link href="/" className="inline-flex items-center gap-2 mb-8">
-                <Image
-                  src="/logo-washlee.png"
-                  alt="Washlee Logo"
-                  width={48}
-                  height={48}
-                  className="rounded-full object-cover"
-                  priority
-                />
-                <span className="font-bold text-2xl text-dark">Washlee</span>
-              </Link>
-              <h1 className="text-3xl font-bold text-dark">Sign In</h1>
-              <p className="text-gray mt-2">Welcome back! Let's get your laundry done.</p>
-            </div>
+    <main className="min-h-screen bg-soft-hero flex flex-col">
+      <header className="container-page py-5 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-2 text-primary-deep font-semibold hover:text-primary transition"
+        >
+          <ArrowLeft size={18} />
+          Back
+        </button>
+        <Link href="/" className="text-sm font-semibold text-gray hover:text-primary-deep transition">
+          Home
+        </Link>
+      </header>
 
-            {/* Form */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
-              {error}
-            </div>
-          )}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 pb-10">
+        <div className="w-full max-w-md animate-slide-up">
+          <div className="text-center mb-7">
+            <span className="pill mb-3"><Sparkles size={14} /> Welcome back</span>
+            <h1 className="text-2xl sm:text-3xl font-bold text-dark mb-1">Sign in to Washlee</h1>
+            <p className="text-sm text-gray">Pick up where you left off — book, track, and manage orders.</p>
+          </div>
 
-          {/* Success Message */}
-          {successMessage && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-4 rounded-lg mb-6 text-center">
-              <p className="font-semibold text-base">{successMessage}</p>
-            </div>
-          )}
-
-          {/* Forgot Password / Login / Email Not Confirmed Section */}
-          {successMessage ? (
-            <div className="text-center py-8">
-              <div className="flex justify-center mb-4">
-                <Spinner />
+          <div className="surface-card p-6 sm:p-8">
+            {error && (
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 mb-5 flex gap-2">
+                <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-800 whitespace-pre-line">{error}</p>
               </div>
-            </div>
-          ) : emailNotConfirmedError ? (
-            // Email Not Confirmed Message
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 px-4 py-4 rounded-lg">
-              <p className="font-semibold mb-3">📧 Email Not Confirmed</p>
-              <p className="text-sm mb-4">Your email address hasn't been verified yet. We sent a <strong>verification code</strong> to:</p>
-              <p className="font-mono bg-white border border-yellow-300 px-3 py-2 rounded text-center font-semibold text-sm mb-4">{emailNotConfirmedError}</p>
-              <p className="text-sm mb-4">
-                <strong>Next Steps:</strong>
-              </p>
-              <ol className="text-sm mb-6 ml-4 list-decimal space-y-1">
-                <li>Check your inbox for the email with the verification code</li>
-                <li>Copy the code (it looks like: Q7ZGM2)</li>
-                <li>Click the button below to enter your code</li>
-                <li>Complete your profile setup 🎉</li>
-              </ol>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  router.push(`/auth/verify-email-code?email=${encodeURIComponent(emailNotConfirmedError)}`)
-                }}
-                className="w-full px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:opacity-90 transition mb-3"
-              >
-                Verify with Code
-              </button>
+            )}
 
-              <p className="text-sm mb-3 border-t border-yellow-300 pt-3">Didn't receive the email? <button
-                type="button"
-                onClick={handleResendConfirmationEmail}
-                className="text-primary font-semibold underline hover:opacity-75 transition"
-              >
-                Click here to resend it
-              </button>.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmailNotConfirmedError('')
-                  setEmail('')
-                  setPassword('')
-                }}
-                className="w-full px-4 py-2 border border-yellow-200 text-yellow-900 rounded-lg font-semibold hover:bg-yellow-100 transition text-sm"
-              >
-                Try Another Email
-              </button>
-            </div>
-          ) : showForgotPassword ? (
-            <form onSubmit={handlePasswordReset} className="space-y-4">
-              {/* Reset Success Message */}
-              {resetSuccessMessage && (
-                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-4 rounded-lg mb-6 text-center flex items-center justify-center gap-2">
-                  <CheckCircle size={20} />
-                  <p className="font-semibold text-sm">{resetSuccessMessage}</p>
-                </div>
-              )}
-
-              <h2 className="text-xl font-bold text-dark mb-4">Reset Your Password</h2>
-              <p className="text-sm text-gray mb-4">Enter your email and we'll send you a link to reset your password.</p>
-              
-              <div>
-                <label htmlFor="reset-email" className="block text-sm font-semibold text-dark mb-2">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
-                  <input
-                    id="reset-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    required
-                  />
-                </div>
+            {successMessage && (
+              <div className="rounded-xl bg-mint border border-primary/20 px-4 py-3 mb-5 flex items-center gap-2">
+                <CheckCircle size={18} className="text-primary-deep flex-shrink-0" />
+                <p className="text-sm font-semibold text-dark">{successMessage}</p>
               </div>
+            )}
 
-              <div className="flex gap-3">
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="w-full flex-1"
-                  disabled={isResetLoading}
+            {emailNotConfirmedError ? (
+              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5">
+                <p className="font-semibold text-amber-900 mb-2">Email not confirmed</p>
+                <p className="text-sm text-amber-900 mb-3">
+                  Your email hasn&rsquo;t been verified yet. We sent a verification code to:
+                </p>
+                <p className="font-mono bg-white border border-amber-200 px-3 py-2 rounded-lg text-center text-sm font-semibold text-dark mb-4 break-all">
+                  {emailNotConfirmedError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/auth/verify-email-code?email=${encodeURIComponent(emailNotConfirmedError)}`)}
+                  className="btn-primary w-full mb-3"
                 >
-                  {isResetLoading ? 'Sending...' : 'Send Reset Link'}
-                </Button>
+                  Enter verification code
+                  <ArrowRight size={16} />
+                </button>
+                <p className="text-sm text-amber-900 text-center mb-3">
+                  Didn&rsquo;t get the email?{' '}
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmationEmail}
+                    className="font-semibold underline hover:opacity-80"
+                  >
+                    Resend it
+                  </button>
+                </p>
                 <button
                   type="button"
                   onClick={() => {
-                    setShowForgotPassword(false)
-                    setResetEmail('')
-                    setResetSuccessMessage('')
-                    setError('')
+                    setEmailNotConfirmedError('')
+                    setEmail('')
+                    setPassword('')
                   }}
-                  className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition"
+                  className="w-full text-sm text-amber-900 underline"
                 >
-                  Back
+                  Try a different email
                 </button>
               </div>
-            </form>
-          ) : (
-            <>
-              {/* Login Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Email */}
-                <div>
-                  <label htmlFor="email" className="block text-sm font-semibold text-dark mb-2">
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
-                    <input
-                      id="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      required
-                    />
+            ) : (
+              <>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label htmlFor="email" className="label-field">Email</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-soft" size={18} />
+                      <input
+                        id="email"
+                        type="email"
+                        autoComplete="email"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="input-field pl-12"
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Password */}
-                <div>
-                  <label htmlFor="password" className="block text-sm font-semibold text-dark mb-2">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
-                    <input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-12 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray hover:text-primary"
+                  <div>
+                    <label htmlFor="password" className="label-field">Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-soft" size={18} />
+                      <input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="input-field pl-12 pr-12"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-soft hover:text-primary-deep transition"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded border-line accent-primary"
+                      />
+                      <span className="text-sm text-gray">Remember me for 7 days</span>
+                    </label>
+                    <Link
+                      href="/auth/forgot-password"
+                      className="text-sm text-primary-deep hover:text-primary font-semibold"
                     >
-                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
+                      Forgot password?
+                    </Link>
                   </div>
-                </div>
 
-                {/* Remember & Forgot */}
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded border border-gray accent-primary"
-                    />
-                    <span className="text-sm text-gray">Remember me for 7 days</span>
-                  </label>
                   <button
-                    type="button"
-                    onClick={() => setShowForgotPassword(true)}
-                    className="text-sm text-primary hover:text-accent transition font-semibold"
+                    type="submit"
+                    disabled={isLoading}
+                    className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Forgot password?
+                    {isLoading ? 'Signing in…' : 'Sign in'}
+                    {!isLoading && <ArrowRight size={16} />}
                   </button>
+                </form>
+
+                <div className="flex items-center gap-3 my-6">
+                  <div className="flex-1 h-px bg-line" />
+                  <span className="text-xs text-gray-soft uppercase tracking-wider font-semibold">or</span>
+                  <div className="flex-1 h-px bg-line" />
                 </div>
 
-                {/* Submit */}
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="w-full flex items-center justify-center gap-2"
-                  disabled={isLoading}
-                >
-                  {isLoading && <Spinner />}
-                  {isLoading ? 'Signing in...' : 'Sign In'}
-                </Button>
-              </form>
-
-              {/* Divider */}
-              <div className="flex items-center gap-4 my-6">
-                <div className="flex-1 h-px bg-gray"></div>
-                <span className="text-sm text-gray">OR</span>
-                <div className="flex-1 h-px bg-gray"></div>
-              </div>
-
-              {/* Google Login */}
-              <button 
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                className="w-full py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  />
-                </svg>
-                {isLoading ? 'Signing in...' : 'Sign in with Google'}
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Sign Up Link */}
-        <div className="text-center">
-          <p className="text-gray">Don't have an account? </p>
-          <Link href="/auth/signup" className="font-semibold text-primary hover:text-accent transition">
-            Sign up for free
-          </Link>
-        </div>
+                <OAuthButtons
+                  intent="login"
+                  redirectTo={redirectTo || '/dashboard'}
+                  onError={setError}
+                  onStart={(provider) => {
+                    setError('')
+                    setSuccessMessage(`Opening ${provider === 'apple' ? 'Apple' : 'Google'} sign in...`)
+                  }}
+                />
+              </>
+            )}
           </div>
-        </>
-      )}
-    </div>
+
+          <p className="text-center text-sm text-gray mt-6">
+            Don&rsquo;t have an account?{' '}
+            <Link href="/auth/signup-customer" className="font-semibold text-primary-deep hover:text-primary">
+              Sign up for free
+            </Link>
+          </p>
+        </div>
+      </div>
+    </main>
   )
 }
 
-export default function Login() {
+export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Spinner /></div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-gray">
+          <div className="animate-spin h-8 w-8 rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   )

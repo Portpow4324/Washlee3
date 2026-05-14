@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ChevronLeft, Search, MoreVertical } from 'lucide-react'
+import { ArrowLeft, Search } from 'lucide-react'
 import Link from 'next/link'
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
 
 interface User {
   id: string
@@ -91,18 +93,22 @@ export default function UsersAdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-light">
-      <div className="bg-white border-b border-gray/10">
+    <>
+    <Header />
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-4 mb-4">
-            <Link href="/admin" className="p-2 hover:bg-light rounded-lg transition">
-              <ChevronLeft size={24} className="text-dark" />
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-dark">User Management</h1>
-              <p className="text-gray text-sm">View and manage all users</p>
-            </div>
-          </div>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-3 hover:text-primary"
+          >
+            <ArrowLeft size={14} />
+            Control center
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-950">Users</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Customers, Pros, and admins. Search by name or email and filter by role.
+          </p>
         </div>
       </div>
 
@@ -203,5 +209,7 @@ export default function UsersAdminPage() {
         </div>
       </div>
     </div>
+    <Footer />
+    </>
   )
 }

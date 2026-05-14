@@ -1,256 +1,182 @@
 'use client'
 
-import Link from 'next/link'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import Button from '@/components/Button'
-import Card from '@/components/Card'
-import { CheckCircle, Shield, Users, Zap, AlertCircle } from 'lucide-react'
+import Link from 'next/link'
+import { Shield, Users, Zap, CheckCircle, ArrowRight, AlertCircle } from 'lucide-react'
 
-export default function ProtectionPlan() {
+const trust = [
+  {
+    icon: Shield,
+    title: 'ID verified',
+    body: 'Every Washlee Pro is identity-verified before they accept their first order.',
+  },
+  {
+    icon: Shield,
+    title: 'Background checked',
+    body: 'We run national police checks on every Pro before approval.',
+  },
+  {
+    icon: Zap,
+    title: 'Reviewed continuously',
+    body: 'Customer ratings and signals from every order feed into who keeps getting jobs.',
+  },
+  {
+    icon: Users,
+    title: 'Real local Pros',
+    body: 'Pros are independent contractors paid commission per completed order — not anonymous handlers.',
+  },
+]
+
+const tiers = [
+  {
+    name: 'Basic',
+    price: 'Included',
+    perItem: 'Up to $50 per item',
+    perOrder: 'Up to $300 per order',
+    body: 'Comes with every Washlee order, no opt-in needed.',
+  },
+  {
+    name: 'Premium',
+    price: '+$3.50',
+    perItem: 'Up to $100 per item',
+    perOrder: 'Up to $500 per order',
+    body: 'Add at checkout for higher per-item and per-order cover.',
+    highlight: true,
+  },
+  {
+    name: 'Premium+',
+    price: '+$8.50',
+    perItem: 'Up to $150 per item',
+    perOrder: 'Up to $1,000 per order',
+    body: 'For wardrobes that include investment pieces.',
+  },
+]
+
+const claimSteps = [
+  { step: 1, title: 'Open the order', body: 'From your dashboard, open the affected order within 14 days of delivery.' },
+  { step: 2, title: 'Submit a claim', body: 'Tap “Report an issue” and add photos plus a short description.' },
+  { step: 3, title: 'Quick review', body: 'Our team reviews most claims within 2 business days and gets in touch.' },
+  { step: 4, title: 'Resolution', body: 'Approved claims are paid back to your original payment method or in account credit.' },
+]
+
+export default function ProtectionPlanPage() {
   return (
-    <div className="min-h-screen bg-light flex flex-col">
+    <>
       <Header />
-      
-      <main className="flex-1 py-12">
-        {/* Hero Section */}
-        <section className="max-w-4xl mx-auto px-6 mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold text-dark mb-6">You're Protected with Washlee</h1>
-          <p className="text-xl text-gray mb-6">
-            Your safety and peace of mind are our top priorities. We take extensive measures to ensure that every laundry experience with Washlee is secure, professional, and protected.
-          </p>
-        </section>
 
-        {/* Trust & Safety Section */}
-        <section className="max-w-4xl mx-auto px-6 mb-16">
-          <h2 className="text-3xl font-bold text-dark mb-8">Verified and Vetted Laundry Pros</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <div className="flex items-start gap-4">
-                <Shield className="text-primary flex-shrink-0" size={32} />
-                <div>
-                  <h3 className="font-bold text-dark mb-2">ID Verified</h3>
-                  <p className="text-sm text-gray">Every Laundry Pro is required to verify their identity using a secure system that cross-references government-issued ID, personal data, and more.</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-start gap-4">
-                <Shield className="text-primary flex-shrink-0" size={32} />
-                <div>
-                  <h3 className="font-bold text-dark mb-2">Background Cleared</h3>
-                  <p className="text-sm text-gray">We perform comprehensive background checks to ensure each Laundry Pro has a clean, law-abiding history.</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-start gap-4">
-                <Zap className="text-primary flex-shrink-0" size={32} />
-                <div>
-                  <h3 className="font-bold text-dark mb-2">AI-Screened</h3>
-                  <p className="text-sm text-gray">Our proprietary AI analyzes billions of data points to detect and block bad actors—before they ever join the platform.</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-start gap-4">
-                <Users className="text-primary flex-shrink-0" size={32} />
-                <div>
-                  <h3 className="font-bold text-dark mb-2">Performance-Based Ranking</h3>
-                  <p className="text-sm text-gray">Our algorithm continually ranks Laundry Pros using dozens of performance metrics. Top-ranked Pros receive more jobs.</p>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </section>
-
-        {/* Protection Plan Section */}
-        <section className="bg-white py-16">
-          <div className="max-w-4xl mx-auto px-6">
-            <h2 className="text-3xl font-bold text-dark mb-8">The Washlee Protection Plan</h2>
-            <p className="text-lg text-gray mb-12">
-              In the rare event of loss or damage, you're backed by the Washlee Protection Plan, which offers up to $1,000 in coverage. Most customers never need it—but it's there for peace of mind.
+      <section className="bg-soft-hero">
+        <div className="container-page py-14 sm:py-24">
+          <div className="max-w-2xl">
+            <span className="pill mb-4">
+              <Shield size={14} /> Damage protection on every order
+            </span>
+            <h1 className="h1 text-dark text-balance mb-4">You&rsquo;re covered.</h1>
+            <p className="text-lg text-gray leading-relaxed">
+              Every Washlee order includes basic damage protection. Need a higher cap for delicates or business attire? Pick Premium or Premium+ at checkout — that&rsquo;s it.
             </p>
+          </div>
+        </div>
+      </section>
 
-            {/* Coverage Tiers */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-              <Card className="p-8 border-2 border-gray">
-                <div className="mb-4">
-                  <h3 className="text-2xl font-bold text-dark">Basic</h3>
-                  <p className="text-sm text-gray">Included with every order</p>
-                </div>
-                <div className="mb-6 p-4 bg-mint rounded-lg">
-                  <p className="text-3xl font-bold text-primary">FREE</p>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle size={20} className="text-primary flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-dark">Up to $50/garment</p>
-                      <p className="text-gray">Maximum $300/order</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
+      <section className="container-page py-14">
+        <div className="text-center mb-10">
+          <h2 className="section-title">Why you can trust us with your wardrobe</h2>
+          <p className="section-subtitle">Vetted Pros, transparent process, real cover.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {trust.map((t) => (
+            <div key={t.title} className="surface-card p-6">
+              <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center mb-4">
+                <t.icon size={18} className="text-primary-deep" />
+              </div>
+              <h3 className="font-bold text-dark mb-1.5">{t.title}</h3>
+              <p className="text-sm text-gray leading-relaxed">{t.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-              <Card className="p-8 border-2 border-primary">
-                <div className="mb-4">
-                  <h3 className="text-2xl font-bold text-dark">Premium</h3>
-                  <p className="text-sm text-gray">Enhanced protection</p>
+      <section className="bg-soft-mint">
+        <div className="container-page py-14">
+          <div className="text-center mb-10">
+            <h2 className="section-title">Choose your level</h2>
+            <p className="section-subtitle">Pick at checkout — applies to that single order.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+            {tiers.map((t) => (
+              <div
+                key={t.name}
+                className={`surface-card p-6 sm:p-7 ${t.highlight ? 'border-primary bg-gradient-to-br from-mint to-white shadow-glow' : ''}`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xl font-bold text-dark">{t.name}</h3>
+                  {t.highlight && (
+                    <span className="pill text-[10px]">Most popular</span>
+                  )}
                 </div>
-                <div className="mb-6 p-4 bg-mint rounded-lg">
-                  <p className="text-3xl font-bold text-primary">$2.50</p>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle size={20} className="text-primary flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-dark">Up to $100/garment</p>
-                      <p className="text-gray">Maximum $500/order</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
+                <p className="text-3xl font-bold text-primary-deep mb-1">{t.price}</p>
+                <p className="text-sm text-gray mb-4">{t.body}</p>
+                <ul className="space-y-2 text-sm text-dark">
+                  <li className="flex items-start gap-2"><CheckCircle size={16} className="text-primary-deep flex-shrink-0 mt-0.5" /> {t.perItem}</li>
+                  <li className="flex items-start gap-2"><CheckCircle size={16} className="text-primary-deep flex-shrink-0 mt-0.5" /> {t.perOrder}</li>
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray text-center mt-4">All caps in AUD. Cover applies to accidental damage or loss during the laundry process.</p>
+        </div>
+      </section>
 
-              <Card className="p-8 border-2 border-primary bg-mint/20">
-                <div className="mb-4">
-                  <h3 className="text-2xl font-bold text-dark">Premium+</h3>
-                  <p className="text-sm text-gray">Maximum protection</p>
-                </div>
-                <div className="mb-6 p-4 bg-mint rounded-lg">
-                  <p className="text-3xl font-bold text-primary">$5.75</p>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle size={20} className="text-primary flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-dark">Up to $150/garment</p>
-                      <p className="text-gray">Maximum $1,000/order</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
+      <section className="container-page py-14">
+        <div className="text-center mb-10">
+          <h2 className="section-title">Making a claim</h2>
+          <p className="section-subtitle">Simple, no paperwork-fortress.</p>
+        </div>
+        <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+          {claimSteps.map((s) => (
+            <li key={s.step} className="surface-card p-6">
+              <div className="w-9 h-9 rounded-full bg-primary text-white font-bold flex items-center justify-center mb-3">
+                {s.step}
+              </div>
+              <h3 className="font-bold text-dark mb-1.5">{s.title}</h3>
+              <p className="text-sm text-gray leading-relaxed">{s.body}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="container-page pb-16">
+        <div className="surface-card p-6 sm:p-8 bg-mint/40 border-primary/15 max-w-3xl mx-auto">
+          <div className="flex gap-3">
+            <AlertCircle size={20} className="text-primary-deep flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-dark leading-relaxed">
+              <p className="font-semibold mb-1">A note on what isn&rsquo;t covered</p>
+              <p className="text-gray">
+                Pre-existing damage, items mis-declared as machine-washable, dry-clean-only items sent through standard wash, and consequential losses are not covered. Please tell us about delicates or special care needs at booking — we&rsquo;ll handle them appropriately.
+              </p>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Laundry Process Section */}
-        <section className="max-w-4xl mx-auto px-6 mb-16">
-          <h2 className="text-3xl font-bold text-dark mb-8">Our Laundry Process = Yours at Home</h2>
-          <p className="text-lg text-gray mb-8">
-            We treat your laundry with the same care you would at home:
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <div className="flex items-start gap-4">
-                <CheckCircle className="text-primary flex-shrink-0" size={24} />
-                <div>
-                  <h3 className="font-bold text-dark mb-2">Cold Wash by Default</h3>
-                  <p className="text-sm text-gray">Unless you request otherwise, we use gentle cold water washing to protect your fabrics.</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-start gap-4">
-                <CheckCircle className="text-primary flex-shrink-0" size={24} />
-                <div>
-                  <h3 className="font-bold text-dark mb-2">Color Separation</h3>
-                  <p className="text-sm text-gray">Whites and colors, lights and darks are washed separately to prevent color bleeding.</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-start gap-4">
-                <CheckCircle className="text-primary flex-shrink-0" size={24} />
-                <div>
-                  <h3 className="font-bold text-dark mb-2">Temperature Control</h3>
-                  <p className="text-sm text-gray">Medium heat drying, low-heat drying, or hang-dry based on your fabric preferences.</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-start gap-4">
-                <CheckCircle className="text-primary flex-shrink-0" size={24} />
-                <div>
-                  <h3 className="font-bold text-dark mb-2">Order Separation</h3>
-                  <p className="text-sm text-gray">Your order is tagged upon pickup and kept separate from other orders during the entire process.</p>
-                </div>
-              </div>
-            </Card>
+      <section className="container-page pb-16">
+        <div className="surface-card p-8 sm:p-10 bg-gradient-to-br from-mint to-white text-center">
+          <h2 className="h3 text-dark mb-2">Book with confidence</h2>
+          <p className="text-gray mb-6 max-w-xl mx-auto">$7.50/kg standard, $12.50/kg express, $75 minimum. Damage protection on every order.</p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link href="/booking" className="btn-primary">
+              Book a pickup
+              <ArrowRight size={16} />
+            </Link>
+            <Link href="/pricing" className="btn-outline">
+              See pricing
+            </Link>
           </div>
-        </section>
-
-        {/* Reimbursement Section */}
-        <section className="bg-white py-16">
-          <div className="max-w-4xl mx-auto px-6">
-            <h2 className="text-3xl font-bold text-dark mb-8">How We Handle Reimbursements</h2>
-            
-            <Card className="p-8 mb-8 border-l-4 border-primary">
-              <p className="text-lg text-gray mb-6">
-                In accordance with your chosen Washlee Protection Plan, we offer flexible reimbursement options to make things right if an item is lost or damaged during service.
-              </p>
-              
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0 font-bold">1</div>
-                  <div>
-                    <h4 className="font-bold text-dark mb-2">100% Reimbursement Option</h4>
-                    <p className="text-gray">You can get up to 100% of the retail cost reimbursed (up to your coverage amount) if you choose to repurchase the item and meet our claim requirements.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0 font-bold">2</div>
-                  <div>
-                    <h4 className="font-bold text-dark mb-2">Account Credit Option</h4>
-                    <p className="text-gray">We can issue Washlee account credit up to 100% of the item's new value (if a purchase receipt is provided), or up to 70% of its value without one.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0 font-bold">3</div>
-                  <div>
-                    <h4 className="font-bold text-dark mb-2">14-Day Claim Window</h4>
-                    <p className="text-gray">To be eligible for reimbursement, please submit your claim within 14 days of delivery and follow the steps outlined in our Help Center policies.</p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <p className="text-gray mb-8">
-              All claims are reviewed carefully, and final decisions are made by the Washlee team. Our goal is always to make things right — and we're here to help every step of the way.
-            </p>
-          </div>
-        </section>
-
-        {/* Summary Section */}
-        <section className="max-w-4xl mx-auto px-6 mb-16">
-          <Card className="p-8 bg-mint">
-            <h2 className="text-2xl font-bold text-dark mb-4">In Summary</h2>
-            <p className="text-dark text-lg">
-              Washlee is built to be safe, dependable, and customer-focused. We combine people, technology, and clear policies to ensure you always feel confident placing an order. If something does go wrong, we've got your back—with real protection and responsive support.
-            </p>
-          </Card>
-        </section>
-
-        {/* CTA Section */}
-        <section className="max-w-4xl mx-auto px-6 mb-16 text-center">
-          <h2 className="text-3xl font-bold text-dark mb-4">Ready to Try Washlee?</h2>
-          <p className="text-gray mb-8">Start your first order with peace of mind. Protected every step of the way.</p>
-          <Link href="/booking-hybrid">
-            <Button size="lg">Book Your First Order</Button>
-          </Link>
-        </section>
-      </main>
+        </div>
+      </section>
 
       <Footer />
-    </div>
+    </>
   )
 }

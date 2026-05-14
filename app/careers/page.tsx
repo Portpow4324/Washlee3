@@ -2,192 +2,189 @@
 
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import Card from '@/components/Card'
-import Button from '@/components/Button'
-import { Briefcase, Users, Heart, Zap, MapPin, DollarSign } from 'lucide-react'
 import Link from 'next/link'
+import { Briefcase, Users, Heart, Zap, MapPin, Mail, Sparkles, ArrowRight, Sun } from 'lucide-react'
 
-export default function Careers() {
-  const openPositions = [
-    {
-      title: "Senior Full-Stack Developer",
-      location: "Remote",
-      type: "Full-time",
-      salary: "$120K - $160K",
-      description: "Help us build the next generation of laundry technology. We're looking for experienced developers to join our growing team."
-    },
-    {
-      title: "Customer Success Manager",
-      location: "Headquarters",
-      type: "Full-time",
-      salary: "$70K - $90K",
-      description: "Be the voice of our customers. Help us build lasting relationships and ensure customer satisfaction."
-    },
-    {
-      title: "Operations Coordinator",
-      location: "Headquarters",
-      type: "Full-time",
-      salary: "$55K - $70K",
-      description: "Optimize our daily operations. Manage logistics, schedules, and ensure seamless service delivery."
-    },
-    {
-      title: "Marketing Specialist",
-      location: "Remote",
-      type: "Full-time",
-      salary: "$65K - $85K",
-      description: "Tell our story. Create compelling campaigns that connect with our customers and grow our brand."
-    },
-    {
-      title: "Mobile App Developer",
-      location: "Remote",
-      type: "Full-time",
-      salary: "$110K - $150K",
-      description: "Build mobile experiences. Develop iOS and Android apps that our customers love."
-    },
-    {
-      title: "Facility Manager",
-      location: "Headquarters",
-      type: "Full-time",
-      salary: "$60K - $80K",
-      description: "Manage our cleaning facility. Ensure quality standards and optimize our cleaning operations."
-    },
-  ]
+const openPositions = [
+  {
+    title: 'Senior Full-Stack Engineer',
+    location: 'Melbourne / Remote (AU)',
+    type: 'Full-time',
+    description:
+      'Help shape the next chapter of the Washlee app and website. Strong TypeScript, React, and Postgres experience.',
+  },
+  {
+    title: 'Operations Lead — Melbourne',
+    location: 'Melbourne, VIC',
+    type: 'Full-time',
+    description:
+      'Run the day-to-day across our Melbourne facility and Pro network. Logistics, scheduling, and quality.',
+  },
+  {
+    title: 'Customer Support Specialist',
+    location: 'Melbourne / Remote (AU)',
+    type: 'Full-time',
+    description:
+      'Be the friendly, helpful voice of Washlee. Email-first with some occasional in-app chat.',
+  },
+  {
+    title: 'Mobile Engineer (Flutter)',
+    location: 'Remote (AU)',
+    type: 'Full-time',
+    description:
+      'Build delightful experiences on iOS and Android for both customers and Pros. Flutter and Dart experience required.',
+  },
+  {
+    title: 'Brand &amp; Marketing Lead',
+    location: 'Melbourne / Hybrid',
+    type: 'Full-time',
+    description:
+      'Own the Washlee brand and growth across paid, organic, and partnerships in Australia.',
+  },
+]
 
-  const whyJoinUs = [
-    {
-      icon: Heart,
-      title: "Meaningful Work",
-      description: "Join a mission-driven company solving real problems in people's lives."
-    },
-    {
-      icon: Users,
-      title: "Amazing Team",
-      description: "Work with talented, passionate people who are excited about what we do."
-    },
-    {
-      icon: Zap,
-      title: "Growth Opportunities",
-      description: "We invest in our team's development with training, mentorship, and career paths."
-    },
-    {
-      icon: DollarSign,
-      title: "Competitive Benefits",
-      description: "Competitive salary, health insurance, 401k matching, and unlimited PTO."
-    },
-  ]
+const whyJoinUs = [
+  {
+    icon: Heart,
+    title: 'Mission you can feel',
+    body: 'You give people back their evenings and weekends. Real impact, every order.',
+  },
+  {
+    icon: Users,
+    title: 'Small, sharp team',
+    body: 'Work directly with founders and engineers. Decisions fast, ownership real.',
+  },
+  {
+    icon: Zap,
+    title: 'Build &amp; ship',
+    body: 'We move quickly, iterate openly, and ship things customers actually use.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Fair, honest pay',
+    body: 'Market-rate compensation with stock options for full-time roles.',
+  },
+]
 
+const benefits = [
+  { emoji: '🩺', title: 'Private health support', body: 'Allowance toward private cover' },
+  { emoji: '🌴', title: 'Generous leave', body: 'Standard AU leave + extra mental-health days' },
+  { emoji: '💻', title: 'Remote-friendly', body: 'Most roles remote across Australia' },
+  { emoji: '🌱', title: 'Super + bonus', body: 'AU superannuation, performance bonus on FT roles' },
+  { emoji: '📚', title: 'Learning budget', body: 'Annual budget for courses, books, or conferences' },
+  { emoji: '☕', title: 'Team time', body: 'Regular Melbourne meetups for the whole team' },
+]
+
+export default function CareersPage() {
   return (
-    <div className="min-h-screen bg-light flex flex-col">
+    <>
       <Header />
-      <main className="flex-1">
-        {/* Hero */}
-        <section className="bg-gradient-to-br from-mint to-white py-20">
-          <div className="max-w-6xl mx-auto px-4">
-            <h1 className="text-5xl md:text-6xl font-bold text-dark mb-6">Join The Washlee Team</h1>
-            <p className="text-xl text-gray max-w-2xl">
-              We're building the future of laundry services. Be part of something special.
+
+      {/* Hero */}
+      <section className="bg-soft-hero">
+        <div className="container-page py-14 sm:py-24">
+          <div className="max-w-2xl">
+            <span className="pill mb-4">
+              <Sun size={14} /> Hiring across Australia
+            </span>
+            <h1 className="h1 text-dark text-balance mb-4">Build Washlee with us.</h1>
+            <p className="text-lg text-gray leading-relaxed">
+              We&rsquo;re a small team building the easiest way to get laundry done in Melbourne. If that sounds
+              like fun, we&rsquo;d love to hear from you.
             </p>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Why Join Us */}
-        <section className="py-20 max-w-6xl mx-auto px-4">
-          <h2 className="text-4xl font-bold text-dark mb-12 text-center">Why Join Us</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
-            {whyJoinUs.map((item, index) => {
-              const Icon = item.icon
-              return (
-                <Card key={index} className="p-8">
-                  <Icon size={40} className="text-primary mb-4" />
-                  <h3 className="text-2xl font-bold text-dark mb-3">{item.title}</h3>
-                  <p className="text-gray">{item.description}</p>
-                </Card>
-              )
-            })}
-          </div>
-
-          {/* Benefits */}
-          <div className="bg-primary text-white rounded-2xl p-12 mb-20">
-            <h2 className="text-3xl font-bold mb-8 text-center">Our Benefits Package</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-              <div>
-                <div className="text-3xl font-bold mb-2">🏥</div>
-                <p className="font-semibold">Health Insurance</p>
-                <p className="text-mint text-sm">Medical, dental & vision</p>
+      {/* Why */}
+      <section className="container-page py-14">
+        <div className="text-center mb-10">
+          <h2 className="section-title">Why Washlee</h2>
+          <p className="section-subtitle">Small team, big mission. Honest work, honest comp.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {whyJoinUs.map((item) => (
+            <div key={item.title} className="surface-card p-6">
+              <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center mb-4">
+                <item.icon size={18} className="text-primary-deep" />
               </div>
-              <div>
-                <div className="text-3xl font-bold mb-2">📈</div>
-                <p className="font-semibold">401(k) Matching</p>
-                <p className="text-mint text-sm">Up to 5% match</p>
-              </div>
-              <div>
-                <div className="text-3xl font-bold mb-2">✈️</div>
-                <p className="font-semibold">Unlimited PTO</p>
-                <p className="text-mint text-sm">Work-life balance matters</p>
-              </div>
-              <div>
-                <div className="text-3xl font-bold mb-2">💰</div>
-                <p className="font-semibold">Competitive Salary</p>
-                <p className="text-mint text-sm">Industry-leading pay</p>
-              </div>
-              <div>
-                <div className="text-3xl font-bold mb-2">🚀</div>
-                <p className="font-semibold">Growth Training</p>
-                <p className="text-mint text-sm">Professional development</p>
-              </div>
-              <div>
-                <div className="text-3xl font-bold mb-2">🎉</div>
-                <p className="font-semibold">Team Events</p>
-                <p className="text-mint text-sm">Regular celebrations</p>
-              </div>
+              <h3 className="font-bold text-dark mb-1.5">{item.title}</h3>
+              <p className="text-sm text-gray leading-relaxed">{item.body}</p>
             </div>
-          </div>
+          ))}
+        </div>
+      </section>
 
-          {/* Open Positions */}
-          <div>
-            <h2 className="text-4xl font-bold text-dark mb-12 text-center">Open Positions</h2>
-            <div className="space-y-6">
-              {openPositions.map((position, index) => (
-                <Card key={index} className="p-8 hover:shadow-lg transition">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-2xl font-bold text-dark">{position.title}</h3>
-                      <div className="flex items-center gap-4 mt-2 text-gray">
-                        <div className="flex items-center gap-1">
-                          <MapPin size={16} />
-                          {position.location}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Briefcase size={16} />
-                          {position.type}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <DollarSign size={16} />
-                          {position.salary}
-                        </div>
-                      </div>
-                    </div>
+      {/* Benefits */}
+      <section className="bg-soft-mint">
+        <div className="container-page py-14">
+          <div className="text-center mb-10">
+            <h2 className="section-title">What we offer</h2>
+            <p className="section-subtitle">All amounts in AUD. Roles based in Australia.</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-4xl mx-auto">
+            {benefits.map((b) => (
+              <div key={b.title} className="surface-card p-5 text-center">
+                <div className="text-2xl mb-2" aria-hidden="true">{b.emoji}</div>
+                <p className="font-semibold text-dark text-sm">{b.title}</p>
+                <p className="text-xs text-gray mt-1">{b.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Positions */}
+      <section className="container-page py-14">
+        <div className="text-center mb-10">
+          <h2 className="section-title">Open roles</h2>
+          <p className="section-subtitle">Don&rsquo;t see a fit? Send us a note anyway — we keep an eye out.</p>
+        </div>
+
+        <div className="space-y-3 max-w-3xl mx-auto">
+          {openPositions.map((position) => (
+            <article key={position.title} className="surface-card p-6 sm:p-7">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-dark">{position.title}</h3>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-sm text-gray">
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin size={14} className="text-primary-deep" /> {position.location}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Briefcase size={14} className="text-primary-deep" /> {position.type}
+                    </span>
                   </div>
-                  <p className="text-gray mb-6">{position.description}</p>
-                  <Button size="sm">View & Apply</Button>
-                </Card>
-              ))}
-            </div>
-
-            {/* Apply Section */}
-            <div className="mt-16 text-center">
-              <h3 className="text-2xl font-bold text-dark mb-4">Don't see your role?</h3>
-              <p className="text-gray mb-6 max-w-2xl mx-auto">
-                We're always looking for talented, passionate people. Send us your resume and tell us what you'd like to do at Washlee.
-              </p>
-              <div className="flex justify-center">
-                <Button size="lg" className="text-white">View All Opportunities</Button>
+                </div>
+                <a
+                  href={`mailto:careers@washlee.com.au?subject=${encodeURIComponent(`Application: ${position.title}`)}`}
+                  className="btn-outline text-sm self-start"
+                >
+                  Apply
+                  <ArrowRight size={14} />
+                </a>
               </div>
-            </div>
-          </div>
-        </section>
-      </main>
+              <p className="text-sm text-gray leading-relaxed">{position.description}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="mt-12 surface-card p-8 sm:p-10 text-center bg-gradient-to-br from-mint to-white">
+          <h3 className="text-2xl font-bold text-dark mb-2">Don&rsquo;t see your role?</h3>
+          <p className="text-gray mb-5 max-w-xl mx-auto text-sm sm:text-base">
+            We&rsquo;re always interested in great people. Send a note about what you&rsquo;d like to do and a link to anything you&rsquo;ve made.
+          </p>
+          <Link
+            href="mailto:careers@washlee.com.au?subject=General%20application"
+            className="btn-primary inline-flex"
+          >
+            <Mail size={16} />
+            careers@washlee.com.au
+          </Link>
+        </div>
+      </section>
+
       <Footer />
-    </div>
+    </>
   )
 }

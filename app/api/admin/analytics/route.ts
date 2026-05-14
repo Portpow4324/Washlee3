@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // Lazy initialization to avoid build-time issues
 let supabase: SupabaseClient | null = null
+const ADMIN_ANALYTICS_QUERY_TIMEOUT_MS = 3_500
 
 function getSupabaseClient() {
   if (!supabase) {
@@ -16,6 +17,39 @@ function getSupabaseClient() {
     supabase = createClient(url, key)
   }
   return supabase
+}
+
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string') return message
+  }
+  return String(error)
+}
+
+async function runAdminAnalyticsQuery<T>(
+  label: string,
+  query: (signal: AbortSignal) => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>
+) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), ADMIN_ANALYTICS_QUERY_TIMEOUT_MS)
+
+  try {
+    const result = await query(controller.signal)
+    if (result.error) {
+      return { data: [] as T[], error: `${label}: ${result.error.message || 'query failed'}` }
+    }
+    return { data: Array.isArray(result.data) ? result.data : [], error: null }
+  } catch (error) {
+    return { data: [] as T[], error: `${label}: ${errorMessage(error)}` }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function collectQueryErrors(...results: Array<{ error: string | null }>) {
+  return results.map((result) => result.error).filter(Boolean)
 }
 
 export async function POST(request: NextRequest) {
@@ -32,24 +66,35 @@ export async function POST(request: NextRequest) {
         else if (dateRange === '30days') startDate.setDate(now.getDate() - 30)
         else if (dateRange === '90days') startDate.setDate(now.getDate() - 90)
 
-        const { data: allOrders = [] } = await getSupabaseClient().from('orders').select('*')
-        const { data: allUsers = [] } = await getSupabaseClient().from('users').select('*')
-        const { data: inquiries = [] } = await getSupabaseClient().from('inquiries').select('*').eq('status', 'pending')
+        const [ordersResult, usersResult, inquiriesResult] = await Promise.all([
+          runAdminAnalyticsQuery<Record<string, any>>('orders', (signal) =>
+            getSupabaseClient().from('orders').select('created_at,total_price,user_id,status').abortSignal(signal)
+          ),
+          runAdminAnalyticsQuery<Record<string, any>>('users', (signal) =>
+            getSupabaseClient().from('users').select('created_at,user_type,is_admin').abortSignal(signal)
+          ),
+          runAdminAnalyticsQuery<Record<string, any>>('inquiries', (signal) =>
+            getSupabaseClient().from('inquiries').select('id,status').eq('status', 'pending').abortSignal(signal)
+          ),
+        ])
 
-        const ordersArray = allOrders || []
+        const queryErrors = collectQueryErrors(ordersResult, usersResult, inquiriesResult)
+        const ordersArray = ordersResult.data
         const recentOrders = ordersArray.filter((order: any) => new Date(order.created_at) >= startDate)
         const totalRevenue = ordersArray.reduce((sum, o: any) => sum + (o.total_price || 0), 0)
         const activeUsers = new Set(ordersArray.map((o: any) => o.user_id)).size
-        const newSignups = (allUsers || []).filter((u: any) => new Date(u.created_at) >= startDate).length
+        const newSignups = usersResult.data.filter((u: any) => new Date(u.created_at) >= startDate).length
 
         return NextResponse.json({
           success: true,
+          degraded: queryErrors.length > 0,
+          queryErrors,
           analytics: {
             totalRevenue,
             totalOrders: ordersArray.length,
             activeUsers,
             newSignups,
-            pendingApplications: inquiries?.length || 0,
+            pendingApplications: inquiriesResult.data.length,
             refundRate: 0,
             averageOrderValue: ordersArray.length > 0 ? totalRevenue / ordersArray.length : 0,
             topProEarnings: 0,
@@ -60,14 +105,19 @@ export async function POST(request: NextRequest) {
       }
 
       case 'get_user_analytics': {
-        const { data: users = [] } = await getSupabaseClient().from('users').select('*')
-        const customers = (users || []).filter((u: any) => u.user_type === 'customer')
-        const pros = (users || []).filter((u: any) => u.user_type === 'pro')
-        const admins = (users || []).filter((u: any) => u.is_admin)
+        const usersResult = await runAdminAnalyticsQuery<Record<string, any>>('users', (signal) =>
+          getSupabaseClient().from('users').select('user_type,is_admin').abortSignal(signal)
+        )
+        const users = usersResult.data
+        const customers = users.filter((u: any) => u.user_type === 'customer')
+        const pros = users.filter((u: any) => u.user_type === 'pro')
+        const admins = users.filter((u: any) => u.is_admin)
 
         return NextResponse.json({
           success: true,
-          totalUsers: users?.length || 0,
+          degraded: Boolean(usersResult.error),
+          queryErrors: usersResult.error ? [usersResult.error] : [],
+          totalUsers: users.length,
           customers: customers.length,
           pros: pros.length,
           adminUsers: admins.length
@@ -75,9 +125,11 @@ export async function POST(request: NextRequest) {
       }
 
       case 'get_order_analytics': {
-        const { data: orders = [] } = await getSupabaseClient().from('orders').select('*')
+        const ordersResult = await runAdminAnalyticsQuery<Record<string, any>>('orders', (signal) =>
+          getSupabaseClient().from('orders').select('status,total_price').abortSignal(signal)
+        )
 
-        const ordersArray = orders || []
+        const ordersArray = ordersResult.data
         const statuses = {
           pending: ordersArray.filter((o: any) => o.status === 'pending').length,
           confirmed: ordersArray.filter((o: any) => o.status === 'confirmed').length,
@@ -91,7 +143,9 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          totalOrders: orders?.length || 0,
+          degraded: Boolean(ordersResult.error),
+          queryErrors: ordersResult.error ? [ordersResult.error] : [],
+          totalOrders: ordersArray.length,
           statuses,
           totalRevenue: revenue,
           cancellationRate
@@ -99,9 +153,11 @@ export async function POST(request: NextRequest) {
       }
 
       case 'get_payment_analytics': {
-        const { data: payments = [] } = await getSupabaseClient().from('payments').select('*')
+        const paymentsResult = await runAdminAnalyticsQuery<Record<string, any>>('payments', (signal) =>
+          getSupabaseClient().from('payments').select('status,amount').abortSignal(signal)
+        )
 
-        const paymentsArray = payments || []
+        const paymentsArray = paymentsResult.data
         const succeeded = paymentsArray.filter((p: any) => p.status === 'succeeded').length
         const failed = paymentsArray.filter((p: any) => p.status === 'failed').length
         const pending = paymentsArray.filter((p: any) => p.status === 'processing').length
@@ -109,6 +165,8 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
+          degraded: Boolean(paymentsResult.error),
+          queryErrors: paymentsResult.error ? [paymentsResult.error] : [],
           totalPayments: paymentsArray.length,
           succeeded,
           failed,

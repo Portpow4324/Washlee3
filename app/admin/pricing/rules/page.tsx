@@ -8,13 +8,12 @@ import Card from '@/components/Card'
 import Button from '@/components/Button'
 import {
   calculatePrice,
-  getPricingPreview,
   getSurgePricingInfo,
-  applyCoupon,
   isCurrentRushHour,
   isPeakDay,
 } from '@/lib/pricing-engine'
-import { DollarSign, TrendingUp, Clock, AlertCircle, Zap } from 'lucide-react'
+import { DollarSign, TrendingUp, Clock, AlertCircle, Zap, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 
 interface PricingRule {
   name: string
@@ -29,15 +28,15 @@ export default function PricingRulesPage() {
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([
     {
       name: 'Base Price',
-      value: 3.0,
+      value: 7.5,
       unit: '$/kg',
-      description: 'Price per kilogram of laundry',
+      description: 'Standard wash & fold rate per kilogram (AUD)',
     },
     {
       name: 'Minimum Order',
-      value: 5.0,
+      value: 75,
       unit: '$',
-      description: 'Minimum order value',
+      description: 'Minimum order value (AUD, GST inclusive)',
     },
     {
       name: 'Distance Rate',
@@ -70,16 +69,16 @@ export default function PricingRulesPage() {
       description: 'Additional charge during snow',
     },
     {
-      name: 'Express Delivery',
-      value: 0.5,
-      unit: '%',
-      description: 'Premium for same-day delivery',
+      name: 'Express Same-Day',
+      value: 12.5,
+      unit: '$/kg',
+      description: 'Canonical express same-day rate (AUD)',
     },
     {
-      name: 'Delicate Care',
-      value: 0.3,
-      unit: '%',
-      description: 'Premium for delicate fabric handling',
+      name: 'Delicates / Special Care',
+      value: 7.5,
+      unit: '$/kg',
+      description: 'Same per-kg rate as standard, with care notes captured at booking',
     },
     {
       name: 'Downtown Zone',
@@ -97,7 +96,7 @@ export default function PricingRulesPage() {
 
   const [previewWeight, setPreviewWeight] = useState(5)
   const [previewDistance, setPreviewDistance] = useState(5)
-  const [previewService, setPreviewService] = useState<'standard' | 'express' | 'delicate' | 'comforter'>('standard')
+  const [previewService, setPreviewService] = useState<'standard' | 'express' | 'delicate'>('standard')
   const [previewZone, setPreviewZone] = useState<'downtown' | 'suburban' | 'rural'>('suburban')
   const [previewWeather, setPreviewWeather] = useState<'clear' | 'rain' | 'snow'>('clear')
   const [previewPrice, setPreviewPrice] = useState<any>(null)
@@ -119,19 +118,35 @@ export default function PricingRulesPage() {
 
   if (checkingAdminAccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray">Loading...</p>
-      </div>
+      <>
+        <Header />
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="flex flex-col items-center gap-3 text-gray-600">
+            <div className="animate-spin h-8 w-8 rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-sm">Loading…</p>
+          </div>
+        </div>
+        <Footer />
+      </>
     )
   }
 
   return (
-    <div className="min-h-screen bg-light flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-3 hover:text-primary"
+        >
+          <ArrowLeft size={14} />
+          Control center
+        </Link>
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-dark mb-2">Pricing Rules & Configuration</h1>
-          <p className="text-gray">Manage dynamic pricing factors and test calculations</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-950 mb-1">Pricing rules &amp; modelling</h1>
+          <p className="text-sm text-gray-600">
+            Internal what-if calculator. The customer-facing booking flow uses canonical pricing — Standard $7.50/kg, Express $12.50/kg, $75 minimum (AUD) — from <code className="px-1.5 py-0.5 bg-mint/40 rounded text-primary-deep text-xs font-mono">lib/mobilePricing.ts</code>.
+          </p>
         </div>
 
         {/* Tabs */}
@@ -196,16 +211,12 @@ export default function PricingRulesPage() {
                     <span className="font-semibold text-dark">$0.00 (base)</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray">Express Delivery</span>
-                    <span className="font-semibold text-dark">+50%</span>
+                    <span className="text-gray">Express same-day</span>
+                    <span className="font-semibold text-dark">+$5.00/kg</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray">Delicate Care</span>
-                    <span className="font-semibold text-dark">+30%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray">Comforter Service</span>
-                    <span className="font-semibold text-dark">+40%</span>
+                    <span className="text-gray">Delicates / special care</span>
+                    <span className="font-semibold text-dark">$0.00 (same rate)</span>
                   </div>
                 </div>
               </Card>
@@ -270,9 +281,8 @@ export default function PricingRulesPage() {
                     className="w-full px-4 py-2 rounded-lg border-2 border-gray/20 focus:border-primary"
                   >
                     <option value="standard">Standard</option>
-                    <option value="express">Express Delivery</option>
-                    <option value="delicate">Delicate Care</option>
-                    <option value="comforter">Comforter Service</option>
+                    <option value="express">Express same-day</option>
+                    <option value="delicate">Delicates / special care</option>
                   </select>
                 </div>
 
@@ -314,7 +324,7 @@ export default function PricingRulesPage() {
                 <h3 className="font-bold text-dark mb-4">Price Breakdown</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray">Base Price ({previewWeight}kg × $3.00)</span>
+                    <span className="text-gray">Base Price ({previewWeight}kg × $7.50)</span>
                     <span className="font-semibold text-dark">${previewPrice.breakdown.base.toFixed(2)}</span>
                   </div>
                   {previewPrice.breakdown.demand > 0 && (

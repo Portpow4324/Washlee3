@@ -2,10 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { Lock, AlertCircle, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { grantAdminAccess } from '@/lib/useAdminAccess'
+
+function formatRetryAfter(secondsValue: string | null) {
+  const seconds = Number(secondsValue)
+  if (!Number.isFinite(seconds) || seconds <= 0) return 'a few minutes'
+
+  const minutes = Math.ceil(seconds / 60)
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`
+}
 
 export default function AdminLogin() {
   const router = useRouter()
@@ -28,7 +36,7 @@ export default function AdminLogin() {
 
       if (!response.ok) {
         if (response.status === 429) {
-          setError('Too many attempts. Please wait a few minutes and try again.')
+          setError(`Too many attempts. Please wait ${formatRetryAfter(response.headers.get('Retry-After'))} and try again.`)
         } else {
           setError('Invalid password')
         }
@@ -50,39 +58,41 @@ export default function AdminLogin() {
   return (
     <>
       <Header />
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-light to-mint/20 py-12 px-4">
+      <main className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
         <div className="w-full max-w-md">
-          {/* Logo/Title */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
-              <Lock size={32} className="text-white" />
+            <div className="inline-flex items-center justify-center w-14 h-14 bg-primary rounded-2xl shadow-soft mb-4">
+              <Lock size={24} className="text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-dark">Admin Access</h1>
-            <p className="text-gray mt-2">Enter the admin password to continue</p>
+            <h1 className="text-2xl font-bold text-gray-950">Admin access</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Enter the admin password to open the Washlee control center.
+            </p>
           </div>
 
-          {/* Login Form */}
-          <form onSubmit={handleLogin} className="bg-white rounded-lg shadow-lg p-8 space-y-6" autoComplete="off">
-            {/* Error Message */}
+          <form
+            onSubmit={handleLogin}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-5"
+            autoComplete="off"
+          >
             {error && (
-              <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 p-3.5 bg-red-50 border border-red-200 rounded-xl">
+                <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-red-900">Access Denied</p>
+                  <p className="font-semibold text-red-900 text-sm">Access denied</p>
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
               </div>
             )}
 
-            {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-dark mb-2">
-                Admin Password
+              <label htmlFor="admin-password" className="block text-sm font-semibold text-gray-800 mb-2">
+                Admin password
               </label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
-                  id="password"
+                  id="admin-password"
                   name="washlee-admin-passphrase"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -91,7 +101,7 @@ export default function AdminLogin() {
                     setError('')
                   }}
                   placeholder="Enter admin password"
-                  className="w-full pl-12 pr-12 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
                   disabled={loading}
                   autoComplete="off"
                   data-lpignore="true"
@@ -101,41 +111,40 @@ export default function AdminLogin() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray hover:text-primary disabled:opacity-50"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary-deep disabled:opacity-50 transition"
                   disabled={loading}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading || !password.trim()}
-              className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white font-semibold py-3 rounded-lg transition disabled:cursor-not-allowed"
+              className="w-full inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-deep disabled:bg-primary/40 text-white font-semibold py-3 rounded-full transition disabled:cursor-not-allowed"
             >
-              {loading ? 'Verifying...' : 'Access Admin Panel'}
+              {loading ? 'Verifying…' : 'Open admin control center'}
+              {!loading && <ArrowRight size={16} />}
             </button>
 
-            {/* Info Box */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
-              <p className="font-semibold mb-2">Admin Panel Features:</p>
-              <ul className="space-y-1 text-blue-800">
-                <li>• View and manage pro applications</li>
-                <li>• Generate employee codes</li>
-                <li>• Monitor platform analytics</li>
-                <li>• Access administrative tools</li>
+            <div className="rounded-xl bg-mint/40 border border-primary/15 p-4 text-sm text-gray-700">
+              <p className="font-semibold text-gray-950 mb-1.5">What&rsquo;s inside</p>
+              <ul className="space-y-1 text-xs text-gray-700">
+                <li>• Orders, users, and Pro applications</li>
+                <li>• Payouts, support tickets, and inquiries</li>
+                <li>• Analytics, monitoring, and security logs</li>
+                <li>• Wash Club, marketing, and pricing tools</li>
               </ul>
             </div>
           </form>
 
-          {/* Security Notice */}
-          <p className="text-center text-xs text-gray mt-6">
-            This is a secure admin area. Keep your password confidential.
+          <p className="text-center text-xs text-gray-500 mt-5">
+            Authorised personnel only. Sessions are short-lived and rate-limited.
           </p>
         </div>
-      </div>
+      </main>
       <Footer />
     </>
   )

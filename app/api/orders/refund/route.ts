@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     const invoiceDetails = {
       orderid: order.id,
       amount: order.total_price,
-      currency: 'USD',
+      currency: 'AUD',
       description: `Refund for cancelled order ${order.id.slice(0, 8)}`,
       timestamp: new Date().toISOString(),
     }

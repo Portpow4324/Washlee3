@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
+  ArrowLeft,
   BarChart3,
   Bot,
   CheckCircle2,
@@ -125,7 +126,7 @@ function StatCard({
     <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-gray-600">{label}</p>
-        <Icon className="h-5 w-5 text-[#48C9B0]" />
+        <Icon className="h-5 w-5 text-primary-deep" />
       </div>
       <p className="mt-3 text-3xl font-bold text-gray-950">{value}</p>
       <p className="mt-1 text-sm text-gray-500">{detail}</p>
@@ -159,7 +160,7 @@ function FunnelBar({ label, count, max }: { label: string; count: number; max: n
         <span className="text-sm font-bold text-gray-950">{count}</span>
       </div>
       <div className="h-2 rounded-full bg-gray-100">
-        <div className="h-2 rounded-full bg-[#48C9B0]" style={{ width: `${width}%` }} />
+        <div className="h-2 rounded-full bg-primary" style={{ width: `${width}%` }} />
       </div>
     </div>
   )
@@ -247,11 +248,18 @@ export default function MonitoringDashboard() {
       <Header />
       <main className="min-h-screen bg-gray-50 px-4 py-8">
         <div className="mx-auto max-w-7xl">
+          <a
+            href="/admin"
+            className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-3 hover:text-primary"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Control center
+          </a>
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase tracking-wide text-[#48C9B0]">Washlee Monitor</p>
-              <h1 className="text-4xl font-bold text-gray-950">Monitoring Command Center</h1>
-              <p className="mt-2 text-gray-600">Live website traffic, mobile app screens, funnel health, uptime and passive security alerts.</p>
+              <p className="text-sm font-bold uppercase tracking-wide text-primary-deep">Washlee Monitor</p>
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-950">Monitoring command center</h1>
+              <p className="mt-2 text-sm text-gray-600">Live website traffic, mobile app screens, funnel health, uptime, and passive security alerts.</p>
             </div>
             <div className="flex flex-wrap gap-3">
               <button
@@ -265,7 +273,7 @@ export default function MonitoringDashboard() {
               <button
                 onClick={runChecks}
                 disabled={runningChecks}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#48C9B0] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#3aad9a] disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-deep disabled:opacity-60"
               >
                 <MonitorCheck className="h-4 w-4" />
                 Run Checks
@@ -326,7 +334,7 @@ export default function MonitoringDashboard() {
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-bold text-gray-950">
-                    <TrendingUp className="h-5 w-5 text-[#48C9B0]" />
+                    <TrendingUp className="h-5 w-5 text-primary-deep" />
                     Funnel Health
                   </h2>
                   <p className="mt-1 text-sm text-gray-500">Track the journey from visit to booking across website and mobile.</p>
@@ -345,7 +353,7 @@ export default function MonitoringDashboard() {
 
             <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-gray-950">
-                <Bot className="h-5 w-5 text-[#48C9B0]" />
+                <Bot className="h-5 w-5 text-primary-deep" />
                 AI Agent Status
               </h2>
               <p className="text-sm leading-6 text-gray-700">
@@ -392,7 +400,7 @@ export default function MonitoringDashboard() {
 
             <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-950">
-                <BarChart3 className="h-5 w-5 text-[#48C9B0]" />
+                <BarChart3 className="h-5 w-5 text-primary-deep" />
                 Uptime And Config Checks
               </h2>
               <div className="space-y-3">

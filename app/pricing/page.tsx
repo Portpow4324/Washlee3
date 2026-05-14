@@ -2,657 +2,385 @@
 
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import Button from '@/components/Button'
-import Card from '@/components/Card'
 import Link from 'next/link'
 import { useState } from 'react'
-import { ChevronDown, ShoppingBag, Zap, DollarSign, CheckCircle, Lock, Package, Sparkles } from 'lucide-react'
+import { ChevronDown, ShoppingBag, Zap, CheckCircle, Clock, Shield, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
+import PlaceholderReviews from '@/components/marketing/PlaceholderReviews'
 
-export default function Pricing() {
-  const { user, loading, userData } = useAuth()
+const STANDARD_RATE = 7.5
+const EXPRESS_RATE = 12.5
+const MIN_ORDER = 75
+
+const BAG_OPTIONS = [
+  { id: 'medium', label: 'Medium bag', kg: 10, helper: '~10kg — about a week of clothes' },
+  { id: 'large', label: 'Large bag', kg: 15, helper: '~15kg — household load' },
+] as const
+
+type BagId = (typeof BAG_OPTIONS)[number]['id']
+
+export default function PricingPage() {
+  const { user, loading } = useAuth()
   const router = useRouter()
+
   const [openFaq, setOpenFaq] = useState<number | null>(0)
+  const [bagId, setBagId] = useState<BagId>('medium')
   const [bagCount, setBagCount] = useState(1)
-  const [weight, setWeight] = useState(10)
-  const [customWeight, setCustomWeight] = useState<string>('10')
-  const [selectedAddons, setSelectedAddons] = useState<string[]>([])
-  const [deliverySpeed, setDeliverySpeed] = useState('standard')
-  const [protectionPlan, setProtectionPlan] = useState('basic')
-  const [userPlan, setUserPlan] = useState('payPerOrder')
-  const [showSubscriptionNotice, setShowSubscriptionNotice] = useState(false)
-  const [showWholesaleModal, setShowWholesaleModal] = useState(false)
+  const [deliverySpeed, setDeliverySpeed] = useState<'standard' | 'express'>('standard')
+  const [hangDry, setHangDry] = useState(false)
+  const [protectionPlan, setProtectionPlan] = useState<'basic' | 'premium' | 'premium-plus'>('basic')
 
-  // Check if it's past 4pm for same-day delivery cutoff
-  const now = new Date()
-  const isPastCutoff = now.getHours() >= 12
+  const bag = BAG_OPTIONS.find((b) => b.id === bagId)!
+  const weight = bag.kg * bagCount
+  const rate = deliverySpeed === 'express' ? EXPRESS_RATE : STANDARD_RATE
+  const basePrice = weight * rate
+  const addonsPrice = hangDry ? 16.5 : 0
+  const protectionPrice = protectionPlan === 'premium' ? 3.5 : protectionPlan === 'premium-plus' ? 8.5 : 0
+  const subtotal = basePrice + addonsPrice + protectionPrice
+  const minTopUp = subtotal < MIN_ORDER ? MIN_ORDER - subtotal : 0
+  const total = subtotal + minTopUp
 
-  const handleGetStarted = () => {
+  const handleBookNow = () => {
     if (loading) return
-    if (user) {
-      router.push('/booking')
-    } else {
-      router.push('/auth/signup')
-    }
+    router.push(user ? '/booking' : '/auth/signup-customer')
   }
-
-  // Check if user has a specific plan
-  const isCurrentPlan = (planId: string): boolean => {
-    // userData currentPlan check - set default to none if not available
-    const userCurrentPlan = (userData as any)?.currentPlan || 'none'
-    return userCurrentPlan === planId
-  }
-
-  // Get button text based on plan
-  const getPlanButtonText = (planId: string): string => {
-    if (isCurrentPlan(planId)) {
-      return 'Current Plan'
-    }
-    return 'Choose'
-  }
-
-  // Bag to weight conversion: 1 bag = 10kg
-  // Both weight and bagCount are now synced through their setters
-  // If user changes weight, bags update; if user changes bags, weight updates
-
-  // Calculate pricing
-  const standardPrice = weight * 7.5
-  const expressPrice = weight * 12.5
-  const basePrice = deliverySpeed === 'express' ? expressPrice : standardPrice
-  const minOrder = 75
-  
-  let addonsPrice = 0
-  selectedAddons.forEach(addon => {
-    switch (addon) {
-      case 'hang-dry':
-        addonsPrice += 16.50
-        break
-    }
-  })
-  
-  // Protection plan pricing
-  let protectionPrice = 0
-  if (protectionPlan === 'premium') protectionPrice = 3.50
-  if (protectionPlan === 'premium-plus') protectionPrice = 8.50
-  
-  const totalWithAddons = basePrice + addonsPrice + protectionPrice
-  const minOrderApplied = totalWithAddons < minOrder ? minOrder - basePrice : 0
-  const totalPrice = totalWithAddons + minOrderApplied
 
   return (
     <>
       <Header />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-mint to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
-          <h1 className="text-5xl sm:text-6xl font-bold text-dark mb-6">Pricing That Makes Sense</h1>
-          <p className="text-xl text-gray max-w-2xl">
-            Pay only for what you send. No hidden fees, no surprises. The cleaner your laundry, the simpler your bill.
-          </p>
-        </div>
-      </section>
-
-      {/* How Bags Work */}
-      <section className="section bg-white">
-        <div className="max-w-5xl mx-auto mb-20">
-          <h2 className="text-4xl font-bold text-dark mb-12 text-center">How Laundry Bags Work</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="p-8 text-center">
-              <ShoppingBag className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-dark mb-3">Pick Your Bags</h3>
-              <p className="text-gray mb-4">Minimum 1 bag (10kg) per order</p>
-              <div className="bg-mint rounded-lg p-4">
-                <p className="text-sm text-gray">Minimum load:</p>
-                <p className="text-xs text-gray mt-1">• 1 bag = 10kg minimum ($75)</p>
-                <p className="text-xs text-gray">• 2 bags = 20kg</p>
-                <p className="text-xs text-gray">• 3 bags = 30kg</p>
-              </div>
-            </Card>
-
-            <Card className="p-8 text-center">
-              <DollarSign className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-dark mb-3">Simple Pricing</h3>
-              <p className="text-gray mb-4">Minimum order $75 (10kg)</p>
-              <div className="bg-mint rounded-lg p-4">
-                <p className="text-3xl font-bold text-primary mb-1">$7.50/kg</p>
-                <p className="text-xs text-gray">Standard delivery (by 5pm next day)</p>
-                <p className="text-3xl font-bold text-primary mt-3">$12.50/kg</p>
-                <p className="text-xs text-gray">Express delivery (same-day by 7pm)</p>
-              </div>
-            </Card>
-
-            <Card className="p-8 text-center">
-              <Zap className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-dark mb-3">Flexible Add-ons</h3>
-              <p className="text-gray mb-4">Enhance your service</p>
-              <div className="bg-mint rounded-lg p-4 text-left">
-                <p className="text-xs font-semibold text-dark mb-2">Popular add-ons:</p>
-                <p className="text-xs text-gray flex items-center gap-2"><CheckCircle size={14} className="text-primary" /> Hang Dry ($16.50)</p>
-              </div>
-            </Card>
+      <section className="bg-soft-hero">
+        <div className="container-page py-14 sm:py-24">
+          <div className="max-w-2xl">
+            <span className="pill mb-4">
+              <CheckCircle size={14} /> Pay-per-order. No subscription.
+            </span>
+            <h1 className="h1 text-dark text-balance mb-4">Simple, per-kilo pricing.</h1>
+            <p className="text-lg text-gray leading-relaxed">
+              One rate for standard, one for Express. Free pickup and delivery, every time. The price you see is the price you pay.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Price Calculator */}
-      <section className="section bg-light">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-4xl font-bold text-dark mb-12 text-center">Price Calculator</h2>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Left: Delivery Speed & Add-ons */}
-            <div className="space-y-6">
-
-              {/* Delivery Speed */}
-              <Card className="p-6">
-                <p className="text-gray text-sm font-semibold mb-4">DELIVERY SPEED</p>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 p-3 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
-                    onClick={() => setDeliverySpeed('standard')}
-                  >
-                    <input
-                      type="radio"
-                      checked={deliverySpeed === 'standard'}
-                      onChange={() => {}}
-                      className="w-4 h-4"
-                    />
-                    <div className="flex-1">
-                      <p className="font-semibold text-dark">Standard</p>
-                      <p className="text-xs text-gray">Delivered by 5pm next business day</p>
-                    </div>
-                    <span className="text-sm font-bold text-primary">$7.50/kg</span>
-                  </label>
-
-                  <label 
-                    className={`flex items-center gap-3 p-3 border-2 rounded-lg transition ${
-                      weight > 25 || (isPastCutoff && weight > 0)
-                        ? 'border-gray/30 opacity-50 cursor-not-allowed bg-gray/5'
-                        : 'border-gray cursor-pointer hover:border-primary'
-                    }`}
-                    onClick={() => {
-                      if (weight > 25) return
-                      if (isPastCutoff) return
-                      setDeliverySpeed('express')
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      checked={deliverySpeed === 'express'}
-                      onChange={() => {}}
-                      disabled={weight > 25 || isPastCutoff}
-                      className="w-4 h-4"
-                    />
-                    <div className="flex-1">
-                      <p className="font-semibold text-dark">Express</p>
-                      <p className="text-xs text-gray">
-                        {weight > 25 ? '✕ Not available (max 25kg)' : isPastCutoff ? `✕ Unavailable (cutoff 12pm) - ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}` : 'Same-day by 7pm'}
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-primary">$12.50/kg</span>
-                  </label>
-                </div>
-              </Card>
-
-              {/* Add-ons */}
-              <Card className="p-6">
-                <p className="text-gray text-sm font-semibold mb-4">ADD-ONS (OPTIONAL)</p>
-                <div className="space-y-3">
-                  {[
-                    { id: 'hang-dry', name: 'Hang Dry', price: '$16.50' },
-                  ].map(addon => (
-                    <label key={addon.id} className="flex items-center gap-3 p-3 border border-light rounded-lg cursor-pointer hover:bg-light transition">
-                      <input
-                        type="checkbox"
-                        checked={selectedAddons.includes(addon.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedAddons([...selectedAddons, addon.id])
-                          } else {
-                            setSelectedAddons(selectedAddons.filter(a => a !== addon.id))
-                          }
-                        }}
-                        className="w-4 h-4"
-                      />
-                      <div className="flex-1">
-                        <p className="font-semibold text-dark text-sm">{addon.name}</p>
-                      </div>
-                      <p className="text-xs font-bold text-primary">{addon.price}</p>
-                    </label>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Protection Plan */}
-              <Card className="p-6 border-2 border-primary bg-gradient-to-br from-yellow-50 to-white">
-                <p className="text-gray text-sm font-semibold mb-3">PROTECTION PLAN</p>
-                <p className="text-xs text-gray mb-4">Covers damage & loss up to $1,000</p>
-                <div className="space-y-2">
-                  {[
-                    { id: 'basic', name: 'Basic Coverage', price: 'Free', desc: 'Standard protection' },
-                    { id: 'premium', name: 'Premium Plan', price: '$3.50', desc: 'Enhanced coverage' },
-                    { id: 'premium-plus', name: 'Premium Plus', price: '$8.50', desc: 'Maximum coverage' },
-                  ].map(plan => (
-                    <label key={plan.id} className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition ${
-                      protectionPlan === plan.id
-                        ? 'border-primary bg-mint'
-                        : 'border-light hover:border-primary'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="protection"
-                        checked={protectionPlan === plan.id}
-                        onChange={() => setProtectionPlan(plan.id)}
-                        className="w-4 h-4"
-                      />
-                      <div className="flex-1">
-                        <p className="font-semibold text-dark text-sm">{plan.name}</p>
-                        <p className="text-xs text-gray">{plan.desc}</p>
-                      </div>
-                      <p className="text-xs font-bold text-primary">{plan.price}</p>
-                    </label>
-                  ))}
-                </div>
-              </Card>
+      {/* Headline rates */}
+      <section className="container-page pb-10 sm:pb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="surface-card p-6 sm:p-8">
+            <div className="flex items-center gap-2 mb-3 text-primary-deep">
+              <Clock size={18} />
+              <span className="text-sm font-semibold uppercase tracking-wider">Standard</span>
             </div>
-
-            {/* Right: Weight Control & Price Breakdown */}
-            <div className="flex flex-col gap-6">
-              {/* Weight & Bag Control - Top */}
-              <Card className="p-6 border-2 border-primary bg-gradient-to-br from-mint to-white">
-                <p className="text-gray text-sm font-semibold mb-4">LAUNDRY WEIGHT</p>
-                
-                {/* Weight Presets - Full Range */}
-                <div className="mb-4">
-                  <div className="grid grid-cols-5 gap-2 mb-3">
-                    {[
-                      { kg: 10, bags: 4, label: '10kg', price: '$50.00' },
-                      { kg: 15, bags: 6, label: '15kg', price: '$75.00' },
-                      { kg: 20, bags: 8, label: '20kg', price: '$100.00' },
-                      { kg: 25, bags: 10, label: '25kg', price: '$125.00' },
-                    ].map(preset => (
-                      <button
-                        key={preset.kg}
-                        onClick={() => {
-                          setWeight(preset.kg)
-                          setBagCount(preset.bags)
-                        }}
-                        className={`py-1.5 px-2 rounded text-xs font-semibold transition flex flex-col items-center gap-0.5 ${
-                          weight === preset.kg
-                            ? 'bg-primary text-white'
-                            : 'bg-white text-dark hover:bg-primary/10 border border-gray'
-                        }`}
-                      >
-                        <span>{preset.label}</span>
-                        <span className={`text-xs ${weight === preset.kg ? 'text-white/90' : 'text-primary'}`}>{preset.price}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* 30kg+ Locked Options - Compact */}
-                  <div className="mb-3">
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { kg: 32, bags: 13, label: '32kg', price: '$96.00' },
-                        { kg: 38, bags: 16, label: '38kg', price: '$114.00' },
-                        { kg: 45, bags: 18, label: '45kg', price: '$135.00' },
-                      ].map(preset => (
-                        <div key={preset.kg} className="relative group">
-                          <button
-                            onClick={() => {
-                              if (userPlan === 'payPerOrder') {
-                                setShowSubscriptionNotice(true)
-                                return
-                              }
-                              setWeight(preset.kg)
-                              setBagCount(preset.bags)
-                              // Force standard delivery for 30kg+
-                              setDeliverySpeed('standard')
-                            }}
-                            className={`w-full py-1.5 px-2 rounded text-xs font-semibold transition flex flex-col items-center gap-0.5 ${
-                              weight === preset.kg
-                                ? 'bg-primary text-white'
-                                : 'bg-white text-dark hover:bg-primary/10 border border-gray'
-                            } ${userPlan === 'payPerOrder' ? 'opacity-50' : ''}`}
-                          >
-                            <span>{preset.label}</span>
-                            <span className={`text-xs ${weight === preset.kg ? 'text-white/90' : 'text-primary'}`}>{preset.price}</span>
-                          </button>
-                          
-                          {/* Hover Upgrade Overlay for Locked Options */}
-                          {userPlan === 'basic' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setShowSubscriptionNotice(true)
-                              }}
-                              className="absolute inset-0 bg-black/70 rounded opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center p-2 text-white text-xs font-semibold cursor-pointer hover:bg-black/80"
-                            >
-                              <span>You don't have</span>
-                              <span>the account plan</span>
-                              <span className="mt-1 text-primary underline">See our plans</span>
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {userPlan === 'basic' && (
-                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-3">
-                      💡 <strong>Min order $30</strong> (10kg @ $3/kg or with add-ons). Loads up to 25kg available.
-                    </p>
-                  )}
-
-                  {/* Subscription Notice Modal */}
-                  {showSubscriptionNotice && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                      <div className="bg-white rounded-lg p-6 max-w-sm">
-                        <h3 className="text-lg font-bold text-dark mb-3 flex items-center gap-2"><Lock size={20} className="text-orange-600" /> Premium Feature</h3>
-                        <p className="text-sm text-gray mb-4">
-                          Loads over 25kg are only available with a Professional or Washlee Premium subscription.
-                        </p>
-                        <p className="text-sm text-gray mb-6">
-                          <strong>Your current limit:</strong> Up to 25kg per load
-                        </p>
-                        <p className="text-xs text-gray bg-amber-50 border border-amber-200 rounded p-3 mb-6 flex gap-2">
-                          <Sparkles size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                          <span>Need larger loads? Unlock 30kg-45kg with Premium plans for 3-5 business day delivery.</span>
-                        </p>
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => setShowSubscriptionNotice(false)}
-                            className="flex-1 px-4 py-2 border border-gray rounded-lg text-dark font-semibold hover:bg-light transition"
-                          >
-                            Close
-                          </button>
-                          <button
-                            onClick={() => router.push('/pricing#plans')}
-                            className="flex-1 px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
-                          >
-                            View Plans
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Wholesale Modal */}
-                  {showWholesaleModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                      <div className="bg-white rounded-lg p-6 max-w-sm">
-                        <h3 className="text-lg font-bold text-dark mb-3 flex items-center gap-2"><Package size={20} className="text-blue-600" /> Wholesale Orders</h3>
-                        <p className="text-sm text-gray mb-4">
-                          Orders over 45kg require pre-booking and 24 hours notice.
-                        </p>
-                        <p className="text-sm text-gray mb-6">
-                          <strong>Perfect for:</strong> Bulk laundry, corporate uniforms, hotel linens, and more
-                        </p>
-                        <p className="text-xs text-gray bg-blue-50 border border-blue-200 rounded p-3 mb-6 flex gap-2">
-                          <Sparkles size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                          <span>Get a personalized quote and flexible scheduling for your wholesale needs.</span>
-                        </p>
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => setShowWholesaleModal(false)}
-                            className="flex-1 px-4 py-2 border border-gray rounded-lg text-dark font-semibold hover:bg-light transition"
-                          >
-                            Close
-                          </button>
-                          <button
-                            onClick={() => router.push('/wholesale')}
-                            className="flex-1 px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
-                          >
-                            Pre-book
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Slider */}
-                <input
-                  type="range"
-                  min="10"
-                  max="45"
-                  step="0.5"
-                  value={weight}
-                  onChange={(e) => {
-                    const newWeight = parseFloat(e.target.value)
-                    setWeight(newWeight)
-                    setBagCount(Math.ceil(newWeight / 10))
-                    // Force standard delivery for weights > 27.5kg
-                    if (newWeight > 27.5) {
-                      setDeliverySpeed('standard')
-                    }
-                  }}
-                  className="w-full h-2 bg-light rounded-lg appearance-none cursor-pointer accent-primary mb-3"
-                />
-
-                {/* Weight Display */}
-                <div className="text-center mb-4">
-                  <p className="text-3xl font-bold text-primary">{weight.toFixed(1)} kg</p>
-                  <p className="text-xs text-gray mt-1">= {Math.ceil(weight / 10)} bag{Math.ceil(weight / 10) !== 1 ? 's' : ''} (10kg each)</p>
-                </div>
-
-                {/* Bag Counter & Weight Controls */}
-                <div className="flex items-center justify-center gap-3 mb-4">
-                  <button
-                    onClick={() => {
-                      const newWeight = Math.max(10, weight - 1)
-                      setWeight(newWeight)
-                      setBagCount(Math.ceil(newWeight / 10))
-                      setCustomWeight(newWeight.toFixed(1))
-                    }}
-                    className="w-10 h-10 rounded-full bg-dark text-white font-bold hover:bg-dark/90 text-lg"
-                  >
-                    −
-                  </button>
-                  <span className="text-2xl font-bold text-dark w-12 text-center">{weight.toFixed(1)}</span>
-                  <button
-                    onClick={() => {
-                      const newWeight = weight + 1
-                      setWeight(newWeight)
-                      setBagCount(Math.ceil(newWeight / 10))
-                      setCustomWeight(newWeight.toFixed(1))
-                    }}
-                    className="w-10 h-10 rounded-full bg-dark text-white font-bold hover:bg-dark/90 text-lg"
-                  >
-                    +
-                  </button>
-                </div>
-
-                {/* Slider */}
-                <input
-                  type="range"
-                  min="10"
-                  max="45"
-                  step="0.5"
-                  value={weight}
-                  onChange={(e) => {
-                    const newWeight = parseFloat(e.target.value)
-                    setWeight(newWeight)
-                    setBagCount(Math.ceil(newWeight / 10))
-                    setCustomWeight(newWeight.toFixed(1))
-                  }}
-                  className="w-full h-2 bg-light rounded-lg appearance-none cursor-pointer accent-primary mb-4"
-                />
-
-                {/* Custom Weight Input */}
-                <div className="mb-4">
-                  <label className="text-xs text-gray font-semibold mb-2 block">Or enter custom weight (kg):</label>
-                  <input
-                    type="number"
-                    min="10"
-                    max="45"
-                    step="0.5"
-                    value={customWeight}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      setCustomWeight(val)
-                      if (val) {
-                        const newWeight = Math.max(10, Math.min(45, parseFloat(val)))
-                        setWeight(newWeight)
-                        setBagCount(Math.ceil(newWeight / 10))
-                      }
-                    }}
-                    onBlur={() => {
-                      if (!customWeight || parseFloat(customWeight) < 10) {
-                        setWeight(10)
-                        setCustomWeight('10')
-                      } else if (parseFloat(customWeight) > 45) {
-                        setWeight(45)
-                        setCustomWeight('45')
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray rounded-lg text-sm focus:border-primary focus:outline-none"
-                    placeholder="10"
-                  />
-                  <p className="text-xs text-gray mt-1">Minimum: 10kg | Maximum: 45kg</p>
-                </div>
-              </Card>
-
-              {/* Order Summary - Below Weight Control */}
-              <Card className="p-8 bg-gradient-to-br from-mint to-light sticky top-8">
-                <h3 className="text-2xl font-bold text-dark mb-6">Order Summary</h3>
-                
-                <div className="space-y-3 mb-6 pb-6 border-b border-primary">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray">Weight:</span>
-                    <span className="font-semibold text-dark">{weight.toFixed(1)} kg</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray">Bags:</span>
-                    <span className="font-semibold text-dark">{bagCount} bag{bagCount !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray">Delivery Speed:</span>
-                    <span className="font-semibold text-dark capitalize">{deliverySpeed}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                  <div className="flex justify-between">
-                    <span className="text-gray">{weight.toFixed(1)} kg @ ${deliverySpeed === 'express' ? '12.50' : '7.50'}/kg:</span>
-                    <span className="font-semibold text-dark">${basePrice.toFixed(2)}</span>
-                  </div>
-                  
-                  {selectedAddons.length > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray">Add-ons</span>
-                      <span className="font-semibold text-dark">+${addonsPrice.toFixed(2)}</span>
-                    </div>
-                  )}
-                  
-                  {protectionPrice > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray">Protection Plan</span>
-                      <span className="font-semibold text-dark">+${protectionPrice.toFixed(2)}</span>
-                    </div>
-                  )}
-                  
-                  {minOrderApplied > 0 && (
-                    <div className="flex justify-between text-amber-600 text-sm">
-                      <span>Minimum Order Applied</span>
-                      <span>+${minOrderApplied.toFixed(2)}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-primary pt-4 mb-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <span className="font-bold text-dark">Estimated Total:</span>
-                    <span className="text-4xl font-bold text-primary">${totalPrice.toFixed(2)} (inc. GST)</span>
-                  </div>
-                  <p className="text-xs text-gray mb-6">*Final price based on actual weight after washing</p>
-                </div>
-
-                <Button 
-                  size="lg" 
-                  className="w-full"
-                  onClick={handleGetStarted}
-                >
-                  Book Now
-                </Button>
-              </Card>
+            <p className="text-4xl sm:text-5xl font-bold text-dark mb-1">
+              $7.50<span className="text-lg font-medium text-gray">/kg</span>
+            </p>
+            <p className="text-gray text-sm">Delivered by 5pm next business day. Free pickup &amp; drop-off.</p>
+          </div>
+          <div className="surface-card p-6 sm:p-8 bg-gradient-to-br from-mint to-white border-primary/20">
+            <div className="flex items-center gap-2 mb-3 text-primary-deep">
+              <Zap size={18} />
+              <span className="text-sm font-semibold uppercase tracking-wider">Express same-day</span>
             </div>
+            <p className="text-4xl sm:text-5xl font-bold text-dark mb-1">
+              $12.50<span className="text-lg font-medium text-gray">/kg</span>
+            </p>
+            <p className="text-gray text-sm">Order before noon, back by 7pm. Subject to Pro availability.</p>
           </div>
         </div>
+        <p className="text-xs text-gray mt-3 pl-1">Minimum order $75. All prices in AUD, GST included. Final price calculated by actual weight after washing.</p>
       </section>
 
-      {/* FAQ */}
-      <section className="section bg-white">
-        <h2 className="text-4xl font-bold text-dark mb-12 text-center">Pricing FAQ</h2>
-
-        <div className="max-w-2xl mx-auto space-y-4">
-          {[
-            {
-              q: 'How are bags converted to kilograms?',
-              a: 'One laundry bag ≈ 2.5kg. We use this estimate for your initial quote, but you\'re charged based on the actual weight after washing.',
-            },
-            {
-              q: 'What\'s the difference between standard and express?',
-                    a: 'Standard delivery is next day at $7.50/kg. Express is same-day or overnight at $12.50/kg with delivery by 8pm.',
-            },
-            {
-              q: 'Is there a minimum order?',
-              a: 'Yes, we have a $30 minimum order to ensure profitability of your service. This includes the base service and any add-ons.',
-            },
-            {
-              q: 'Are delivery fees included?',
-              a: 'Yes! Free pickup and delivery are included in the per-kilogram price. No hidden fees ever.',
-            },
-            {
-              q: 'How do add-ons work with pricing?',
-                    a: 'Add-ons are optional enhancements like Hang Dry ($16.50) for air-drying your clothes. They\'re added to your total along with the base per-kg charge.',
-            },
-            {
-              q: 'What if my order weighs less than the minimum?',
-              a: 'If your order costs less than $30, we\'ll charge the $30 minimum to ensure we can provide quality service.',
-            },
-          ].map((faq, i) => (
-            <div
-              key={i}
-              className="border border-gray rounded-lg overflow-hidden"
-            >
-              <button
-                onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                className="w-full flex items-center justify-between p-6 hover:bg-light transition text-left"
-              >
-                <span className="font-bold text-dark">{faq.q}</span>
-                <ChevronDown
-                  size={20}
-                  className={`text-primary transition ${openFaq === i ? 'rotate-180' : ''}`}
-                />
-              </button>
-              {openFaq === i && (
-                <div className="px-6 pb-6 text-gray">
-                  {faq.a}
+      {/* Bag sizes */}
+      <section className="section-tight bg-white">
+        <div className="text-center mb-10">
+          <h2 className="section-title">Choose a bag</h2>
+          <p className="section-subtitle">We offer two bag sizes — pick the one closest to your load.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+          {BAG_OPTIONS.map((b) => (
+            <div key={b.id} className="surface-card p-6">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center">
+                  <ShoppingBag size={18} className="text-primary-deep" />
                 </div>
-              )}
+                <h3 className="font-bold text-dark">{b.label}</h3>
+              </div>
+              <p className="text-sm text-gray mb-3">{b.helper}</p>
+              <div className="text-sm text-dark">
+                Standard: <span className="font-semibold">${(b.kg * STANDARD_RATE).toFixed(2)}</span> &nbsp;·&nbsp; Express: <span className="font-semibold">${(b.kg * EXPRESS_RATE).toFixed(2)}</span>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="bg-gradient-to-r from-primary to-accent py-16 sm:py-20">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
-            Ready to Get Started?
-          </h2>
-          <p className="text-lg text-white mb-8 opacity-90">
-            Send your first load and experience the Washlee difference.
-          </p>
-          <div className="flex justify-center">
-            <Link href="/booking">
-              <Button size="lg" className="bg-white text-primary hover:bg-light">
-                Book Your First Order
-              </Button>
-            </Link>
+      {/* Calculator */}
+      <section className="bg-soft-mint">
+        <div className="container-page py-14 sm:py-20">
+          <div className="text-center mb-10">
+            <h2 className="section-title">Estimate your order</h2>
+            <p className="section-subtitle">Adjust the options to see your total. Final invoice is based on actual weight.</p>
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
+            {/* Controls */}
+            <div className="space-y-4">
+              {/* Bag size */}
+              <div className="surface-card p-6">
+                <p className="label-field uppercase text-xs tracking-wider text-gray">Bag size</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {BAG_OPTIONS.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setBagId(b.id)}
+                      className={`text-left p-4 rounded-xl border-2 transition ${
+                        bagId === b.id ? 'border-primary bg-mint' : 'border-line bg-white hover:border-primary/40'
+                      }`}
+                    >
+                      <p className="font-semibold text-dark">{b.label}</p>
+                      <p className="text-xs text-gray">~{b.kg}kg</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bag count */}
+              <div className="surface-card p-6">
+                <p className="label-field uppercase text-xs tracking-wider text-gray">How many bags?</p>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setBagCount(Math.max(1, bagCount - 1))}
+                    className="w-11 h-11 rounded-full bg-dark text-white font-bold text-xl flex items-center justify-center hover:bg-dark-soft transition"
+                    aria-label="Decrease bag count"
+                  >
+                    −
+                  </button>
+                  <div className="flex-1 text-center">
+                    <p className="text-3xl font-bold text-dark">{bagCount}</p>
+                    <p className="text-xs text-gray">{weight}kg total</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBagCount(Math.min(10, bagCount + 1))}
+                    className="w-11 h-11 rounded-full bg-dark text-white font-bold text-xl flex items-center justify-center hover:bg-dark-soft transition"
+                    aria-label="Increase bag count"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Delivery speed */}
+              <div className="surface-card p-6">
+                <p className="label-field uppercase text-xs tracking-wider text-gray">Delivery speed</p>
+                <div className="space-y-2">
+                  {[
+                    { id: 'standard', label: 'Standard', helper: 'Next business day by 5pm', rate: STANDARD_RATE },
+                    { id: 'express', label: 'Express same-day', helper: 'Order before noon, back by 7pm', rate: EXPRESS_RATE },
+                  ].map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition ${
+                        deliverySpeed === opt.id ? 'border-primary bg-mint' : 'border-line hover:border-primary/40'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="delivery"
+                        checked={deliverySpeed === opt.id}
+                        onChange={() => setDeliverySpeed(opt.id as 'standard' | 'express')}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <div className="flex-1">
+                        <p className="font-semibold text-dark">{opt.label}</p>
+                        <p className="text-xs text-gray">{opt.helper}</p>
+                      </div>
+                      <span className="text-sm font-bold text-primary-deep">${opt.rate.toFixed(2)}/kg</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add-ons */}
+              <div className="surface-card p-6">
+                <p className="label-field uppercase text-xs tracking-wider text-gray">Add-ons</p>
+                <label className="flex items-center gap-3 p-3 rounded-xl border border-line hover:border-primary/40 transition cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hangDry}
+                    onChange={(e) => setHangDry(e.target.checked)}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div className="flex-1">
+                    <p className="font-semibold text-dark text-sm">Hang dry</p>
+                    <p className="text-xs text-gray">Air-dry instead of tumble dry</p>
+                  </div>
+                  <span className="text-sm font-bold text-primary-deep">$16.50</span>
+                </label>
+              </div>
+
+              {/* Protection */}
+              <div className="surface-card p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield size={16} className="text-primary-deep" />
+                  <p className="label-field uppercase text-xs tracking-wider text-gray mb-0">Protection plan</p>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { id: 'basic', label: 'Basic (included)', helper: 'Standard care guarantee', price: 'Free' },
+                    { id: 'premium', label: 'Premium', helper: 'Higher per-item cover', price: '$3.50' },
+                    { id: 'premium-plus', label: 'Premium+', helper: 'Maximum cover', price: '$8.50' },
+                  ].map((p) => (
+                    <label
+                      key={p.id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition ${
+                        protectionPlan === p.id ? 'border-primary bg-mint' : 'border-line hover:border-primary/40'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="protection"
+                        checked={protectionPlan === p.id}
+                        onChange={() => setProtectionPlan(p.id as typeof protectionPlan)}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <div className="flex-1">
+                        <p className="font-semibold text-dark text-sm">{p.label}</p>
+                        <p className="text-xs text-gray">{p.helper}</p>
+                      </div>
+                      <span className="text-sm font-bold text-primary-deep">{p.price}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="lg:sticky lg:top-24 lg:self-start">
+              <div className="surface-card p-6 sm:p-8 bg-white">
+                <h3 className="text-2xl font-bold text-dark mb-6">Order summary</h3>
+
+                <div className="space-y-3 pb-5 border-b border-line text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray">Bags</span>
+                    <span className="font-semibold text-dark">{bagCount} × {bag.label.toLowerCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray">Estimated weight</span>
+                    <span className="font-semibold text-dark">{weight}kg</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray">Speed</span>
+                    <span className="font-semibold text-dark capitalize">{deliverySpeed}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 py-5 border-b border-line text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray">{weight}kg @ ${rate.toFixed(2)}/kg</span>
+                    <span className="font-semibold text-dark">${basePrice.toFixed(2)}</span>
+                  </div>
+                  {addonsPrice > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray">Hang dry</span>
+                      <span className="font-semibold text-dark">+${addonsPrice.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {protectionPrice > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray">Protection plan</span>
+                      <span className="font-semibold text-dark">+${protectionPrice.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {minTopUp > 0 && (
+                    <div className="flex justify-between text-amber-700">
+                      <span>$75 minimum top-up</span>
+                      <span className="font-semibold">+${minTopUp.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-baseline justify-between pt-5 mb-5">
+                  <span className="font-bold text-dark">Estimated total</span>
+                  <span className="text-3xl font-bold text-primary">${total.toFixed(2)}</span>
+                </div>
+
+                <button onClick={handleBookNow} className="btn-primary w-full text-base">
+                  Book now
+                  <ArrowRight size={16} />
+                </button>
+                <p className="text-xs text-gray text-center mt-3">Final price based on actual weight after washing. GST included.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <PlaceholderReviews context="pricing" className="bg-white" />
+
+      {/* FAQ */}
+      <section className="section bg-soft-mint">
+        <div className="container-narrow">
+          <div className="text-center mb-10">
+            <h2 className="section-title">Pricing questions</h2>
+          </div>
+          <div className="space-y-3">
+            {[
+              {
+                q: 'How is the price calculated?',
+                a: 'We charge per kilogram. Standard wash & fold is $7.50/kg, Express same-day is $12.50/kg. Bags are weighed at our facility after cleaning, and your final price reflects the actual weight.',
+              },
+              {
+                q: 'Is there a minimum order?',
+                a: 'Yes — $75 minimum per order. If your laundry weighs less than that, the minimum still applies. A medium bag (10kg) at standard rate already meets the minimum.',
+              },
+              {
+                q: 'What bag sizes do you offer?',
+                a: 'Two sizes: Medium (~10kg) and Large (~15kg). Pick whichever is closest to your load. Use multiple bags for larger orders.',
+              },
+              {
+                q: 'Are pickup and delivery free?',
+                a: 'Always. Pickup and delivery anywhere in our Melbourne service area are included in the per-kilo price.',
+              },
+              {
+                q: 'When is Express available?',
+                a: 'Order before 12pm and an Express load comes back the same day by 7pm, subject to Pro availability in your suburb.',
+              },
+              {
+                q: 'Do I need a subscription?',
+                a: 'No. Washlee is pay-per-order — book whenever you want. Wash Club rewards (free to join) earn points on every order.',
+              },
+            ].map((faq, i) => (
+              <div key={i} className="surface-card overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full flex items-center justify-between p-5 text-left"
+                  aria-expanded={openFaq === i}
+                >
+                  <span className="font-semibold text-dark pr-4">{faq.q}</span>
+                  <ChevronDown size={20} className={`text-primary flex-shrink-0 transition ${openFaq === i ? 'rotate-180' : ''}`} />
+                </button>
+                {openFaq === i && <div className="px-5 pb-5 -mt-1 text-sm text-gray leading-relaxed">{faq.a}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="container-page pb-16 sm:pb-24">
+        <div className="surface-card p-8 sm:p-12 bg-gradient-to-r from-primary to-accent text-white text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">Ready when you are.</h2>
+          <p className="text-white/90 mb-6">Book your first pickup in under a minute.</p>
+          <Link href="/booking" className="inline-flex items-center justify-center gap-2 bg-white text-primary-deep font-bold px-8 py-3 rounded-full hover:shadow-lg transition min-h-[48px]">
+            Book a pickup
+            <ArrowRight size={18} />
+          </Link>
         </div>
       </section>
 

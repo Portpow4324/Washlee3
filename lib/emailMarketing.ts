@@ -4,21 +4,21 @@
  * Integrates with Resend for reliable email delivery
  */
 
-import { sendEmailViaResend } from './resend-email'
+import { sendEmailViaResend } from "./resend-email";
 
 interface EmailData {
-  to: string
-  customerName: string
-  [key: string]: any
+  to: string;
+  customerName: string;
+  [key: string]: any;
 }
 
 /**
  * WELCOME EMAIL - Sent when user signs up
  */
 export async function sendWelcomeEmail(data: {
-  to: string
-  customerName: string
-  email: string
+  to: string;
+  customerName: string;
+  email: string;
 }) {
   const html = `
     <!DOCTYPE html>
@@ -80,7 +80,7 @@ export async function sendWelcomeEmail(data: {
             </div>
             
             <p style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/booking" class="cta-button">Schedule Your First Pickup</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/booking" class="cta-button">Schedule Your First Pickup</a>
             </p>
             
             <div class="section">
@@ -92,31 +92,31 @@ export async function sendWelcomeEmail(data: {
               </ul>
             </div>
             
-            <p>Questions? Reply to this email or visit our <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/faq">FAQ</a></p>
+            <p>Questions? Reply to this email or visit our <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/faq">FAQ</a></p>
             
             <p>Welcome aboard!<br><strong>The Washlee Team</strong></p>
           </div>
           
           <div class="footer">
             <p>&copy; ${new Date().getFullYear()} Washlee. All rights reserved.</p>
-            <p><a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/privacy-policy" style="color: #7FE3D3; text-decoration: none;">Privacy Policy</a> | <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/terms-of-service" style="color: #7FE3D3; text-decoration: none;">Terms of Service</a></p>
+            <p><a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/privacy-policy" style="color: #7FE3D3; text-decoration: none;">Privacy Policy</a> | <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/terms-of-service" style="color: #7FE3D3; text-decoration: none;">Terms of Service</a></p>
           </div>
         </div>
       </body>
     </html>
-  `
+  `;
 
   try {
     await sendEmailViaResend({
       to: data.to,
       subject: `Welcome to Washlee, ${data.customerName}! Get $10 Off Your First Order`,
       html,
-    })
-    console.log('[EmailMarketing] ✓ Welcome email sent to:', data.email)
-    return true
+    });
+    console.log("[EmailMarketing] ✓ Welcome email sent to:", data.email);
+    return true;
   } catch (error) {
-    console.error('[EmailMarketing] Failed to send welcome email:', error)
-    throw error
+    console.error("[EmailMarketing] Failed to send welcome email:", error);
+    throw error;
   }
 }
 
@@ -124,16 +124,16 @@ export async function sendWelcomeEmail(data: {
  * ORDER CONFIRMATION EMAIL - Sent when order is created
  */
 export async function sendOrderConfirmationEmail(data: {
-  to: string
-  customerName: string
-  orderId: string
-  pickupDate: string
-  pickupTime: string
-  pickupAddress: string
-  totalPrice: number
-  serviceType: string
-  weight?: number
-  orderUrl: string
+  to: string;
+  customerName: string;
+  orderId: string;
+  pickupDate: string;
+  pickupTime: string;
+  pickupAddress: string;
+  totalPrice: number;
+  serviceType: string;
+  weight?: number;
+  orderUrl: string;
 }) {
   const html = `
     <!DOCTYPE html>
@@ -191,10 +191,14 @@ export async function sendOrderConfirmationEmail(data: {
                 <span class="detail-label">Service Type:</span>
                 <span class="detail-value">${data.serviceType}</span>
               </div>
-              ${data.weight ? `<div class="detail-row">
+              ${
+                data.weight
+                  ? `<div class="detail-row">
                 <span class="detail-label">Estimated Weight:</span>
                 <span class="detail-value">${data.weight} kg</span>
-              </div>` : ''}
+              </div>`
+                  : ""
+              }
               <div class="total-row">
                 <span class="total-label">Total:</span>
                 <span class="total-value">$${data.totalPrice.toFixed(2)}</span>
@@ -213,11 +217,11 @@ export async function sendOrderConfirmationEmail(data: {
               </div>
               <div class="step">
                 <span class="step-title">Option 2: Request a Refund</span>
-                <p><a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/help/request-refund" style="color: #ff9800; font-weight: bold;">Submit a refund request</a> - our team will respond within 2 hours</p>
+                <p><a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/help/request-refund" style="color: #ff9800; font-weight: bold;">Submit a refund request</a> - our team will respond within 2 hours</p>
               </div>
               <div class="step">
                 <span class="step-title">Option 3: Change Your Password</span>
-                <p>If you didn't recognize this order, <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/dashboard/settings" style="color: #ff9800; font-weight: bold;">change your password</a> for security</p>
+                <p>If you didn't recognize this order, <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/dashboard/settings" style="color: #ff9800; font-weight: bold;">change your password</a> for security</p>
               </div>
               <p><strong>How to change your password:</strong></p>
               <ol>
@@ -233,7 +237,7 @@ export async function sendOrderConfirmationEmail(data: {
               <p>Our pickup professional will arrive at your location on the scheduled date and time. Be sure to have your laundry ready near the pickup location (front door, gate, etc.).</p>
             </div>
             
-            <p>Need help? <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/help">Contact Support</a> • <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/faq">FAQ</a></p>
+            <p>Need help? <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/help">Contact Support</a> • <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/faq">FAQ</a></p>
             
             <p>Best regards,<br><strong>The Washlee Team</strong></p>
           </div>
@@ -244,19 +248,25 @@ export async function sendOrderConfirmationEmail(data: {
         </div>
       </body>
     </html>
-  `
+  `;
 
   try {
     await sendEmailViaResend({
       to: data.to,
       subject: `Order Confirmed: #${data.orderId} - Receipt for Your Washlee Pickup`,
       html,
-    })
-    console.log('[EmailMarketing] ✓ Order confirmation email sent to:', data.to)
-    return true
+    });
+    console.log(
+      "[EmailMarketing] ✓ Order confirmation email sent to:",
+      data.to,
+    );
+    return true;
   } catch (error) {
-    console.error('[EmailMarketing] Failed to send order confirmation email:', error)
-    throw error
+    console.error(
+      "[EmailMarketing] Failed to send order confirmation email:",
+      error,
+    );
+    throw error;
   }
 }
 
@@ -264,13 +274,13 @@ export async function sendOrderConfirmationEmail(data: {
  * REFUND REQUEST EMAIL - Sent when customer requests a refund
  */
 export async function sendRefundRequestEmail(data: {
-  to: string
-  customerName: string
-  orderId: string
-  refundAmount: number
-  reason: string
-  ticketId: string
-  orderDate: string
+  to: string;
+  customerName: string;
+  orderId: string;
+  refundAmount: number;
+  reason: string;
+  ticketId: string;
+  orderDate: string;
 }) {
   const html = `
     <!DOCTYPE html>
@@ -351,33 +361,38 @@ export async function sendRefundRequestEmail(data: {
         </div>
       </body>
     </html>
-  `
+  `;
 
   try {
     await sendEmailViaResend({
       to: data.to,
       subject: `Refund Request Received - Ticket #${data.ticketId}`,
       html,
-    })
-    console.log('[EmailMarketing] ✓ Refund request email sent to:', data.to)
-    return true
+    });
+    console.log("[EmailMarketing] ✓ Refund request email sent to:", data.to);
+    return true;
   } catch (error) {
-    console.error('[EmailMarketing] Failed to send refund request email:', error)
-    throw error
+    console.error(
+      "[EmailMarketing] Failed to send refund request email:",
+      error,
+    );
+    throw error;
   }
 }
 
 /**
- * SUBSCRIPTION SIGNUP EMAIL - Sent when customer subscribes to a plan
+ * LEGACY SUBSCRIPTION EMAIL - Kept for old callers, but Washlee no longer sells
+ * paid subscription tiers. The email now points customers back to pay-per-order
+ * pricing and free Wash Club rewards.
  */
 export async function sendSubscriptionSignupEmail(data: {
-  to: string
-  customerName: string
-  planName: string
-  planPrice: number
-  billingCycle: string
-  benefits: string[]
-  subscriptionUrl: string
+  to: string;
+  customerName: string;
+  planName: string;
+  planPrice: number;
+  billingCycle: string;
+  benefits: string[];
+  subscriptionUrl: string;
 }) {
   const html = `
     <!DOCTYPE html>
@@ -386,55 +401,58 @@ export async function sendSubscriptionSignupEmail(data: {
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #9C27B0 0%, #E040FB 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
+          .header { background: linear-gradient(135deg, #0F4F46 0%, #48C9B0 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
           .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-          .plan-box { background: white; border: 2px solid #9C27B0; padding: 20px; border-radius: 6px; margin: 20px 0; }
+          .plan-box { background: white; border: 2px solid #48C9B0; padding: 20px; border-radius: 6px; margin: 20px 0; }
           .benefit-list { list-style: none; padding: 0; }
           .benefit-list li { padding: 8px 0; padding-left: 25px; position: relative; }
-          .benefit-list li:before { content: "★"; position: absolute; left: 0; color: #9C27B0; font-weight: bold; }
-          .cta-button { display: inline-block; background: #9C27B0; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+          .benefit-list li:before { content: "★"; position: absolute; left: 0; color: #0F4F46; font-weight: bold; }
+          .cta-button { display: inline-block; background: #0F4F46; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
           .footer { background: #1f2d2b; color: white; padding: 20px; text-align: center; font-size: 12px; }
-          .price { font-size: 32px; font-weight: bold; color: #9C27B0; text-align: center; }
+          .price { font-size: 28px; font-weight: bold; color: #0F4F46; text-align: center; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Welcome to ${data.planName}! 🎉</h1>
-            <p>Your subscription is active</p>
+            <h1>Washlee is pay-per-order</h1>
+            <p>No paid subscription is required</p>
           </div>
           
           <div class="content">
             <p>Hi ${data.customerName},</p>
             
-            <p>Thank you for subscribing to the <strong>${data.planName}</strong> plan! You're now unlocking exclusive benefits and savings.</p>
+            <p>Thanks for choosing Washlee. We no longer sell paid subscription plans — you only pay when you book a wash.</p>
             
             <div class="plan-box">
               <p style="text-align: center; margin-top: 0;">
-                <strong>${data.planName} Plan</strong>
+                <strong>Current pricing</strong>
               </p>
-              <div class="price">$${data.planPrice}/${data.billingCycle}</div>
+              <div class="price">$7.50/kg standard · $12.50/kg express</div>
               
-              <h3>Your Benefits:</h3>
+              <h3>What you still get:</h3>
               <ul class="benefit-list">
-                ${data.benefits.map(benefit => `<li>${benefit}</li>`).join('')}
+                <li>$75 minimum order, AUD</li>
+                <li>Pickup and delivery included inside the Melbourne service area</li>
+                <li>Free Wash Club loyalty rewards on every order</li>
+                <li>No monthly fee, no paid membership, no subscription lock-in</li>
               </ul>
             </div>
             
             <p style="text-align: center;">
-              <a href="${data.subscriptionUrl}" class="cta-button">Manage Your Subscription</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com.au"}/booking" class="cta-button">Book a Pickup</a>
             </p>
             
             <div style="background: #f0f0f0; padding: 15px; border-radius: 6px; margin: 20px 0;">
               <p><strong>Next Steps:</strong></p>
               <ul>
-                <li>You can manage your subscription anytime from your dashboard</li>
-                <li>Billing date: Same day each month</li>
-                <li>Cancel anytime - no questions asked</li>
+                <li>Book when you need us from the web or mobile app</li>
+                <li>Track Wash Club rewards from your dashboard</li>
+                <li>Contact support if you see any old subscription record</li>
               </ul>
             </div>
             
-            <p>Questions about your subscription? <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/help">Contact Support</a></p>
+            <p>Questions? <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com.au"}/help-center">Contact Support</a></p>
             
             <p>Happy laundering!<br><strong>The Washlee Team</strong></p>
           </div>
@@ -445,19 +463,25 @@ export async function sendSubscriptionSignupEmail(data: {
         </div>
       </body>
     </html>
-  `
+  `;
 
   try {
     await sendEmailViaResend({
       to: data.to,
-      subject: `Welcome to ${data.planName}! Your Subscription is Active`,
+      subject: 'Washlee pricing update: pay-per-order, no subscription needed',
       html,
-    })
-    console.log('[EmailMarketing] ✓ Subscription signup email sent to:', data.to)
-    return true
+    });
+    console.log(
+      "[EmailMarketing] ✓ Subscription signup email sent to:",
+      data.to,
+    );
+    return true;
   } catch (error) {
-    console.error('[EmailMarketing] Failed to send subscription signup email:', error)
-    throw error
+    console.error(
+      "[EmailMarketing] Failed to send subscription signup email:",
+      error,
+    );
+    throw error;
   }
 }
 
@@ -465,10 +489,10 @@ export async function sendSubscriptionSignupEmail(data: {
  * LOYALTY PROGRAM SIGNUP EMAIL - Sent when customer joins loyalty program
  */
 export async function sendLoyaltyProgramEmail(data: {
-  to: string
-  customerName: string
-  pointsBalance: number
-  rewardsUrl: string
+  to: string;
+  customerName: string;
+  pointsBalance: number;
+  rewardsUrl: string;
 }) {
   const html = `
     <!DOCTYPE html>
@@ -517,7 +541,7 @@ export async function sendLoyaltyProgramEmail(data: {
             
             <div class="reward-item">
               <p><strong>Bonus Points</strong></p>
-              <p>First subscription signup: +50 points<br>Refer a friend: +25 points each</p>
+              <p>First completed Washlee order: bonus points<br>Refer a friend: bonus points each</p>
             </div>
             
             <p style="text-align: center;">
@@ -542,19 +566,22 @@ export async function sendLoyaltyProgramEmail(data: {
         </div>
       </body>
     </html>
-  `
+  `;
 
   try {
     await sendEmailViaResend({
       to: data.to,
       subject: `Welcome to Washlee Rewards! Start Earning Points`,
       html,
-    })
-    console.log('[EmailMarketing] ✓ Loyalty program email sent to:', data.to)
-    return true
+    });
+    console.log("[EmailMarketing] ✓ Loyalty program email sent to:", data.to);
+    return true;
   } catch (error) {
-    console.error('[EmailMarketing] Failed to send loyalty program email:', error)
-    throw error
+    console.error(
+      "[EmailMarketing] Failed to send loyalty program email:",
+      error,
+    );
+    throw error;
   }
 }
 
@@ -562,13 +589,13 @@ export async function sendLoyaltyProgramEmail(data: {
  * ORDER READY FOR PICKUP EMAIL - Sent when order is being prepped
  */
 export async function sendOrderReadyEmail(data: {
-  to: string
-  customerName: string
-  orderId: string
-  pickupDate: string
-  pickupTime: string
-  estimatedDelivery: string
-  trackingUrl: string
+  to: string;
+  customerName: string;
+  orderId: string;
+  pickupDate: string;
+  pickupTime: string;
+  estimatedDelivery: string;
+  trackingUrl: string;
 }) {
   const html = `
     <!DOCTYPE html>
@@ -649,19 +676,19 @@ export async function sendOrderReadyEmail(data: {
         </div>
       </body>
     </html>
-  `
+  `;
 
   try {
     await sendEmailViaResend({
       to: data.to,
       subject: `Your Laundry is Ready! - Order #${data.orderId}`,
       html,
-    })
-    console.log('[EmailMarketing] ✓ Order ready email sent to:', data.to)
-    return true
+    });
+    console.log("[EmailMarketing] ✓ Order ready email sent to:", data.to);
+    return true;
   } catch (error) {
-    console.error('[EmailMarketing] Failed to send order ready email:', error)
-    throw error
+    console.error("[EmailMarketing] Failed to send order ready email:", error);
+    throw error;
   }
 }
 
@@ -669,12 +696,12 @@ export async function sendOrderReadyEmail(data: {
  * ORDER DELIVERED EMAIL - Sent when order is delivered
  */
 export async function sendOrderDeliveredEmail(data: {
-  to: string
-  customerName: string
-  orderId: string
-  deliveredDate: string
-  reviewUrl: string
-  nextSteps: string
+  to: string;
+  customerName: string;
+  orderId: string;
+  deliveredDate: string;
+  reviewUrl: string;
+  nextSteps: string;
 }) {
   const html = `
     <!DOCTYPE html>
@@ -721,7 +748,7 @@ export async function sendOrderDeliveredEmail(data: {
             
             <div style="margin: 20px 0;">
               <p><strong>Ready for Another Order?</strong></p>
-              <p>Book your next pickup and earn loyalty points. You can schedule recurring pickups for even more convenience!</p>
+              <p>Book your next pickup and earn Wash Club rewards every time.</p>
             </div>
             
             <p>Thank you for choosing Washlee!<br><strong>The Washlee Team</strong></p>
@@ -733,19 +760,22 @@ export async function sendOrderDeliveredEmail(data: {
         </div>
       </body>
     </html>
-  `
+  `;
 
   try {
     await sendEmailViaResend({
       to: data.to,
       subject: `Order Delivered! - Order #${data.orderId} - Leave a Review`,
       html,
-    })
-    console.log('[EmailMarketing] ✓ Order delivered email sent to:', data.to)
-    return true
+    });
+    console.log("[EmailMarketing] ✓ Order delivered email sent to:", data.to);
+    return true;
   } catch (error) {
-    console.error('[EmailMarketing] Failed to send order delivered email:', error)
-    throw error
+    console.error(
+      "[EmailMarketing] Failed to send order delivered email:",
+      error,
+    );
+    throw error;
   }
 }
 
@@ -753,16 +783,16 @@ export async function sendOrderDeliveredEmail(data: {
  * PROMOTIONAL EMAIL - Generic promotional campaign
  */
 export async function sendPromotionalEmail(data: {
-  to: string
-  customerName: string
-  subject: string
-  title: string
-  message: string
+  to: string;
+  customerName: string;
+  subject: string;
+  title: string;
+  message: string;
   cta: {
-    text: string
-    url: string
-  }
-  promoCode?: string
+    text: string;
+    url: string;
+  };
+  promoCode?: string;
 }) {
   const html = `
     <!DOCTYPE html>
@@ -791,18 +821,22 @@ export async function sendPromotionalEmail(data: {
             
             <p>${data.message}</p>
             
-            ${data.promoCode ? `
+            ${
+              data.promoCode
+                ? `
               <div class="promo-code">
                 <div class="promo-label">Use this code at checkout:</div>
                 <div class="promo-value">${data.promoCode}</div>
               </div>
-            ` : ''}
+            `
+                : ""
+            }
             
             <p style="text-align: center;">
               <a href="${data.cta.url}" class="cta-button">${data.cta.text}</a>
             </p>
             
-            <p>Questions? <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/help">Contact Support</a></p>
+            <p>Questions? <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/help">Contact Support</a></p>
             
             <p>Best regards,<br><strong>The Washlee Team</strong></p>
           </div>
@@ -814,19 +848,19 @@ export async function sendPromotionalEmail(data: {
         </div>
       </body>
     </html>
-  `
+  `;
 
   try {
     await sendEmailViaResend({
       to: data.to,
       subject: data.subject,
       html,
-    })
-    console.log('[EmailMarketing] ✓ Promotional email sent to:', data.to)
-    return true
+    });
+    console.log("[EmailMarketing] ✓ Promotional email sent to:", data.to);
+    return true;
   } catch (error) {
-    console.error('[EmailMarketing] Failed to send promotional email:', error)
-    throw error
+    console.error("[EmailMarketing] Failed to send promotional email:", error);
+    throw error;
   }
 }
 
@@ -834,13 +868,13 @@ export async function sendPromotionalEmail(data: {
  * PRO ACCEPTED JOB EMAIL - Sent to customer when pro accepts their order
  */
 export async function sendProAcceptedJobEmail(data: {
-  to: string
-  customerName: string
-  proName: string
-  proPhone: string
-  proEmail: string
-  orderAmount: number
-  orderId: string
+  to: string;
+  customerName: string;
+  proName: string;
+  proPhone: string;
+  proEmail: string;
+  orderAmount: number;
+  orderId: string;
 }) {
   const html = `
     <!DOCTYPE html>
@@ -916,10 +950,10 @@ export async function sendProAcceptedJobEmail(data: {
             </div>
 
             <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/dashboard/orders" class="cta-button">View Your Order</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/dashboard/orders" class="cta-button">View Your Order</a>
             </p>
             
-            <p>Questions? <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://washlee.com'}/help">Contact Support</a></p>
+            <p>Questions? <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com"}/help">Contact Support</a></p>
             
             <p>Best regards,<br><strong>The Washlee Team</strong></p>
           </div>
@@ -931,18 +965,178 @@ export async function sendProAcceptedJobEmail(data: {
         </div>
       </body>
     </html>
-  `
+  `;
 
   try {
     await sendEmailViaResend({
       to: data.to,
       subject: `${data.proName} accepted your Washlee order!`,
       html,
-    })
-    console.log('[EmailMarketing] ✓ Pro accepted job email sent to:', data.to)
-    return true
+    });
+    console.log("[EmailMarketing] ✓ Pro accepted job email sent to:", data.to);
+    return true;
   } catch (error) {
-    console.error('[EmailMarketing] Failed to send pro accepted job email:', error)
-    throw error
+    console.error(
+      "[EmailMarketing] Failed to send pro accepted job email:",
+      error,
+    );
+    throw error;
+  }
+}
+
+/**
+ * PASSWORD CHANGED EMAIL - Sent after a customer updates their password
+ */
+export async function sendPasswordChangedEmail(data: {
+  to: string;
+  customerName: string;
+  changedAt?: string;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://washlee.com";
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2d2b; line-height: 1.6;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 24px;">
+          <div style="background: #0f4f46; color: white; padding: 28px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0;">Your password was changed</h1>
+          </div>
+          <div style="background: #f8fbfa; padding: 28px; border-radius: 0 0 8px 8px;">
+            <p>Hi ${data.customerName},</p>
+            <p>This is a confirmation that your Washlee password was changed${data.changedAt ? ` on ${data.changedAt}` : ""}.</p>
+            <p>If this was you, no action is needed.</p>
+            <p>If you did not change your password, contact Washlee support immediately and use "Log out on all devices" from Security.</p>
+            <p><a href="${appUrl}/help" style="display:inline-block;background:#48C9B0;color:white;padding:12px 18px;border-radius:6px;text-decoration:none;font-weight:bold;">Contact support</a></p>
+            <p>The Washlee Team</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  try {
+    await sendEmailViaResend({
+      to: data.to,
+      subject: "Your Washlee password was changed",
+      html,
+    });
+    console.log("[EmailMarketing] Password changed email sent to:", data.to);
+    return true;
+  } catch (error) {
+    console.error(
+      "[EmailMarketing] Failed to send password changed email:",
+      error,
+    );
+    throw error;
+  }
+}
+
+/**
+ * ORDER STATUS UPDATE EMAIL - Sent when the Pro advances the order timeline
+ */
+export async function sendOrderStatusUpdateEmail(data: {
+  to: string;
+  customerName: string;
+  orderId: string;
+  stage: string;
+  stageTitle: string;
+  message: string;
+  orderUrl: string;
+  proofNote?: string;
+}) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2d2b; line-height: 1.6;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 24px;">
+          <div style="background: #0f4f46; color: white; padding: 28px; border-radius: 8px 8px 0 0;">
+            <p style="letter-spacing: 1.4px; text-transform: uppercase; margin: 0 0 8px;">Order update</p>
+            <h1 style="margin: 0;">${data.stageTitle}</h1>
+          </div>
+          <div style="background: #f8fbfa; padding: 28px; border-radius: 0 0 8px 8px;">
+            <p>Hi ${data.customerName},</p>
+            <p>${data.message}</p>
+            <div style="background:white;border:1px solid #d7e7e2;border-radius:8px;padding:18px;margin:18px 0;">
+              <p style="margin:0;"><strong>Order:</strong> #${data.orderId}</p>
+              <p style="margin:8px 0 0;"><strong>Status:</strong> ${data.stage.replace(/_/g, " ")}</p>
+              ${data.proofNote ? `<p style="margin:8px 0 0;"><strong>Proof:</strong> ${data.proofNote}</p>` : ""}
+            </div>
+            <p><a href="${data.orderUrl}" style="display:inline-block;background:#48C9B0;color:white;padding:12px 18px;border-radius:6px;text-decoration:none;font-weight:bold;">Track order</a></p>
+            <p>Need help? Reply to this email or contact support in the app.</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  try {
+    await sendEmailViaResend({
+      to: data.to,
+      subject: `${data.stageTitle} - Order #${data.orderId}`,
+      html,
+    });
+    console.log("[EmailMarketing] Order status email sent to:", data.to);
+    return true;
+  } catch (error) {
+    console.error("[EmailMarketing] Failed to send order status email:", error);
+    throw error;
+  }
+}
+
+/**
+ * ABANDONED BOOKING EMAIL - Sent when a signed-in customer saves/exits a booking draft
+ */
+export async function sendAbandonedBookingEmail(data: {
+  to: string;
+  customerName: string;
+  resumeUrl: string;
+  estimatedTotal?: number;
+  pickupAddress?: string;
+}) {
+  const totalLine =
+    typeof data.estimatedTotal === "number"
+      ? `<p style="margin:8px 0 0;"><strong>Estimated total:</strong> $${data.estimatedTotal.toFixed(2)}</p>`
+      : "";
+  const addressLine = data.pickupAddress
+    ? `<p style="margin:8px 0 0;"><strong>Pickup:</strong> ${data.pickupAddress}</p>`
+    : "";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2d2b; line-height: 1.6;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 24px;">
+          <div style="background: #48C9B0; color: white; padding: 28px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0;">Want to finish your Washlee pickup?</h1>
+          </div>
+          <div style="background: #f8fbfa; padding: 28px; border-radius: 0 0 8px 8px;">
+            <p>Hi ${data.customerName},</p>
+            <p>You started a Washlee booking but did not confirm it. Your progress has been saved in the app.</p>
+            <div style="background:white;border:1px solid #d7e7e2;border-radius:8px;padding:18px;margin:18px 0;">
+              ${addressLine}
+              ${totalLine}
+            </div>
+            <p><a href="${data.resumeUrl}" style="display:inline-block;background:#0f4f46;color:white;padding:12px 18px;border-radius:6px;text-decoration:none;font-weight:bold;">Resume booking</a></p>
+            <p>If you do not need laundry pickup right now, you can ignore this email.</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  try {
+    await sendEmailViaResend({
+      to: data.to,
+      subject: "Your Washlee booking draft is waiting",
+      html,
+    });
+    console.log("[EmailMarketing] Abandoned booking email sent to:", data.to);
+    return true;
+  } catch (error) {
+    console.error(
+      "[EmailMarketing] Failed to send abandoned booking email:",
+      error,
+    );
+    throw error;
   }
 }

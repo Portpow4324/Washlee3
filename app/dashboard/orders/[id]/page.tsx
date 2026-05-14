@@ -3,13 +3,13 @@
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useEffect } from 'react'
+import { ArrowLeft } from 'lucide-react'
 
-export default function OrderDetail() {
+export default function OrderDetailRedirect() {
   const params = useParams()
   const router = useRouter()
   const orderId = params?.id as string
 
-  // Redirect to tracking page with the order ID using useEffect
   useEffect(() => {
     if (orderId) {
       router.replace(`/tracking?orderId=${orderId}`)
@@ -17,21 +17,23 @@ export default function OrderDetail() {
   }, [orderId, router])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white flex items-center justify-center p-4">
-      <div className="max-w-md w-full text-center">
+    <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <div className="surface-card max-w-md w-full p-8 text-center">
         {orderId ? (
           <>
-            <div className="animate-spin inline-block w-8 h-8 border-4 border-[#48C9B0] border-t-transparent rounded-full mb-4"></div>
-            <p className="text-[#6b7b78]">Loading order details...</p>
+            <div className="animate-spin inline-block w-8 h-8 border-2 border-primary border-t-transparent rounded-full mb-4" />
+            <p className="text-gray text-sm">Opening your order…</p>
           </>
         ) : (
           <>
-            <h1 className="text-3xl font-bold text-[#1f2d2b] mb-4">Order Not Found</h1>
-            <p className="text-[#6b7b78] mb-6">
-              The order ID could not be found. Please try again.
-            </p>
-            <Link href="/dashboard/orders" className="text-[#48C9B0] hover:text-[#7FE3D3] font-medium">
-              ← Back to My Orders
+            <h1 className="text-2xl font-bold text-dark mb-2">Order not found</h1>
+            <p className="text-gray text-sm mb-5">We couldn&rsquo;t find that order ID.</p>
+            <Link
+              href="/dashboard/orders"
+              className="btn-primary inline-flex"
+            >
+              <ArrowLeft size={16} />
+              Back to my orders
             </Link>
           </>
         )}

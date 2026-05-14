@@ -1,26 +1,34 @@
 'use client'
 
-import Button from '@/components/Button'
-import Spinner from '@/components/Spinner'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
-import { Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, ArrowLeft, X, MapPin } from 'lucide-react'
+import { useState } from 'react'
+import { Mail, Lock, Phone, Eye, EyeOff, CheckCircle, X, MapPin, ArrowLeft, ArrowRight, Sparkles, Gift } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import { createCustomerProfile } from '@/lib/userManagement'
-import { sendWelcomeEmail } from '@/lib/emailService'
 import { AUSTRALIAN_STATES } from '@/lib/australianValidation'
+import { getAttributionMetadata, trackWashleeEvent } from '@/lib/analytics/client'
 import WashClubSignupModal from '@/components/WashClubSignupModal'
+import OAuthButtons from '@/components/OAuthButtons'
 
-export default function SignupCustomer() {
-  const [currentStep, setCurrentStep] = useState(0)
+type StepId = 0 | 1 | 2 | 3 | 4
+
+const STEP_TITLES: Record<StepId, { title: string; description: string }> = {
+  0: { title: 'Create your account', description: 'Use Google, Apple, or a Washlee email and password.' },
+  1: { title: 'Tell us a bit about you', description: 'We need this for pickups and order updates.' },
+  2: { title: 'Verify your email', description: 'Enter the 6-digit code we sent to your inbox.' },
+  3: { title: 'How will you use Washlee?', description: 'Choose what fits your laundry — you can change this later.' },
+  4: { title: 'Join Wash Club?', description: 'Free loyalty rewards — earn points on every order.' },
+}
+
+export default function SignupCustomerPage() {
+  const router = useRouter()
+  const [currentStep, setCurrentStep] = useState<StepId>(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [showWashClubModal, setShowWashClubModal] = useState(false)
-  const [newUserId, setNewUserId] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -31,16 +39,20 @@ export default function SignupCustomer() {
     password: '',
     confirmPassword: '',
     personalUse: '',
-    marketingTexts: false,
-    accountTexts: false,
     selectedPlan: 'none',
     verificationCode: '',
   })
 
-  const [showPassword, setShowPassword] = useState(false)
-  const router = useRouter()
+  const trackSignupStep = (step: StepId, extra: Record<string, string | number | boolean> = {}) => {
+    trackWashleeEvent('customer_signup_step_completed', {
+      metadata: {
+        step: step + 1,
+        step_title: STEP_TITLES[step].title,
+        ...extra,
+      },
+    })
+  }
 
-  // Password validation helpers
   const validatePassword = (pwd: string) => ({
     hasLength: pwd.length >= 8,
     hasNumber: /\d/.test(pwd),
@@ -48,279 +60,25 @@ export default function SignupCustomer() {
     hasUpper: /[A-Z]/.test(pwd),
     hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
   })
-
   const passwordRules = validatePassword(formData.password)
   const isPasswordValid = Object.values(passwordRules).every(Boolean)
 
-  // No email verification state needed - Supabase handles it built-in
-
-  const steps = [
-    {
-      title: 'Create Your Account',
-      description: 'Get started with your email and password',
-      content: (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-dark mb-2">Email*</label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="you@example.com"
-                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-dark mb-2">Password*</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="••••••••"
-                className="w-full pl-12 pr-12 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray hover:text-primary"
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-            <div className="mt-3 space-y-2">
-              <p className="text-sm font-semibold text-dark">Passwords must include:</p>
-              <div className="space-y-1">
-                {[
-                  { key: 'hasLength', label: '8+ Characters' },
-                  { key: 'hasNumber', label: '1 Number' },
-                  { key: 'hasLower', label: '1 Lowercase Letter' },
-                  { key: 'hasUpper', label: '1 Uppercase Letter' },
-                  { key: 'hasSpecial', label: '1 Special Character' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="flex items-center gap-2">
-                    {passwordRules[key as keyof typeof passwordRules] ? (
-                      <CheckCircle size={16} className="text-primary flex-shrink-0" />
-                    ) : (
-                      <X size={16} className="text-gray flex-shrink-0" />
-                    )}
-                    <span className={`text-sm ${passwordRules[key as keyof typeof passwordRules] ? 'text-primary' : 'text-gray'}`}>
-                      {label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-dark mb-2">Confirm Password*</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                placeholder="••••••••"
-                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Introduce yourself',
-      description: 'Who do we have the pleasure of serving?',
-      content: (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-dark mb-2">First Name*</label>
-            <input
-              type="text"
-              value={formData.firstName}
-              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              placeholder="John"
-              className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-dark mb-2">Last Name*</label>
-            <input
-              type="text"
-              value={formData.lastName}
-              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              placeholder="Doe"
-              className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-dark mb-2">Phone Number <span className="text-gray">(Optional but recommended)</span></label>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="+61 (2) 1234 5678"
-              className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <p className="text-xs text-gray mt-1">We recommend providing a phone number for delivery confirmations</p>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-dark mb-2">State*</label>
-            <div className="relative">
-              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray" size={20} />
-              <select
-                value={formData.state}
-                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
-                required
-              >
-                <option value="">Choose a state...</option>
-                {AUSTRALIAN_STATES.map(state => (
-                  <option key={state.code} value={state.code}>{state.name} ({state.code})</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Verify Your Email',
-      description: 'Enter the code we sent to your email',
-      content: (
-        <div className="space-y-4">
-          <div className="bg-mint rounded-lg p-8 border-2 border-primary text-center">
-            <div className="text-5xl mb-4">📧</div>
-            <p className="text-lg font-semibold text-dark mb-2">Check Your Email</p>
-            <p className="text-sm text-gray mb-6">We've sent a 6-digit verification code to:</p>
-            <p className="font-mono bg-white p-3 rounded border border-primary text-primary font-semibold mb-6 text-sm">{formData.email}</p>
-            
-            {/* Verification Code Input */}
-            <div className="space-y-3">
-              <label className="block text-sm font-semibold text-dark text-left">Enter Verification Code</label>
-              <input
-                type="text"
-                maxLength={6}
-                value={formData.verificationCode}
-                onChange={(e) => setFormData({ ...formData, verificationCode: e.target.value.toUpperCase() })}
-                placeholder="000000"
-                className="w-full px-4 py-3 border-2 border-primary rounded-lg text-center text-2xl font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <p className="text-xs text-gray">Code expires in 24 hours</p>
-            </div>
-
-            {/* Resend Option */}
-            <div className="mt-6 pt-6 border-t border-gray/30">
-              <p className="text-sm text-gray mb-3">Didn't receive the code?</p>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    console.log('[Resend] Requesting new verification code for:', formData.email)
-                    const response = await fetch('/api/auth/resend-verification', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ email: formData.email })
-                    })
-                    if (response.ok) {
-                      setError('')
-                      setSuccessMessage('✓ New verification code sent! Check your email.')
-                      setTimeout(() => setSuccessMessage(''), 5000)
-                    } else {
-                      setSuccessMessage('')
-                      setError('Failed to resend code. Please try again.')
-                    }
-                  } catch (err) {
-                    console.error('[Resend Error]', err)
-                    setSuccessMessage('')
-                    setError('Error resending code')
-                  }
-                }}
-                className="text-primary font-semibold hover:underline text-sm"
-              >
-                Resend Code
-              </button>
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Usage Type',
-      description: 'Are you using Washlee for personal use or business?*',
-      content: (
-        <div className="space-y-3">
-          <label className="flex items-center gap-3 p-4 border-2 cursor-pointer transition"
-            style={{ borderColor: formData.personalUse === 'personal' ? '#48C9B0' : '#6b7b78', backgroundColor: formData.personalUse === 'personal' ? '#E8FFFB' : 'transparent' }}
-            onClick={() => {
-              console.log('[Usage Type] Selected: personal')
-              setFormData({ ...formData, personalUse: 'personal' })
-            }}
-          >
-            <input
-              type="radio"
-              name="usage"
-              value="personal"
-              checked={formData.personalUse === 'personal'}
-              onChange={() => {}}
-              className="w-4 h-4"
-            />
-            <span className="font-semibold text-dark">Personal</span>
-          </label>
-          <label className="flex items-center gap-3 p-4 border-2 cursor-pointer transition"
-            style={{ borderColor: formData.personalUse === 'business' ? '#48C9B0' : '#6b7b78', backgroundColor: formData.personalUse === 'business' ? '#E8FFFB' : 'transparent' }}
-            onClick={() => {
-              console.log('[Usage Type] Selected: business')
-              setFormData({ ...formData, personalUse: 'business' })
-            }}
-          >
-            <input
-              type="radio"
-              name="usage"
-              value="business"
-              checked={formData.personalUse === 'business'}
-              onChange={() => {}}
-              className="w-4 h-4"
-            />
-            <span className="font-semibold text-dark">Business</span>
-          </label>
-        </div>
-      ),
-    },
-    {
-      title: 'Subscribe to a Plan?',
-      description: 'Would you like to explore subscription plans to save on orders?',
-      content: (
-        <div className="space-y-6">
-          <div className="bg-mint rounded-lg p-6 border-2 border-primary">
-            <p className="text-lg font-semibold text-dark mb-4">Ready to get started?</p>
-            <p className="text-dark mb-6">We offer flexible subscription plans that can help you save on laundry costs. You can always pay per order, or choose a plan that works best for you.</p>
-          </div>
-        </div>
-      ),
-    },
-  ]
-
-  const isStepValid = () => {
+  const isStepValid = (): boolean => {
     switch (currentStep) {
       case 0:
-        return formData.email && formData.password && formData.confirmPassword && isPasswordValid && formData.password === formData.confirmPassword
+        return Boolean(
+          formData.email &&
+            formData.password &&
+            formData.confirmPassword &&
+            isPasswordValid &&
+            formData.password === formData.confirmPassword
+        )
       case 1:
-        return formData.firstName.trim() && formData.lastName.trim() && formData.state
+        return Boolean(formData.firstName.trim() && formData.lastName.trim() && formData.state)
       case 2:
-        // Step 2 is verification - requires 6-digit code
-        return formData.verificationCode && formData.verificationCode.length === 6
+        return Boolean(formData.verificationCode && formData.verificationCode.length === 6)
       case 3:
-        return formData.personalUse
+        return Boolean(formData.personalUse)
       case 4:
         return true
       default:
@@ -328,121 +86,71 @@ export default function SignupCustomer() {
     }
   }
 
-  const handleNext = async (planSelection?: string) => {
-    console.log('[handleNext] ==========================================')
-    console.log('[handleNext] currentStep:', currentStep)
-    console.log('[handleNext] isStepValid():', isStepValid())
-    console.log('[handleNext] personalUse:', formData.personalUse)
-    console.log('[handleNext] steps.length:', steps.length)
-    console.log('[handleNext] ==========================================')
-    
-    if (isStepValid()) {
-      if (currentStep === 1) {
-        // After step 1 (Introduce yourself), create account and send email before moving to step 2 (Check Email)
-        console.log('[handleNext] Step 1 detected - creating account before moving to step 2 (Check Email)')
-        await handleCreateAccount()
-      } else if (currentStep === 2) {
-        // Step 2 is verification code - verify it before moving to step 3
-        console.log('[handleNext] Step 2 (Verification Code) detected - verifying code...')
-        await handleVerifyCode(formData.verificationCode)
-      } else if (currentStep === 4) {
-        // At final step (Subscribe to Plan) - just save plan selection and complete signup
-        const finalPlanData = planSelection !== undefined ? planSelection : formData.selectedPlan
-        console.log('[handleNext] Step 4 (final) detected')
-        console.log('[handleNext] SelectedPlan:', finalPlanData)
-        // Just move to next step to complete signup
-        setCurrentStep(currentStep + 1)
-      } else if (currentStep < steps.length - 1) {
-        console.log('[handleNext] Moving from step', currentStep, 'to', currentStep + 1)
-        setCurrentStep(currentStep + 1)
+  const handleResendVerification = async () => {
+    setError('')
+    setSuccessMessage('')
+    try {
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email }),
+      })
+      if (response.ok) {
+        setSuccessMessage('A fresh code is on its way. Check your inbox.')
+        setTimeout(() => setSuccessMessage(''), 5000)
+      } else {
+        setError('Could not resend the code. Try again in a moment.')
       }
-    } else {
-      console.log('[handleNext] Step not valid, showing error')
-      setError('Please complete this step')
+    } catch (err) {
+      console.error('[Resend Error]', err)
+      setError('Could not resend the code. Try again in a moment.')
     }
   }
 
-  const handleSendVerificationEmail = async () => {
-    // Supabase will send verification email automatically during signup
-    // Just proceed to next step
-    setCurrentStep(currentStep + 1)
-  }
-
   const handleVerifyCode = async (code: string) => {
-    console.log('[VerifyCode] Verifying code:', code)
     setIsLoading(true)
     setError('')
-
     try {
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          code: code
-        })
+        body: JSON.stringify({ email: formData.email, code }),
       })
-
       const data = await response.json()
-
       if (!response.ok) {
-        console.error('[VerifyCode] Verification failed:', data.error)
         setError(data.error || 'Invalid verification code')
         setIsLoading(false)
         return
       }
-
-      console.log('[VerifyCode] ✓ Code verified successfully!')
       setIsLoading(false)
-      setCurrentStep(currentStep + 1)
-    } catch (error) {
-      console.error('[VerifyCode] Error:', error)
+      trackSignupStep(2)
+      setCurrentStep(3)
+    } catch (err) {
+      console.error('[VerifyCode] Error:', err)
       setError('Failed to verify code. Please try again.')
       setIsLoading(false)
     }
   }
 
   const handleAutoLogin = async () => {
-    console.log('[AutoLogin] Attempting to auto-login user...')
     setIsLoading(true)
-    
     try {
-      // Use Supabase directly for login - this will set the session
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       })
-
-      if (error) {
-        console.warn('[AutoLogin] Auto-login failed:', error.message)
-        console.log('[AutoLogin] User can login manually later')
-        setIsLoading(false)
-        setIsRedirecting(true)
-        // Still redirect even if auto-login fails
-        setTimeout(() => router.push('/'), 1500)
-        return
-      }
-
-      if (!data.user) {
-        console.warn('[AutoLogin] No user returned from login')
+      if (signInError || !data.user) {
+        console.warn('[AutoLogin] Failed:', signInError?.message)
         setIsLoading(false)
         setIsRedirecting(true)
         setTimeout(() => router.push('/'), 1500)
         return
       }
-
-      console.log('[AutoLogin] ✓ Auto-login successful! User:', data.user.id)
       setIsLoading(false)
       setIsRedirecting(true)
-      
-      // Small delay to allow session to be set before redirect
-      setTimeout(() => {
-        console.log('[AutoLogin] Redirecting to home...')
-        router.push('/')
-      }, 1500)
-    } catch (error) {
-      console.error('[AutoLogin] Error:', error)
-      // Don't block redirect on auto-login failure
+      setTimeout(() => router.push('/'), 1500)
+    } catch (err) {
+      console.error('[AutoLogin] Error:', err)
       setIsLoading(false)
       setIsRedirecting(true)
       setTimeout(() => router.push('/'), 1500)
@@ -450,37 +158,27 @@ export default function SignupCustomer() {
   }
 
   const resendVerificationEmail = async (email: string) => {
-    console.log('[Signup] Requesting to resend verification email for:', email)
     try {
       const response = await fetch('/api/auth/resend-confirmation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email }),
       })
-
       const data = await response.json()
-      
       if (!response.ok) {
-        console.error('[Signup] Resend error:', data.error)
-        alert(`Error: ${data.error}`)
+        alert(`Error: ${data.error || 'Could not resend confirmation email.'}`)
         return
       }
-
-      console.log('[Signup] ✅ Verification email resent successfully')
-      alert('Verification email sent! Please check your inbox.')
-    } catch (err: any) {
+      alert('Verification email sent. Please check your inbox.')
+    } catch (err) {
       console.error('[Signup] Resend exception:', err)
       alert('Failed to resend verification email. Please try again.')
     }
   }
 
-  const handleCreateAccount = async (planSelection?: string) => {
+  const handleCreateAccount = async () => {
     setError('')
     setIsLoading(true)
-
-    const signupStartTime = performance.now()
-    console.log('[Signup] Starting customer account creation at', new Date().toISOString())
-
     try {
       if (!formData.firstName || !formData.lastName || !formData.email) {
         setError('Missing required information.')
@@ -488,11 +186,8 @@ export default function SignupCustomer() {
         return
       }
 
-      // Create account via our API route which saves to database
-      const authStartTime = performance.now()
-      console.log('[Signup] Creating account via /api/auth/signup...')
       const fullName = `${formData.firstName} ${formData.lastName}`
-      
+
       const apiResponse = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -504,22 +199,17 @@ export default function SignupCustomer() {
           state: formData.state || null,
           personalUse: formData.personalUse || null,
           userType: 'customer',
-        })
+          marketingAttribution: getAttributionMetadata(),
+        }),
       })
 
-      console.log('[Signup] API response status:', apiResponse.status)
-      console.log('[Signup] API response ok:', apiResponse.ok)
-      
       if (!apiResponse.ok) {
-        console.log('[Signup] Attempting to parse error response...')
-        let errorData: any = { error: 'Unknown error' }
+        let errorData: { error?: string; code?: string } = { error: 'Unknown error' }
         try {
           const responseText = await apiResponse.text()
-          console.log('[Signup] Response text:', responseText)
           if (responseText) {
             try {
               errorData = JSON.parse(responseText)
-              console.log('[Signup] Parsed error data:', errorData)
             } catch {
               errorData = { error: responseText || `Server error: ${apiResponse.statusText}` }
             }
@@ -530,79 +220,89 @@ export default function SignupCustomer() {
           console.error('[Signup] Failed to parse error response:', parseError)
           errorData = { error: `Server error: ${apiResponse.statusText}` }
         }
-        
-        console.error('[Signup] API error:', errorData)
-        
-        // Handle duplicate email error
+
         if (errorData.code === 'DUPLICATE_EMAIL' || apiResponse.status === 409) {
-          setError('This email is already registered. Would you like to log in instead?')
+          setError('This email is already registered. Try signing in instead.')
           setIsLoading(false)
-          
-          // Offer to resend verification email
-          const shouldResend = confirm('Your email is already registered. Would you like us to resend the verification email?')
+          const shouldResend = confirm(
+            'Your email is already registered. Resend the verification email?'
+          )
           if (shouldResend) {
             await resendVerificationEmail(formData.email)
           }
           return
         }
-        
-        // Handle rate limit error
         if (errorData.code === 'RATE_LIMIT' || apiResponse.status === 429) {
           setError('Too many signup attempts. Please wait 60 seconds and try again.')
           setIsLoading(false)
           return
         }
-        
         throw new Error(errorData.error || 'Failed to create account')
       }
 
       const apiData = await apiResponse.json()
-      console.log('[Signup] API response data:', apiData)
-      
-      const authDuration = performance.now() - authStartTime
       const uid = apiData.user?.id
       if (!uid) throw new Error('Failed to get user ID from API response')
-      console.log(`[Signup] Account created via API: ${Math.round(authDuration)}ms`, uid)
-      
-      // Save user ID for later profile creation
-      setNewUserId(uid)
-      
-      // The signup backend already sends a verification code via /api/auth/send-confirmation.
-      // Avoid sending a second, mismatched code from the client to ensure verification consistency.
-      const totalTime = performance.now() - signupStartTime
-      console.log(`[Signup] ✓ Account created. Backend initiation completed. (${Math.round(totalTime)}ms)`)
 
-      // Move to email verification step (step 2 = "Check Your Email")
       setIsLoading(false)
+      trackSignupStep(1)
       setCurrentStep(2)
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create account'
       console.error('[Signup] Error:', err)
-      console.error('[Signup] Error message:', err.message)
-      setError(err.message || 'Failed to create account')
-    } finally {
+      setError(message)
       setIsLoading(false)
     }
   }
 
-  if (isRedirecting || isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
-        <div className="w-full max-w-md text-center">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-            <h1 className="text-3xl font-bold text-dark mb-3">Creating Your Account</h1>
-            <p className="text-gray mb-6">Setting up your profile and preparing to redirect you...</p>
-            <p className="text-sm text-gray mb-8">This may take a few moments</p>
-          </div>
-        </div>
-      </div>
-    )
+  const handleNext = async (planSelection?: string) => {
+    if (!isStepValid()) {
+      setError('Please complete this step.')
+      return
+    }
+    setError('')
+
+    if (currentStep === 1) {
+      await handleCreateAccount()
+      return
+    }
+    if (currentStep === 2) {
+      await handleVerifyCode(formData.verificationCode)
+      return
+    }
+    if (currentStep === 4) {
+      const finalPlanData = planSelection !== undefined ? planSelection : formData.selectedPlan
+      setFormData((prev) => ({ ...prev, selectedPlan: finalPlanData }))
+      trackSignupStep(4, { wash_club_choice: finalPlanData })
+      if (finalPlanData === 'wash-club') {
+        trackWashleeEvent('wash_club_join_clicked', {
+          metadata: { route: '/auth/signup-customer' },
+        })
+      }
+      trackWashleeEvent('customer_signup_completed', {
+        metadata: { wash_club_choice: finalPlanData },
+      })
+      // Move past the last step → triggers final screen.
+      setCurrentStep((prev) => (prev + 1) as StepId)
+      return
+    }
+    if (currentStep < 4) {
+      trackSignupStep(currentStep)
+      setCurrentStep((prev) => (prev + 1) as StepId)
+    }
   }
 
-  if (currentStep === steps.length) {
-    // Auto-login on account completion
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep((prev) => (prev - 1) as StepId)
+      setError('')
+    } else {
+      router.back()
+    }
+  }
+
+  // Final completion screen → auto-login then redirect.
+  if (currentStep > 4) {
     if (!isRedirecting && !isLoading) {
       handleAutoLogin()
     }
@@ -620,139 +320,428 @@ export default function SignupCustomer() {
     }
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
+      <main className="min-h-screen bg-soft-hero flex items-center justify-center px-4 sm:px-6 py-12">
         <WashClubSignupModal
           isOpen={showWashClubModal}
           onJoin={handleJoinWashClub}
           onSkip={handleSkipWashClub}
         />
-        <div className="w-full max-w-md text-center">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="flex justify-center mb-6">
-              <CheckCircle size={64} className="text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold text-dark mb-3">Account Created!</h1>
-            <p className="text-gray mb-6">Welcome to Washlee. Your account is all set up.</p>
-            <p className="text-sm text-gray mb-8">Logging you in and redirecting you home...</p>
-            <Link href="/" className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold">
-              Go Home
-            </Link>
+        <div className="w-full max-w-md surface-card p-8 text-center animate-slide-up">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-mint mb-4">
+            <CheckCircle className="w-8 h-8 text-primary-deep" />
           </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-dark mb-1">Account created</h1>
+          <p className="text-gray text-base mb-6">
+            Welcome to Washlee — signing you in and redirecting…
+          </p>
+          <Link href="/" className="btn-outline w-full">
+            Go to home
+          </Link>
         </div>
-      </div>
+      </main>
     )
   }
 
-  const step = steps[currentStep]
-  const progress = ((currentStep + 1) / steps.length) * 100
+  if (isRedirecting || isLoading) {
+    return (
+      <main className="min-h-screen bg-soft-hero flex items-center justify-center px-4 sm:px-6">
+        <div className="surface-card p-8 max-w-sm w-full text-center">
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+          <h1 className="text-xl font-bold text-dark mb-1">
+            {isRedirecting ? 'Almost there…' : 'Working on it…'}
+          </h1>
+          <p className="text-sm text-gray">
+            {isRedirecting ? 'Logging you in.' : 'Setting up your account.'}
+          </p>
+        </div>
+      </main>
+    )
+  }
+
+  const stepMeta = STEP_TITLES[currentStep]
+  const progress = ((currentStep + 1) / 5) * 100
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4 py-8">
-      <button
-        onClick={() => currentStep > 0 ? setCurrentStep(currentStep - 1) : router.back()}
-        className="absolute top-6 left-6 p-2 hover:bg-white rounded-full transition"
-        title="Go back"
-      >
-        <ArrowLeft size={24} className="text-primary" />
-      </button>
-      <Link href="/" className="absolute top-6 right-6 px-4 py-2 bg-white text-primary rounded-full font-semibold hover:shadow-lg transition">
-        Home
-      </Link>
-      <div className="w-full max-w-md">
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex justify-between mb-2">
-            <span className="text-sm font-semibold text-dark">Step {currentStep + 1} of {steps.length}</span>
-            <span className="text-sm text-gray">{Math.round(progress)}%</span>
-          </div>
-          <div className="h-2 bg-gray rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
+    <main className="min-h-screen bg-soft-hero flex flex-col">
+      <header className="container-page py-5 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-2 text-primary-deep font-semibold hover:text-primary transition"
+        >
+          <ArrowLeft size={18} />
+          Back
+        </button>
+        <Link href="/" className="text-sm font-semibold text-gray hover:text-primary-deep transition">
+          Home
+        </Link>
+      </header>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-          {/* Error */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
-              {error}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 pb-10">
+        <div className="w-full max-w-md animate-slide-up">
+          {/* Progress */}
+          <div className="mb-6">
+            <div className="flex justify-between mb-2">
+              <span className="text-sm font-semibold text-dark">Step {currentStep + 1} of 5</span>
+              <span className="text-sm text-gray-soft">{Math.round(progress)}%</span>
             </div>
-          )}
-          {/* Success */}
-          {successMessage && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm">
-              {successMessage}
+            <div className="h-1.5 bg-line rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
             </div>
-          )}
-
-          {/* Title */}
-          <h1 className="text-2xl font-bold text-dark mb-2">{step.title}</h1>
-          <p className="text-gray mb-6">{step.description}</p>
-
-          {/* Content */}
-          <div className="mb-8">
-            {step.content}
           </div>
 
-          {/* Navigation */}
-          <div className="flex gap-3">
-            {currentStep === 4 ? (
-              // Custom buttons for subscription step (final step)
-              <>
-                <button
-                  onClick={() => {
-                    handleNext('view-plans')
-                  }}
-                  className="flex-1 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
-                >
-                  Yes, Show Me Plans
-                </button>
-                <button
-                  onClick={() => {
-                    handleNext('none')
-                  }}
-                  className="flex-1 py-3 border-2 border-primary text-primary rounded-lg font-semibold hover:bg-mint transition"
-                >
-                  No, Create Account
-                </button>
-              </>
-            ) : (
-              // Standard previous/next buttons
-              <>
-                <button
-                  onClick={() => currentStep > 0 ? setCurrentStep(currentStep - 1) : router.back()}
-                  className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  Back
-                </button>
-                <Button
-                  onClick={handleNext}
-                  size="lg"
-                  className="flex-1"
-                  disabled={!isStepValid() || isLoading}
-                >
-                  {isLoading ? <Spinner /> : (currentStep === steps.length - 1 ? 'Create Account' : 'Next')}
-                </Button>
-              </>
+          {/* Card */}
+          <div className="surface-card p-6 sm:p-8">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-dark mb-1">{stepMeta.title}</h1>
+              <p className="text-sm text-gray">{stepMeta.description}</p>
+            </div>
+
+            {error && (
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 mb-5 text-sm text-red-800">
+                {error}
+              </div>
             )}
-          </div>
-        </div>
+            {successMessage && (
+              <div className="rounded-xl bg-mint border border-primary/20 px-4 py-3 mb-5 text-sm text-dark font-semibold">
+                {successMessage}
+              </div>
+            )}
 
-        {/* Step Indicators */}
-        <div className="flex justify-center gap-2">
-          {steps.map((_, i) => (
-            <div
-              key={i}
-              className={`h-2 rounded-full transition-all ${
-                i <= currentStep ? 'bg-primary w-4' : 'bg-gray w-2'
-              }`}
-            />
-          ))}
+            {currentStep === 0 && (
+              <div className="space-y-4">
+                <OAuthButtons
+                  intent="signup"
+                  redirectTo="/dashboard"
+                  onError={setError}
+                  onStart={(provider) => {
+                    setError('')
+                    setSuccessMessage(`Opening ${provider === 'apple' ? 'Apple' : 'Google'} sign up...`)
+                  }}
+                />
+
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-line" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-soft">
+                    or use email
+                  </span>
+                  <div className="h-px flex-1 bg-line" />
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="label-field">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-soft" size={18} />
+                    <input
+                      id="email"
+                      type="email"
+                      autoComplete="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="you@example.com"
+                      className="input-field pl-12"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="password" className="label-field">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-soft" size={18} />
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="••••••••"
+                      className="input-field pl-12 pr-12"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-soft hover:text-primary-deep transition"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {[
+                      { key: 'hasLength' as const, label: '8+ characters' },
+                      { key: 'hasNumber' as const, label: '1 number' },
+                      { key: 'hasLower' as const, label: '1 lowercase' },
+                      { key: 'hasUpper' as const, label: '1 uppercase' },
+                      { key: 'hasSpecial' as const, label: '1 special character' },
+                    ].map(({ key, label }) => {
+                      const ok = passwordRules[key]
+                      return (
+                        <li key={key} className="flex items-center gap-2 text-xs">
+                          {ok ? (
+                            <CheckCircle size={14} className="text-primary-deep flex-shrink-0" />
+                          ) : (
+                            <X size={14} className="text-gray-soft flex-shrink-0" />
+                          )}
+                          <span className={ok ? 'text-primary-deep font-semibold' : 'text-gray'}>{label}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+                <div>
+                  <label htmlFor="confirmPassword" className="label-field">Confirm password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-soft" size={18} />
+                    <input
+                      id="confirmPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                      placeholder="••••••••"
+                      className="input-field pl-12"
+                      required
+                    />
+                  </div>
+                  {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                    <p className="text-xs text-red-600 mt-1.5">Passwords don&rsquo;t match.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {currentStep === 1 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="firstName" className="label-field">First name</label>
+                    <input
+                      id="firstName"
+                      type="text"
+                      autoComplete="given-name"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                      placeholder="Alex"
+                      className="input-field"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lastName" className="label-field">Last name</label>
+                    <input
+                      id="lastName"
+                      type="text"
+                      autoComplete="family-name"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                      placeholder="Nguyen"
+                      className="input-field"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="phone" className="label-field">
+                    Phone <span className="text-gray-soft font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-soft" size={18} />
+                    <input
+                      id="phone"
+                      type="tel"
+                      autoComplete="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="04xx xxx xxx"
+                      className="input-field pl-12"
+                    />
+                  </div>
+                  <p className="text-xs text-gray mt-1.5">Helpful for delivery confirmations.</p>
+                </div>
+
+                <div>
+                  <label htmlFor="state" className="label-field">State</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-soft pointer-events-none" size={18} />
+                    <select
+                      id="state"
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      className="input-field pl-12 appearance-none"
+                      required
+                    >
+                      <option value="">Choose a state…</option>
+                      {AUSTRALIAN_STATES.map((state) => (
+                        <option key={state.code} value={state.code}>
+                          {state.name} ({state.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-mint/60 border border-primary/15 p-5 sm:p-6 text-center">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-soft mb-3">
+                    <Mail size={20} className="text-primary-deep" />
+                  </div>
+                  <p className="text-sm text-gray mb-1">We sent a 6-digit code to:</p>
+                  <p className="font-semibold text-dark break-all">{formData.email}</p>
+                </div>
+
+                <div>
+                  <label htmlFor="verificationCode" className="label-field">Verification code</label>
+                  <input
+                    id="verificationCode"
+                    type="text"
+                    inputMode="text"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    value={formData.verificationCode}
+                    onChange={(e) =>
+                      setFormData({ ...formData, verificationCode: e.target.value.toUpperCase() })
+                    }
+                    placeholder="000000"
+                    className="input-field text-center text-2xl font-bold tracking-[0.4em] uppercase"
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-soft mt-1.5">Code expires in 24 hours.</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  className="text-sm text-primary-deep font-semibold hover:underline w-full text-center"
+                >
+                  Didn&rsquo;t receive it? Resend code
+                </button>
+              </div>
+            )}
+
+            {currentStep === 3 && (
+              <div className="space-y-3">
+                {[
+                  { id: 'personal', title: 'Personal use', body: 'Your home laundry — clothes, towels, bedding.' },
+                  { id: 'business', title: 'Business use', body: 'Uniforms, hotel linens, gym towels, or salon laundry.' },
+                ].map((opt) => {
+                  const selected = formData.personalUse === opt.id
+                  return (
+                    <label
+                      key={opt.id}
+                      className={`flex items-start gap-4 p-4 rounded-2xl border-2 cursor-pointer transition ${
+                        selected ? 'border-primary bg-mint' : 'border-line hover:border-primary/40'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="usage"
+                        value={opt.id}
+                        checked={selected}
+                        onChange={() => setFormData({ ...formData, personalUse: opt.id })}
+                        className="w-4 h-4 mt-0.5 accent-primary"
+                      />
+                      <div>
+                        <p className="font-semibold text-dark">{opt.title}</p>
+                        <p className="text-sm text-gray">{opt.body}</p>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+
+            {currentStep === 4 && (
+              <div className="rounded-2xl border border-primary/20 bg-mint/50 p-5 sm:p-6">
+                <span className="pill mb-3">
+                  <Sparkles size={14} /> Free to join
+                </span>
+                <p className="font-bold text-dark text-lg mb-2">Earn rewards on every wash</p>
+                <p className="text-sm text-gray mb-4 leading-relaxed">
+                  Wash Club is our free loyalty program — earn 1 point per dollar, tier up automatically, and redeem credit at checkout. No membership fee, ever.
+                </p>
+                <ul className="space-y-2 text-sm">
+                  {['Earn on every order', 'Birthday bonuses', 'Members-only perks'].map((line) => (
+                    <li key={line} className="flex items-center gap-2 text-dark">
+                      <Gift size={14} className="text-primary-deep" /> {line}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex gap-3 mt-6">
+              {currentStep === 4 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleNext('none')}
+                    className="btn-outline flex-1"
+                  >
+                    No thanks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleNext('wash-club')}
+                    className="btn-primary flex-1"
+                  >
+                    Join Wash Club
+                    <ArrowRight size={16} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="btn-outline flex-1"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleNext()}
+                    disabled={!isStepValid() || isLoading}
+                    className="btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {currentStep === 1 ? 'Send code' : currentStep === 2 ? 'Verify' : 'Next'}
+                    <ArrowRight size={16} />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Step indicators */}
+          <div className="flex justify-center gap-1.5 mt-6">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className={`h-1.5 rounded-full transition-all ${
+                  i <= currentStep ? 'bg-primary w-6' : 'bg-line w-2'
+                }`}
+              />
+            ))}
+          </div>
+
+          <p className="text-center text-sm text-gray mt-6">
+            Already have an account?{' '}
+            <Link href="/auth/login" className="font-semibold text-primary-deep hover:underline">
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

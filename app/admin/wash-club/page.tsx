@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ChevronLeft, Search, Filter, MoreVertical, Gift } from 'lucide-react'
+import { ArrowLeft, Search, Gift, Sparkles } from 'lucide-react'
 import Link from 'next/link'
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
 
 interface WashClubMember {
   id: string
@@ -113,30 +115,38 @@ export default function WashClubPage() {
   }
 
   return (
-    <div className="min-h-screen bg-light">
+    <>
+    <Header />
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray/10">
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-4 mb-4">
-            <Link
-              href="/admin"
-              className="p-2 hover:bg-light rounded-lg transition"
-            >
-              <ChevronLeft size={24} className="text-dark" />
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-dark flex items-center gap-2">
-                <Gift size={32} className="text-primary" />
-                Wash Club Members
-              </h1>
-              <p className="text-gray text-sm">Manage loyalty program members and credits</p>
-            </div>
-          </div>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-3 hover:text-primary"
+          >
+            <ArrowLeft size={14} />
+            Control center
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-950 inline-flex items-center gap-2">
+            <Gift size={26} className="text-primary-deep" />
+            Wash Club members
+          </h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Free loyalty program. Members earn points and credits on every order — there is no paid membership.
+          </p>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="rounded-lg border border-primary/15 bg-mint/40 p-4 mb-6 flex gap-2 text-sm text-dark">
+          <Sparkles size={16} className="flex-shrink-0 mt-0.5 text-primary-deep" />
+          <span>
+            Wash Club is free to join — there are no membership fees or paid tiers. Tier names (Bronze / Silver / Gold / Platinum) reflect cumulative spend only.
+          </span>
+        </div>
+
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-red-700">
             {error}
@@ -200,7 +210,6 @@ export default function WashClubPage() {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-dark">Total Spend</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-dark">Status</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-dark">Joined</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-dark">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -232,11 +241,6 @@ export default function WashClubPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray">
                       {new Date(member.join_date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <button className="p-2 hover:bg-light rounded-lg transition">
-                        <MoreVertical size={18} className="text-gray" />
-                      </button>
                     </td>
                   </tr>
                 ))}
@@ -272,5 +276,7 @@ export default function WashClubPage() {
         </div>
       </div>
     </div>
+    <Footer />
+    </>
   )
 }

@@ -7,7 +7,8 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { ChevronRight, Mail, Phone, MapPin, CheckCircle, X, Clock, AlertCircle } from 'lucide-react'
+import { ChevronRight, Mail, Phone, CheckCircle, X, AlertCircle, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 import Spinner from '@/components/Spinner'
 
 interface Inquiry {
@@ -184,11 +185,20 @@ export default function InquiriesManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-light flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-12">
-        <h1 className="text-4xl font-bold text-dark mb-2">Employee Inquiries</h1>
-        <p className="text-gray mb-8">Review and verify employee applications</p>
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-10">
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-3 hover:text-primary"
+        >
+          <ArrowLeft size={14} />
+          Control center
+        </Link>
+        <h1 className="text-3xl sm:text-4xl font-bold text-dark mb-1">Pro inquiries</h1>
+        <p className="text-sm text-gray mb-8">
+          Inbound Pro applications. Review the work-rights checklist, ID document, and notes — Pros are independent contractors paid commission per completed order.
+        </p>
 
         {/* Status Filter */}
         <div className="flex gap-2 mb-8 flex-wrap">
@@ -265,7 +275,7 @@ export default function InquiriesManagement() {
         {/* Inquiry Detail Modal */}
         {selectedInquiry && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl max-h-96 overflow-y-auto">
+            <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
                   <div>
@@ -422,14 +432,26 @@ export default function InquiriesManagement() {
                         Cancel
                       </button>
                       <button
-                        onClick={handleRejectInquiry}
+                        onClick={() => {
+                          if (!rejectionReason.trim()) {
+                            alert('Please add a rejection reason first.')
+                            return
+                          }
+                          if (window.confirm(`Reject inquiry from ${selectedInquiry.firstName} ${selectedInquiry.lastName}? They will be notified.`)) {
+                            handleRejectInquiry()
+                          }
+                        }}
                         className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition disabled:opacity-50"
                         disabled={actionLoading}
                       >
                         {actionLoading ? 'Processing...' : 'Reject'}
                       </button>
                       <Button
-                        onClick={handleApproveInquiry}
+                        onClick={() => {
+                          if (window.confirm(`Approve inquiry from ${selectedInquiry.firstName} ${selectedInquiry.lastName} and onboard them as a Pro?`)) {
+                            handleApproveInquiry()
+                          }
+                        }}
                         disabled={actionLoading}
                       >
                         {actionLoading ? 'Processing...' : 'Approve'}

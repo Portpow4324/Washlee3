@@ -187,9 +187,9 @@ export function generateOfferLetterHTML(data: OfferLetterData): string {
         
         <p><strong>Compensation & Payment:</strong></p>
         <ul class="terms-list">
-            <li>Earnings based on completed laundry jobs: \$3.00 per kilogram</li>
-            <li>Service add-ons available: hang dry, delicates care, comforter service, stain treatment</li>
-            <li>Subscription tiers available: Starter, Growth, and Premium</li>
+            <li>Earnings are commission-based per completed order, with the payout shown before acceptance</li>
+            <li>Customer service options include standard wash & fold, express same-day, delicates / special care, hang dry, and protection add-ons</li>
+            <li>Wash Club is a free customer loyalty program, not a paid subscription or Pro tier</li>
             <li>Weekly payments via bank transfer</li>
             <li>Detailed earnings dashboard and transaction history</li>
         </ul>

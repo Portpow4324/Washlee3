@@ -6,16 +6,98 @@ import { supabase } from '@/lib/supabaseClient'
 import { createCustomerProfile } from '@/lib/userManagement'
 import Spinner from '@/components/Spinner'
 
+const ATTRIBUTION_KEYS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_content',
+  'utm_term',
+  'promo',
+  'ref',
+  'channel',
+  'campaign_id',
+  'landing_page',
+  'first_utm_source',
+  'first_utm_medium',
+  'first_utm_campaign',
+] as const
+
+function safeRedirectPath(input?: string | null) {
+  if (!input) return '/dashboard'
+  if (!input.startsWith('/') || input.startsWith('//')) return '/dashboard'
+  if (input.startsWith('/auth/callback')) return '/dashboard'
+  return input
+}
+
 function AuthCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
-  const [message, setMessage] = useState('Confirming your email...')
+  const [successTitle, setSuccessTitle] = useState('All set!')
+  const [message, setMessage] = useState('Completing your sign-in...')
 
   useEffect(() => {
+    const getCallbackAttribution = () => {
+      const result: Record<string, string> = {}
+      ATTRIBUTION_KEYS.forEach((key) => {
+        const value = searchParams?.get(key)
+        if (value) result[key] = value
+      })
+      return result
+    }
+
+    const ensureOAuthProfile = async (provider: string | null, intent: string | null) => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        throw new Error('OAuth session was created but no access token was available.')
+      }
+
+      setMessage('Preparing your Washlee profile...')
+      const response = await fetch('/api/auth/oauth-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          provider,
+          intent,
+          marketingAttribution: getCallbackAttribution(),
+        }),
+      })
+
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || result.success === false) {
+        throw new Error(result.error || 'Could not prepare your Washlee profile.')
+      }
+    }
+
     const handleCallback = async () => {
       try {
-        console.log('[AuthCallback] Processing email verification...')
+        const code = searchParams?.get('code')
+        const provider = searchParams?.get('provider')
+        const intent = searchParams?.get('intent') || 'login'
+        const redirect = safeRedirectPath(searchParams?.get('redirect'))
+
+        if (code) {
+          console.log('[AuthCallback] Processing OAuth code callback...')
+          setMessage(`Completing ${provider || 'OAuth'} ${intent}...`)
+
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+          if (exchangeError) throw exchangeError
+
+          if (!data.session?.user) {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session?.user) throw new Error('No session found after OAuth callback.')
+          }
+
+          await ensureOAuthProfile(provider, intent)
+          setStatus('success')
+          setSuccessTitle('You are signed in!')
+          setMessage('You are signed in. Taking you to Washlee...')
+          setTimeout(() => router.replace(redirect), 700)
+          return
+        }
 
         // Get token from URL hash
         const hash = window.location.hash.substring(1)
@@ -26,7 +108,7 @@ function AuthCallbackContent() {
         if (!token_hash || type !== 'signup') {
           console.log('[AuthCallback] No valid token found, checking for existing session...')
           
-          // Check if Supabase already has a session (auto-created by magic link)
+          // Check if Supabase already has a session (OAuth implicit flow or magic link)
           const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
           if (sessionError || !session) {
@@ -34,6 +116,15 @@ function AuthCallbackContent() {
           }
 
           console.log('[AuthCallback] ✓ Valid session found:', session.user.id)
+          if (provider || session.user.app_metadata?.provider) {
+            await ensureOAuthProfile(provider || String(session.user.app_metadata?.provider || 'oauth'), intent)
+            setStatus('success')
+            setSuccessTitle('You are signed in!')
+            setMessage('You are signed in. Taking you to Washlee...')
+            setTimeout(() => router.replace(redirect), 700)
+            return
+          }
+
           await handleVerifiedSession(session.user)
           return
         }
@@ -68,8 +159,8 @@ function AuthCallbackContent() {
         setMessage('Creating your profile...')
 
         // Get user metadata from signup
-        const firstName = user.user_metadata?.firstName || 'User'
-        const lastName = user.user_metadata?.lastName || ''
+        const firstName = user.user_metadata?.first_name || user.user_metadata?.firstName || 'User'
+        const lastName = user.user_metadata?.last_name || user.user_metadata?.lastName || ''
         const phone = user.user_metadata?.phone || ''
         const state = user.user_metadata?.state || ''
 
@@ -96,6 +187,7 @@ function AuthCallbackContent() {
         }
 
         setStatus('success')
+        setSuccessTitle('Email confirmed!')
         setMessage('Email confirmed! Completing your profile setup...')
 
         setTimeout(() => {
@@ -125,7 +217,7 @@ function AuthCallbackContent() {
         {status === 'success' && (
           <>
             <div className="text-6xl mb-4">✅</div>
-            <p className="text-lg font-bold text-primary mb-2">Email Confirmed!</p>
+            <p className="text-lg font-bold text-primary mb-2">{successTitle}</p>
             <p className="text-gray">{message}</p>
           </>
         )}

@@ -17,11 +17,13 @@ export default function CookieBanner() {
 
   const handleAccept = () => {
     localStorage.setItem('cookieConsent', 'accepted')
+    window.dispatchEvent(new Event('washlee-cookie-consent-changed'))
     setIsVisible(false)
   }
 
   const handleReject = () => {
     localStorage.setItem('cookieConsent', 'rejected')
+    window.dispatchEvent(new Event('washlee-cookie-consent-changed'))
     setIsVisible(false)
   }
 

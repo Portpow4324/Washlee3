@@ -1,98 +1,80 @@
 'use client'
 
-import Button from '@/components/Button'
 import Link from 'next/link'
-import { ArrowLeft, Users, Briefcase } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { ArrowLeft, ArrowRight, Users, Briefcase } from 'lucide-react'
 
-export default function SigninChoice() {
-  const router = useRouter()
-  
-  const handleBackClick = () => {
-    router.push('/')
-  }
-
+export default function SignInChoicePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-mint to-white flex flex-col">
-      {/* Header Navigation */}
-      <div className="px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
-        <button
-          onClick={handleBackClick}
-          className="p-2 hover:bg-white hover:rounded-full transition"
-          title="Go back to home"
+    <main className="min-h-screen bg-soft-hero flex flex-col">
+      <header className="container-page py-5 flex items-center justify-between">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-primary-deep font-semibold hover:text-primary transition"
         >
-          <ArrowLeft size={24} className="text-primary" />
-        </button>
-        <Link href="/" className="px-4 py-2 bg-white text-primary rounded-full font-semibold hover:shadow-lg transition">
-          Home
+          <ArrowLeft size={18} />
+          Back to home
         </Link>
-      </div>
+        <Link href="/auth/signup-customer" className="text-sm font-semibold text-gray hover:text-primary-deep transition">
+          Sign up
+        </Link>
+      </header>
 
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8">
-        <div className="w-full max-w-4xl">
-          {/* Title */}
-          <div className="text-center mb-16">
-            <h1 className="text-4xl sm:text-5xl font-bold text-dark mb-4">
-              Sign In to Washlee
-            </h1>
-            <p className="text-xl text-gray">
-              Choose how you'd like to get started
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 pb-10">
+        <div className="w-full max-w-3xl animate-slide-up">
+          <div className="text-center mb-10">
+            <h1 className="h2 text-dark mb-3">Sign in to Washlee</h1>
+            <p className="text-gray text-base sm:text-lg max-w-md mx-auto">
+              Choose how you want to sign in. Your customer and Pro accounts can share an email.
             </p>
           </div>
 
-          {/* Two Choice Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Customer Sign In */}
-            <Link href="/auth/login">
-              <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 h-full flex flex-col items-center justify-center cursor-pointer hover:scale-105">
-                <div className="bg-mint rounded-full p-6 mb-6">
-                  <Users size={48} className="text-primary" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Link
+              href="/auth/login"
+              className="group surface-card p-7 sm:p-8 hover:border-primary hover:shadow-glow transition-all"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-12 h-12 rounded-2xl bg-mint flex items-center justify-center">
+                  <Users size={22} className="text-primary-deep" />
                 </div>
-                <h2 className="text-2xl font-bold text-dark mb-3 text-center">
-                  Customer Sign In
-                </h2>
-                <p className="text-gray text-center mb-6">
-                  Access your laundry orders, track pickups, and manage your preferences.
-                </p>
-                <div className="mt-auto">
-                  <Button variant="primary" size="lg">
-                    Sign In
-                  </Button>
-                </div>
+                <ArrowRight size={20} className="text-gray-soft group-hover:text-primary-deep transition" />
               </div>
+              <h2 className="text-xl font-bold text-dark mb-1.5">Customer sign in</h2>
+              <p className="text-sm text-gray leading-relaxed">
+                Book pickups, track orders, manage saved addresses, and earn Wash Club points.
+              </p>
             </Link>
 
-            {/* Washlee Pro Sign In */}
-            <Link href="/auth/employee-signin">
-              <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 h-full flex flex-col items-center justify-center cursor-pointer hover:scale-105">
-                <div className="bg-accent rounded-full p-6 mb-6">
-                  <Briefcase size={48} className="text-primary" />
+            <Link
+              href="/auth/employee-signin"
+              className="group surface-card p-7 sm:p-8 hover:border-primary hover:shadow-glow transition-all"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary-deep flex items-center justify-center">
+                  <Briefcase size={22} className="text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-dark mb-3 text-center">
-                  Washlee Pro Sign In
-                </h2>
-                <p className="text-gray text-center mb-6">
-                  Access your professional dashboard, view available jobs, and manage your earnings.
-                </p>
-                <div className="mt-auto">
-                  <Button variant="primary" size="lg">
-                    Sign In
-                  </Button>
-                </div>
+                <ArrowRight size={20} className="text-gray-soft group-hover:text-primary-deep transition" />
               </div>
+              <h2 className="text-xl font-bold text-dark mb-1.5">Pro sign in</h2>
+              <p className="text-sm text-gray leading-relaxed">
+                Accept jobs, track earnings, and manage your pickups. Use your 6-digit Pro ID.
+              </p>
             </Link>
           </div>
 
-          {/* Footer Note */}
-          <p className="text-center text-gray text-sm mt-12">
-            Don't have an account?{' '}
-            <Link href="/auth/signup" className="text-primary font-semibold hover:underline">
-              Sign up here
+          <p className="text-center text-sm text-gray mt-8">
+            New to Washlee?{' '}
+            <Link href="/auth/signup-customer" className="text-primary-deep font-semibold hover:underline">
+              Create a customer account
+            </Link>{' '}
+            or{' '}
+            <Link href="/pro" className="text-primary-deep font-semibold hover:underline">
+              apply to become a Pro
             </Link>
+            .
           </p>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

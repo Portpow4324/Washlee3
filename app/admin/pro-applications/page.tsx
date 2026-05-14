@@ -9,7 +9,7 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Spinner from '@/components/Spinner'
 import {
-  ChevronRight,
+  ArrowLeft,
   Mail,
   Phone,
   MapPin,
@@ -21,11 +21,10 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
-  Send,
   Shield,
   FileText,
-  DollarSign,
-  Image as ImageIcon
+  Hash,
+  Image as ImageIcon,
 } from 'lucide-react'
 
 interface WorkVerification {
@@ -299,13 +298,17 @@ export default function ProApplicationsPage() {
         {/* Header */}
         <div className="mb-8">
           <button
+            type="button"
             onClick={() => router.push('/admin')}
-            className="text-primary hover:text-primary/80 font-semibold mb-4 flex items-center gap-2"
+            className="inline-flex items-center gap-2 text-primary-deep hover:text-primary font-semibold text-sm mb-3"
           >
-            ← Back to Admin
+            <ArrowLeft size={14} />
+            Control center
           </button>
-          <h1 className="text-4xl font-bold text-dark mb-2">Pro Applications</h1>
-          <p className="text-gray">Review and approve service provider applications</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-dark mb-1">Pro applications</h1>
+          <p className="text-gray text-sm">
+            Review applicants, run the verification checklist, and approve or reject. Pros are independent contractors paid commission per completed order.
+          </p>
         </div>
 
         {/* Success Message */}
@@ -561,7 +564,7 @@ export default function ProApplicationsPage() {
                         {/* Employee ID Generation */}
                         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                           <div className="flex items-center gap-2 mb-3">
-                            <DollarSign size={18} className="text-blue-600" />
+                            <Hash size={18} className="text-blue-600" />
                             <h5 className="font-bold text-blue-900">Employee ID</h5>
                           </div>
                           {employeeIdGenerated ? (

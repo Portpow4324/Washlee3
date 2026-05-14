@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
+import { isAdminPasswordConfigured } from '@/lib/security/adminSession'
 
 type MonitorStatus = 'ok' | 'warning' | 'critical'
 
@@ -145,17 +146,17 @@ async function runChecks() {
 
   await resolveAlert('Admin login should move to server-side verification')
 
-  if (!process.env.ADMIN_PASSWORD) {
+  if (!isAdminPasswordConfigured()) {
     await createAlertOnce({
       severity: 'critical',
       category: 'security',
       title: 'Server-side admin password is not configured',
-      evidence: { requiredEnv: 'ADMIN_PASSWORD' },
+      evidence: { requiredEnv: 'ADMIN_PASSWORD or ADMIN_PASSWORD_HASH' },
     })
   } else {
     await recordRun({
       checkName: 'config_admin_password',
-      target: 'ADMIN_PASSWORD',
+      target: process.env.ADMIN_PASSWORD_HASH ? 'ADMIN_PASSWORD_HASH' : 'ADMIN_PASSWORD',
       status: 'ok',
     })
     await resolveAlert('Server-side admin password is not configured')

@@ -4,10 +4,18 @@ import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Button from '@/components/Button'
-import Card from '@/components/Card'
 import Footer from '@/components/Footer'
-import { DollarSign, Package, TrendingUp, Clock, AlertCircle, CheckCircle, Briefcase, Target, Award } from 'lucide-react'
+import Link from 'next/link'
+import {
+  DollarSign,
+  Package,
+  Briefcase,
+  ArrowRight,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Sparkles,
+} from 'lucide-react'
 
 interface Order {
   id: string
@@ -23,19 +31,40 @@ interface Order {
 interface Stats {
   todayEarnings: number
   activeOrders: number
-  totalRating: number
   availableJobs: number
 }
 
-export default function EmployeeDashboard() {
+const STATUS_BADGE: Record<string, string> = {
+  completed: 'bg-emerald-100 text-emerald-800',
+  'in-progress': 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-blue-100 text-blue-800',
+  picked_up: 'bg-blue-100 text-blue-800',
+  washing: 'bg-blue-100 text-blue-800',
+  out_for_delivery: 'bg-blue-100 text-blue-800',
+  'pending-pickup': 'bg-amber-100 text-amber-800',
+  pending_payment: 'bg-amber-100 text-amber-800',
+  cancelled: 'bg-red-100 text-red-700',
+}
+
+function formatStatus(status: string): string {
+  const cleaned = status.replace(/[_-]/g, ' ')
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+}
+
+function statusIcon(status: string) {
+  if (status === 'completed') return CheckCircle
+  if (status === 'pending-pickup' || status === 'pending_payment') return AlertCircle
+  return Clock
+}
+
+export default function EmployeeDashboardPage() {
   const { user, userData, loading } = useAuth()
   const router = useRouter()
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
   const [stats, setStats] = useState<Stats>({
     todayEarnings: 0,
     activeOrders: 0,
-    totalRating: 4.9,
-    availableJobs: 0
+    availableJobs: 0,
   })
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
   const [dataLoading, setDataLoading] = useState(true)
@@ -43,50 +72,42 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     if (hasCheckedAuth) return
     if (loading === true) return
-    
+
     setHasCheckedAuth(true)
-    
-    // Check if user is authenticated
+
     if (!user) {
       router.push('/auth/employee-signin')
       return
     }
 
-    // Check if employee mode is active
     const employeeMode = localStorage.getItem('employeeMode')
     if (!employeeMode) {
-      // Set employee mode flag when accessing employee dashboard
       localStorage.setItem('employeeMode', 'true')
       sessionStorage.setItem('employeeMode', 'true')
     }
 
-    // Fetch real data from Supabase
     const fetchData = async () => {
       try {
         setDataLoading(true)
-        
-        // Fetch user's pro_earnings
+
         const { data: earningsData } = await supabase
           .from('pro_earnings')
           .select('earnings_amount, created_at')
           .eq('pro_id', user.id)
-        
-        // Get today's earnings (created_at is today)
+
         const today = new Date().toDateString()
         const todayEarnings = (earningsData || [])
-          .filter((e: any) => new Date(e.created_at).toDateString() === today)
-          .reduce((sum: number, e: any) => sum + (e.earnings_amount || 0), 0)
-        
-        // Fetch available jobs (pro_jobs with no pro_id assigned and status='available')
+          .filter((e: { created_at: string }) => new Date(e.created_at).toDateString() === today)
+          .reduce((sum: number, e: { earnings_amount?: number }) => sum + (e.earnings_amount || 0), 0)
+
         const { data: jobsData } = await supabase
           .from('pro_jobs')
           .select('id, status')
           .is('pro_id', null)
           .eq('status', 'available')
-        
+
         const availableJobs = (jobsData || []).length
-        
-        // Fetch user's accepted orders (orders with pro_id = user.id) - both active and recent
+
         const { data: ordersData } = await supabase
           .from('orders')
           .select(`
@@ -102,57 +123,68 @@ export default function EmployeeDashboard() {
           .eq('pro_id', user.id)
           .order('created_at', { ascending: false })
           .limit(10)
-        
-        // Count active orders (non-completed)
-        const activeOrders = (ordersData || []).filter((o: any) => o.status !== 'completed').length
-        
-        // Transform recent orders for display (show both active and recent completed)
-        const transformedOrders: Order[] = (ordersData || []).slice(0, 5).map((order: any) => {
-          const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items
-          const weight = items?.weight || '0'
-          
+
+        const activeOrders = (ordersData || []).filter(
+          (o: { status: string }) => o.status !== 'completed'
+        ).length
+
+        const transformedOrders: Order[] = (ordersData || []).slice(0, 5).map((order: {
+          id: string
+          status: string
+          created_at: string
+          total_price?: number
+          items?: unknown
+          pickup_address?: string
+          users?: { name?: string } | { name?: string }[] | null
+        }) => {
+          let weight: string | number = '0'
+          try {
+            const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items
+            weight = (items as { weight?: string | number })?.weight ?? '0'
+          } catch {
+            weight = '0'
+          }
+
+          const usersField = order.users
+          const customer = Array.isArray(usersField)
+            ? usersField[0]?.name || 'Unknown'
+            : usersField?.name || 'Unknown'
+
           return {
             id: order.id,
-            customer: order.users?.name || 'Unknown',
+            customer,
             status: order.status,
             weight: `${weight} kg`,
-            pickup: new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            pickup: new Date(order.created_at).toLocaleDateString('en-AU', {
+              month: 'short',
+              day: 'numeric',
+            }),
             earnings: `$${(order.total_price || 0).toFixed(2)}`,
-            address: order.pickup_address || 'N/A',
-            orderId: order.id
+            address: order.pickup_address || '—',
+            orderId: order.id,
           }
         })
-        
+
         setRecentOrders(transformedOrders)
-        setStats({
-          todayEarnings,
-          activeOrders,
-          totalRating: 4.9,
-          availableJobs
-        })
+        setStats({ todayEarnings, activeOrders, availableJobs })
       } catch (error) {
-        console.error('Error fetching data:', error)
-        // Keep default values on error
+        console.error('Error fetching dashboard data:', error)
       } finally {
         setDataLoading(false)
       }
     }
-    
+
     fetchData()
-    
-    // Auto-refresh dashboard every 10 seconds
     const refreshInterval = setInterval(fetchData, 10000)
-    
     return () => clearInterval(refreshInterval)
   }, [user, loading, router, hasCheckedAuth])
 
   if (loading || !hasCheckedAuth) {
     return (
-      <div className="min-h-screen bg-light flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full animate-pulse mx-auto mb-4"></div>
-          <p className="text-dark font-semibold">Loading your dashboard...</p>
-          <p className="text-gray text-sm mt-2">Fetching your orders and jobs</p>
+      <div className="min-h-screen bg-soft-mint flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-gray">
+          <div className="animate-spin h-8 w-8 rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm">Loading your dashboard…</p>
         </div>
       </div>
     )
@@ -160,224 +192,183 @@ export default function EmployeeDashboard() {
 
   if (!user) return null
 
-  // Build stats array from real data
-  const statsArray = [
+  const firstName = userData?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'
+
+  const statTiles = [
     {
-      label: 'Today\'s Earnings',
+      label: 'Today’s earnings',
       value: `$${stats.todayEarnings.toFixed(2)}`,
       icon: DollarSign,
-      color: 'from-green-500 to-emerald-500',
-      change: '+12%'
+      hint: stats.todayEarnings === 0 ? 'No completed jobs yet today' : 'Commission from completed jobs',
     },
     {
-      label: 'Active Orders',
+      label: 'Active orders',
       value: stats.activeOrders.toString(),
       icon: Package,
-      color: 'from-blue-500 to-cyan-500',
-      change: '+2 new'
+      hint: stats.activeOrders === 0 ? 'Nothing in progress' : 'In your queue right now',
     },
     {
-      label: 'Total Rating',
-      value: '4.9',
-      icon: Award,
-      color: 'from-yellow-500 to-orange-500',
-      change: '142 reviews'
-    },
-    {
-      label: 'Available Jobs',
+      label: 'Available jobs',
       value: stats.availableJobs.toString(),
       icon: Briefcase,
-      color: 'from-purple-500 to-pink-500',
-      change: '+5 nearby'
-    }
+      hint: stats.availableJobs === 0 ? 'No jobs in your area right now' : 'Open jobs near you',
+    },
   ]
 
-  const displayOrders = dataLoading ? [] : recentOrders
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-500/20 text-green-400'
-      case 'in-progress':
-        return 'bg-blue-500/20 text-blue-400'
-      case 'pending-pickup':
-        return 'bg-yellow-500/20 text-yellow-400'
-      default:
-        return 'bg-gray-500/20 text-gray-400'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return CheckCircle
-      case 'in-progress':
-        return Clock
-      case 'pending-pickup':
-        return AlertCircle
-      default:
-        return Package
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-light flex flex-col">
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-8">
-        {/* Welcome Section */}
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold text-dark">
-            Welcome back, {userData?.name || user?.email?.split('@')[0]}! 👋
+    <div className="min-h-screen bg-soft-mint flex flex-col">
+      <main className="flex-1 container-page py-10 space-y-8">
+        <header className="space-y-1">
+          <span className="pill">
+            <Sparkles size={14} /> Pro dashboard
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-bold text-dark mt-3">
+            Welcome back, {firstName}.
           </h1>
-          <p className="text-gray text-lg">Here's your performance summary for today</p>
-        </div>
+          <p className="text-gray text-sm sm:text-base">
+            Independent contractor — paid commission per completed order.
+          </p>
+        </header>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsArray.map((stat) => {
-          const Icon = stat.icon
-          return (
-            <Card key={stat.label} className="bg-mint hover:shadow-md border-primary/20">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2 flex-1">
-                  <p className="text-gray text-sm font-semibold">{stat.label}</p>
-                  <p className="text-3xl font-bold text-dark">{stat.value}</p>
-                  <p className="text-xs text-primary font-semibold">{stat.change}</p>
-                </div>
-                <div className={`p-3 bg-gradient-to-br ${stat.color} rounded-lg`}>
-                  <Icon size={24} className="text-white" />
-                </div>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
-
-      {/* Recent Orders & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Orders */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Package size={28} className="text-primary" />
-              Recent Orders
-            </h2>
-            <Button variant="outline" size="sm" onClick={() => router.push('/employee/orders')}>
-              View All
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {displayOrders.map((order) => {
-              const StatusIcon = getStatusIcon(order.status)
-              return (
-                <Card
-                  key={order.id}
-                  className="bg-white border-l-4 hover:shadow-md transition cursor-pointer"
-                  hoverable
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-start gap-4 flex-1">
-                      <div className={`p-3 rounded-lg ${getStatusColor(order.status)}`}>
-                        <StatusIcon size={20} />
-                      </div>
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-dark">{order.id}</p>
-                          <span className={`px-2 py-1 rounded text-xs font-semibold capitalize ${getStatusColor(order.status)}`}>
-                            {order.status.replace('-', ' ')}
-                          </span>
-                        </div>
-                        <p className="text-gray text-sm">{order.customer} • {order.weight}</p>
-                        <p className="text-gray text-xs">{order.address}</p>
-                      </div>
-                    </div>
-                    <div className="text-right space-y-1">
-                      <p className="font-bold text-primary text-lg">{order.earnings}</p>
-                      <p className="text-gray text-xs">{order.pickup}</p>
-                    </div>
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {statTiles.map((stat) => {
+            const Icon = stat.icon
+            return (
+              <div key={stat.label} className="surface-card p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs uppercase tracking-wider font-bold text-gray-soft">
+                    {stat.label}
+                  </p>
+                  <div className="w-9 h-9 rounded-xl bg-mint flex items-center justify-center">
+                    <Icon size={16} className="text-primary-deep" />
                   </div>
-                </Card>
-              )
-            })}
-          </div>
+                </div>
+                <p className="text-3xl font-bold text-dark">{stat.value}</p>
+                <p className="text-xs text-gray mt-1">{stat.hint}</p>
+              </div>
+            )
+          })}
         </div>
 
-        {/* Quick Actions */}
-        <div className="space-y-4">
-          <h2 className="text-2xl font-bold text-dark flex items-center gap-2">
-            <TrendingUp size={28} className="text-primary" />
-            Quick Actions
-          </h2>
-
-          <div className="space-y-3">
-            <Button
-              onClick={() => router.push('/employee/jobs')}
-              className="w-full justify-start gap-3 bg-gradient-to-r from-primary to-accent hover:shadow-lg"
-              size="lg"
-            >
-              <Briefcase size={20} />
-              <div className="text-left">
-                <p className="font-semibold">Find Jobs</p>
-                <p className="text-xs opacity-90">{stats.availableJobs} available nearby</p>
-              </div>
-            </Button>
-
-            <Button
-              onClick={() => router.push('/employee/earnings')}
-              variant="outline"
-              className="w-full justify-start gap-3"
-              size="lg"
-            >
-              <DollarSign size={20} />
-              <div className="text-left">
-                <p className="font-semibold">View Earnings</p>
-                <p className="text-xs opacity-90">This week's breakdown</p>
-              </div>
-            </Button>
-
-            <Button
-              onClick={() => router.push('/employee/settings')}
-              variant="outline"
-              className="w-full justify-start gap-3"
-              size="lg"
-            >
-              <Target size={20} />
-              <div className="text-left">
-                <p className="font-semibold">Update Profile</p>
-                <p className="text-xs opacity-90">Availability & docs</p>
-              </div>
-            </Button>
-          </div>
-
-          {/* Performance Card */}
-          <Card className="bg-gradient-to-br from-primary/20 to-accent/20 border-primary/40">
-            <div className="space-y-3">
-              <h3 className="font-bold text-dark flex items-center gap-2">
-                <Award size={20} className="text-primary" />
-                Your Performance
-              </h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray">Completion Rate</span>
-                  <span className="text-primary font-semibold">98%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-gradient-to-r from-primary to-accent rounded-full h-2" style={{ width: '95%' }}></div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray">On-Time Delivery</span>
-                  <span className="text-primary font-semibold">95%</span>
-                </div>
-                <div className="w-full bg-gray rounded-full h-2">
-                  <div className="bg-gradient-to-r from-primary to-accent rounded-full h-2" style={{ width: '95%' }}></div>
-                </div>
-              </div>
+        {/* Recent + quick actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <section className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-dark inline-flex items-center gap-2">
+                <Package size={20} className="text-primary-deep" />
+                Recent orders
+              </h2>
+              <Link href="/employee/orders" className="text-sm font-semibold text-primary-deep hover:underline">
+                View all
+              </Link>
             </div>
-          </Card>
+
+            {dataLoading ? (
+              <div className="surface-card p-10 text-center text-gray">
+                <div className="animate-spin h-6 w-6 rounded-full border-2 border-primary border-t-transparent mx-auto mb-3" />
+                <p className="text-sm">Loading orders…</p>
+              </div>
+            ) : recentOrders.length === 0 ? (
+              <div className="surface-card p-10 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-mint mb-3">
+                  <Package size={20} className="text-primary-deep" />
+                </div>
+                <h3 className="font-bold text-dark mb-1">No orders yet</h3>
+                <p className="text-sm text-gray mb-5">Accept your first job to see it here.</p>
+                <Link href="/employee/jobs" className="btn-primary inline-flex">
+                  Browse jobs
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {recentOrders.map((order) => {
+                  const Icon = statusIcon(order.status)
+                  const badge = STATUS_BADGE[order.status] ?? 'bg-line text-dark'
+                  return (
+                    <li key={order.id} className="surface-card p-5">
+                      <div className="flex items-start gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${badge}`}>
+                          <Icon size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-mono text-sm font-semibold text-dark">{order.id.slice(0, 8)}</p>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${badge}`}>
+                              {formatStatus(order.status)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray">
+                            {order.customer} · {order.weight}
+                          </p>
+                          {order.address && order.address !== '—' && (
+                            <p className="text-xs text-gray-soft mt-0.5 truncate">{order.address}</p>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-bold text-primary-deep">{order.earnings}</p>
+                          <p className="text-xs text-gray-soft mt-0.5">{order.pickup}</p>
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+
+          <aside className="space-y-4">
+            <h2 className="text-xl font-bold text-dark">Quick actions</h2>
+            <div className="space-y-3">
+              <Link
+                href="/employee/jobs"
+                className="surface-card p-5 flex items-center gap-4 hover:border-primary transition group"
+              >
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary-deep flex items-center justify-center flex-shrink-0">
+                  <Briefcase size={18} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-dark">Find jobs</p>
+                  <p className="text-xs text-gray">
+                    {stats.availableJobs > 0
+                      ? `${stats.availableJobs} open in your area`
+                      : 'Open the feed'}
+                  </p>
+                </div>
+                <ArrowRight size={16} className="text-gray-soft group-hover:text-primary-deep transition" />
+              </Link>
+
+              <Link
+                href="/employee/earnings"
+                className="surface-card p-5 flex items-center gap-4 hover:border-primary transition group"
+              >
+                <div className="w-11 h-11 rounded-xl bg-mint flex items-center justify-center flex-shrink-0">
+                  <DollarSign size={18} className="text-primary-deep" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-dark">View earnings</p>
+                  <p className="text-xs text-gray">Weekly &amp; payout history</p>
+                </div>
+                <ArrowRight size={16} className="text-gray-soft group-hover:text-primary-deep transition" />
+              </Link>
+
+              <Link
+                href="/employee/settings"
+                className="surface-card p-5 flex items-center gap-4 hover:border-primary transition group"
+              >
+                <div className="w-11 h-11 rounded-xl bg-mint flex items-center justify-center flex-shrink-0">
+                  <Sparkles size={18} className="text-primary-deep" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-dark">Update profile</p>
+                  <p className="text-xs text-gray">Availability &amp; documents</p>
+                </div>
+                <ArrowRight size={16} className="text-gray-soft group-hover:text-primary-deep transition" />
+              </Link>
+            </div>
+          </aside>
         </div>
-      </div>
       </main>
       <Footer />
     </div>

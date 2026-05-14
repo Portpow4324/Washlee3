@@ -1,254 +1,373 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { sendProAcceptedJobEmail } from '@/lib/emailMarketing'
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { sendProAcceptedJobEmail } from "@/lib/emailMarketing";
+import { findLinkedEmployee } from "@/lib/mobileBackend";
+import {
+  expireStaleAvailableJobs,
+  loadAvailabilityByEmployee,
+  matchEmployeeToJob,
+  parseRecord,
+  readNumber as readMatchNumber,
+  warnJobsNearExpiry,
+} from "@/lib/proMatching";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
-type JsonRecord = Record<string, unknown>
+type JsonRecord = Record<string, unknown>;
 
 function parseItems(raw: unknown): JsonRecord {
-  if (!raw) return {}
-  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as JsonRecord
-  if (typeof raw === 'string') {
+  if (!raw) return {};
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw as JsonRecord;
+  if (typeof raw === "string") {
     try {
-      const decoded = JSON.parse(raw)
-      return decoded && typeof decoded === 'object' && !Array.isArray(decoded)
-        ? decoded as JsonRecord
-        : {}
+      const decoded = JSON.parse(raw);
+      return decoded && typeof decoded === "object" && !Array.isArray(decoded)
+        ? (decoded as JsonRecord)
+        : {};
     } catch {
-      return {}
+      return {};
     }
   }
-  return {}
+  return {};
 }
 
-function readString(source: JsonRecord | null | undefined, keys: string[], fallback = '') {
-  if (!source) return fallback
+function readString(
+  source: JsonRecord | null | undefined,
+  keys: string[],
+  fallback = "",
+) {
+  if (!source) return fallback;
   for (const key of keys) {
-    const value = source[key]
-    if (value === null || value === undefined) continue
-    const text = String(value).trim()
-    if (text) return text
+    const value = source[key];
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text) return text;
   }
-  return fallback
+  return fallback;
 }
 
-function readNumber(source: JsonRecord | null | undefined, keys: string[], fallback = 0) {
-  if (!source) return fallback
+function readNumber(
+  source: JsonRecord | null | undefined,
+  keys: string[],
+  fallback = 0,
+) {
+  if (!source) return fallback;
   for (const key of keys) {
-    const value = source[key]
-    if (typeof value === 'number' && Number.isFinite(value)) return value
-    if (typeof value === 'string') {
-      const parsed = Number(value)
-      if (Number.isFinite(parsed)) return parsed
+    const value = source[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
     }
   }
-  return fallback
+  return fallback;
 }
 
 function parseDeniedBy(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.map(String)
-  if (typeof raw === 'string' && raw.trim()) {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw === "string" && raw.trim()) {
     try {
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed.map(String) : []
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
     } catch {
-      return []
+      return [];
     }
   }
-  return []
+  return [];
 }
 
 function estimatedProEarnings(totalPrice: number) {
-  if (!Number.isFinite(totalPrice) || totalPrice <= 0) return 0
-  return Math.round(totalPrice * 0.75 * 100) / 100
+  if (!Number.isFinite(totalPrice) || totalPrice <= 0) return 0;
+  return Math.round(totalPrice * 0.75 * 100) / 100;
 }
 
 async function getAuthenticatedUser(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  if (!token) return { userId: null, error: 'Missing authorization token' }
+  const token = request.headers
+    .get("authorization")
+    ?.replace(/^Bearer\s+/i, "");
+  if (!token)
+    return { user: null, userId: null, error: "Missing authorization token" };
 
-  const auth = createClient(supabaseUrl, anonKey)
-  const { data, error } = await auth.auth.getUser(token)
+  const auth = createClient(supabaseUrl, anonKey);
+  const { data, error } = await auth.auth.getUser(token);
 
-  if (error || !data.user) return { userId: null, error: 'Invalid or expired token' }
-  return { userId: data.user.id, error: null }
+  if (error || !data.user)
+    return { user: null, userId: null, error: "Invalid or expired token" };
+  return { user: data.user, userId: data.user.id, error: null };
+}
+
+async function getEmployeeAccess(user: { id: string; email?: string | null }) {
+  const { employee, error } = await findLinkedEmployee(supabaseAdmin, user);
+  if (error) {
+    console.error(
+      "[AvailableJobs] Employee access lookup failed:",
+      error.message,
+    );
+    return {
+      allowed: false,
+      employeeId: "",
+      error: "Could not verify your Pro profile",
+    };
+  }
+
+  return {
+    allowed: Boolean(employee),
+    employeeId: employee?.id || "",
+    error: employee ? null : "Pro access is required",
+  };
 }
 
 async function resolveJob(jobIdOrOrderId: string) {
   let { data, error } = await supabaseAdmin
-    .from('pro_jobs')
-    .select('*')
-    .eq('id', jobIdOrOrderId)
-    .maybeSingle()
+    .from("pro_jobs")
+    .select("*")
+    .eq("id", jobIdOrOrderId)
+    .maybeSingle();
 
-  if (!data && error?.code === '22P02') {
-    error = null
+  if (!data && error?.code === "22P02") {
+    error = null;
   }
 
   if (!data && !error) {
     const fallback = await supabaseAdmin
-      .from('pro_jobs')
-      .select('*')
-      .eq('order_id', jobIdOrOrderId)
-      .maybeSingle()
-    data = fallback.data
-    error = fallback.error
+      .from("pro_jobs")
+      .select("*")
+      .eq("order_id", jobIdOrOrderId)
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
   }
 
-  return { data, error }
+  return { data, error };
 }
 
 async function updateOrderAssignment(orderId: string, employeeId: string) {
-  const now = new Date().toISOString()
+  const now = new Date().toISOString();
   const update = {
     pro_id: employeeId,
     employee_id: employeeId,
     assigned_pro_id: employeeId,
-    status: 'assigned',
-    stage_status: 'assigned',
+    status: "assigned",
+    stage_status: "assigned",
     stage_updated_at: now,
     updated_at: now,
-  }
+  };
 
   const { error } = await supabaseAdmin
-    .from('orders')
+    .from("orders")
     .update(update)
-    .eq('id', orderId)
+    .eq("id", orderId);
 
-  if (!error) return
+  if (!error) return;
 
   let retry = await supabaseAdmin
-    .from('orders')
+    .from("orders")
     .update({
       pro_id: employeeId,
       assigned_pro_id: employeeId,
-      status: 'assigned',
-      stage_status: 'assigned',
+      status: "assigned",
+      stage_status: "assigned",
       stage_updated_at: now,
       updated_at: now,
     })
-    .eq('id', orderId)
+    .eq("id", orderId);
 
   if (retry.error) {
     retry = await supabaseAdmin
-      .from('orders')
+      .from("orders")
       .update({
         employee_id: employeeId,
         assigned_pro_id: employeeId,
-        status: 'assigned',
-        stage_status: 'assigned',
+        status: "assigned",
+        stage_status: "assigned",
         stage_updated_at: now,
         updated_at: now,
       })
-      .eq('id', orderId)
+      .eq("id", orderId);
   }
 
   if (retry.error) {
     retry = await supabaseAdmin
-      .from('orders')
+      .from("orders")
       .update({
-        status: 'assigned',
-        stage_status: 'assigned',
+        status: "assigned",
+        stage_status: "assigned",
         stage_updated_at: now,
         updated_at: now,
       })
-      .eq('id', orderId)
+      .eq("id", orderId);
   }
 
   if (retry.error) {
-    console.warn('[AvailableJobs] Failed to update order assignment:', retry.error.message)
+    console.warn(
+      "[AvailableJobs] Failed to update order assignment:",
+      retry.error.message,
+    );
   }
 }
 
-async function createUserNotification(userId: string, payload: {
-  type: string
-  title: string
-  message: string
-  data?: JsonRecord
-}) {
-  const { error } = await supabaseAdmin
-    .from('notifications')
-    .insert({
-      user_id: userId,
-      type: payload.type,
-      title: payload.title,
-      message: payload.message,
-      data: payload.data || {},
-      read: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+async function createUserNotification(
+  userId: string,
+  payload: {
+    type: string;
+    title: string;
+    message: string;
+    data?: JsonRecord;
+  },
+) {
+  const { error } = await supabaseAdmin.from("notifications").insert({
+    user_id: userId,
+    type: payload.type,
+    title: payload.title,
+    message: payload.message,
+    data: payload.data || {},
+    read: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
 
   if (error) {
-    console.warn('[AvailableJobs] Failed to create notification:', error.message)
+    console.warn(
+      "[AvailableJobs] Failed to create notification:",
+      error.message,
+    );
   }
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await getAuthenticatedUser(request)
-  if (auth.error || !auth.userId) {
-    return NextResponse.json({ success: false, error: auth.error }, { status: 401 })
+  const auth = await getAuthenticatedUser(request);
+  if (auth.error || !auth.user || !auth.userId) {
+    return NextResponse.json(
+      { success: false, error: auth.error },
+      { status: 401 },
+    );
   }
 
-  const { searchParams } = new URL(request.url)
-  const employeeId = searchParams.get('employeeId') || auth.userId
-  const status = searchParams.get('status') || 'available'
-  const limit = Math.min(Number(searchParams.get('limit') || 20), 50)
-
-  if (!employeeId) {
-    return NextResponse.json({ success: false, error: 'Missing employeeId parameter' }, { status: 400 })
+  const employeeAccess = await getEmployeeAccess(auth.user);
+  if (!employeeAccess.allowed) {
+    return NextResponse.json(
+      { success: false, error: employeeAccess.error },
+      { status: 403 },
+    );
   }
 
-  if (auth.userId && employeeId !== auth.userId) {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+  const { searchParams } = new URL(request.url);
+  const requestedEmployeeId =
+    searchParams.get("employeeId") || employeeAccess.employeeId;
+  const status = searchParams.get("status") || "available";
+  const limit = Math.min(Number(searchParams.get("limit") || 20), 50);
+
+  if (!requestedEmployeeId) {
+    return NextResponse.json(
+      { success: false, error: "Missing employeeId parameter" },
+      { status: 400 },
+    );
   }
+
+  if (
+    requestedEmployeeId !== auth.userId &&
+    requestedEmployeeId !== employeeAccess.employeeId
+  ) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403 },
+    );
+  }
+  const employeeId = employeeAccess.employeeId;
 
   try {
+    await expireStaleAvailableJobs(supabaseAdmin);
+    await warnJobsNearExpiry(supabaseAdmin);
+
     const { data: jobs, error } = await supabaseAdmin
-      .from('pro_jobs')
-      .select('*')
-      .eq('status', status)
-      .is('pro_id', null)
-      .order('created_at', { ascending: false })
-      .limit(limit)
+      .from("pro_jobs")
+      .select("*")
+      .eq("status", status)
+      .is("pro_id", null)
+      .order("created_at", { ascending: false })
+      .limit(limit);
 
     if (error) {
-      console.error('[AvailableJobs] Fetch error:', error)
-      return NextResponse.json({ success: false, error: 'Failed to fetch jobs' }, { status: 500 })
+      console.error("[AvailableJobs] Fetch error:", error);
+      return NextResponse.json(
+        { success: false, error: "Failed to fetch jobs" },
+        { status: 500 },
+      );
     }
 
-    const result = []
+    const { data: employee } = await supabaseAdmin
+      .from("employees")
+      .select("*")
+      .eq("id", employeeId)
+      .maybeSingle();
+    const availabilityByEmployee = await loadAvailabilityByEmployee(
+      supabaseAdmin,
+      [employeeId],
+    );
+    const employeeAvailability = availabilityByEmployee.get(employeeId) || [];
+    const result = [];
 
     for (const job of jobs || []) {
       const { data: order } = await supabaseAdmin
-        .from('orders')
-        .select('*')
-        .eq('id', job.order_id)
-        .maybeSingle()
+        .from("orders")
+        .select("*")
+        .eq("id", job.order_id)
+        .maybeSingle();
 
-      if (!order) continue
+      if (!order) continue;
 
-      const deniedBy = parseDeniedBy(order.denied_by)
-      if (deniedBy.includes(employeeId)) continue
+      const deniedBy = parseDeniedBy(order.denied_by);
+      if (deniedBy.includes(employeeId)) continue;
 
-      const items = parseItems(order.items)
-      const totalPrice = readNumber(order, ['total_price', 'totalPrice'])
-      const weight = readNumber(order, ['weight', 'weight_kg'], readNumber(items, ['weight', 'estimatedWeight'], 10))
-      const pickupAddress = readString(order, ['pickup_address', 'pickupAddress'])
+      const items = parseItems(order.items);
+      const totalPrice = readNumber(order, ["total_price", "totalPrice"]);
+      const weight = readNumber(
+        order,
+        ["weight", "weight_kg"],
+        readNumber(items, ["weight", "estimatedWeight"], 10),
+      );
+      const pickupAddress = readString(order, [
+        "pickup_address",
+        "pickupAddress",
+      ]);
+      const pickupAddressDetails = parseRecord(
+        order.pickup_address_details || items.pickupAddressDetails,
+      );
+      const pickupDate =
+        order.scheduled_pickup_date || order.pickup_date || items.pickupDate;
+      const pickupTimeSlot =
+        order.pickup_time_slot || items.pickupTimeSlot || items.pickupSlot;
 
-      let customerName = readString(order, ['customer_name', 'customerName'])
+      if (employee) {
+        const match = matchEmployeeToJob({
+          employee,
+          availabilityRows: employeeAvailability,
+          pickupAddress,
+          pickupAddressDetails,
+          pickupDate,
+          pickupTimeSlot,
+        });
+        if (!match.eligible) continue;
+        order._distance_km = match.distanceKm;
+        order._service_radius_km = match.radiusKm;
+      }
+
+      let customerName = readString(order, ["customer_name", "customerName"]);
       if (!customerName && order.user_id) {
         const { data: customer } = await supabaseAdmin
-          .from('users')
-          .select('*')
-          .eq('id', order.user_id)
-          .maybeSingle()
-        customerName = readString(customer, ['full_name', 'name', 'first_name'], 'Customer')
+          .from("users")
+          .select("*")
+          .eq("id", order.user_id)
+          .maybeSingle();
+        customerName = readString(
+          customer,
+          ["full_name", "name", "first_name"],
+          "Customer",
+        );
       }
 
       result.push({
@@ -263,9 +382,14 @@ export async function GET(request: NextRequest) {
         customer_name: customerName,
         pickupAddress,
         pickup_address: pickupAddress,
-        scheduledPickupDate: order.scheduled_pickup_date || order.pickup_date || items.pickupDate,
-        pickup_date: order.scheduled_pickup_date || order.pickup_date || items.pickupDate,
-        deliveryDate: order.scheduled_delivery_date || order.delivery_date || items.deliveryDate,
+        scheduledPickupDate: pickupDate,
+        pickup_date: pickupDate,
+        pickupTimeSlot,
+        pickup_time_slot: pickupTimeSlot,
+        deliveryDate:
+          order.scheduled_delivery_date ||
+          order.delivery_date ||
+          items.deliveryDate,
         delivery_time_slot: order.delivery_time_slot || items.deliveryTimeSlot,
         serviceType: order.service_type || items.service_type,
         deliverySpeed: order.delivery_speed || items.delivery_speed,
@@ -277,181 +401,313 @@ export async function GET(request: NextRequest) {
         total_price: totalPrice,
         estimatedEarnings: estimatedProEarnings(totalPrice),
         earnings: estimatedProEarnings(totalPrice),
-      })
+        distanceKm:
+          typeof order._distance_km === "number"
+            ? Number(order._distance_km.toFixed(1))
+            : null,
+        distance_km:
+          typeof order._distance_km === "number"
+            ? Number(order._distance_km.toFixed(1))
+            : null,
+        serviceRadiusKm: readMatchNumber(order, ["_service_radius_km"], 15),
+        expiresAt: job.expires_at || null,
+        expires_at: job.expires_at || null,
+      });
     }
 
     return NextResponse.json({
       success: true,
       data: result,
       count: result.length,
-    })
+    });
   } catch (error) {
-    console.error('[AvailableJobs] Route error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to fetch jobs' }, { status: 500 })
+    console.error("[AvailableJobs] Route error:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch jobs" },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await getAuthenticatedUser(request)
-  if (auth.error || !auth.userId) {
-    return NextResponse.json({ success: false, error: auth.error }, { status: 401 })
+  const auth = await getAuthenticatedUser(request);
+  if (auth.error || !auth.user || !auth.userId) {
+    return NextResponse.json(
+      { success: false, error: auth.error },
+      { status: 401 },
+    );
   }
 
   try {
-    const { jobId, employeeId, action } = await request.json()
+    await expireStaleAvailableJobs(supabaseAdmin);
+
+    const { jobId, employeeId, action } = await request.json();
 
     if (!jobId || !employeeId || !action) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: jobId, employeeId, action' },
-        { status: 400 }
-      )
+        {
+          success: false,
+          error: "Missing required fields: jobId, employeeId, action",
+        },
+        { status: 400 },
+      );
     }
 
-    if (auth.userId && employeeId !== auth.userId) {
-      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    const employeeAccess = await getEmployeeAccess(auth.user);
+    if (!employeeAccess.allowed) {
+      return NextResponse.json(
+        { success: false, error: employeeAccess.error },
+        { status: 403 },
+      );
     }
 
-    const { data: jobData, error: jobFetchError } = await resolveJob(String(jobId))
+    if (
+      employeeId !== auth.userId &&
+      employeeId !== employeeAccess.employeeId
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
+    }
+    const resolvedEmployeeId = employeeAccess.employeeId;
+
+    const { data: jobData, error: jobFetchError } = await resolveJob(
+      String(jobId),
+    );
     if (jobFetchError || !jobData) {
-      console.error('[AvailableJobs] Job lookup failed:', jobFetchError)
-      return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 })
+      console.error("[AvailableJobs] Job lookup failed:", jobFetchError);
+      return NextResponse.json(
+        { success: false, error: "Job not found" },
+        { status: 404 },
+      );
     }
 
     const { data: orderData, error: orderFetchError } = await supabaseAdmin
-      .from('orders')
-      .select('*')
-      .eq('id', jobData.order_id)
-      .single()
+      .from("orders")
+      .select("*")
+      .eq("id", jobData.order_id)
+      .single();
 
     if (orderFetchError || !orderData) {
-      console.error('[AvailableJobs] Order lookup failed:', orderFetchError)
-      return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 })
+      console.error("[AvailableJobs] Order lookup failed:", orderFetchError);
+      return NextResponse.json(
+        { success: false, error: "Order not found" },
+        { status: 404 },
+      );
     }
 
-    if (action === 'reject') {
-      const deniedBy = Array.from(new Set([...parseDeniedBy(orderData.denied_by), employeeId]))
+    if (action === "reject") {
+      const deniedBy = Array.from(
+        new Set([...parseDeniedBy(orderData.denied_by), resolvedEmployeeId]),
+      );
       const { error } = await supabaseAdmin
-        .from('orders')
+        .from("orders")
         .update({ denied_by: deniedBy, updated_at: new Date().toISOString() })
-        .eq('id', orderData.id)
+        .eq("id", orderData.id);
 
       if (error) {
-        console.warn('[AvailableJobs] Could not persist denied_by:', error.message)
+        console.warn(
+          "[AvailableJobs] Could not persist denied_by:",
+          error.message,
+        );
       }
 
       return NextResponse.json({
         success: true,
-        message: 'Job declined',
-      })
+        message: "Job declined",
+      });
     }
 
-    if (action !== 'accept') {
-      return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 })
-    }
-
-    if (jobData.status !== 'available' || jobData.pro_id) {
+    if (action !== "accept") {
       return NextResponse.json(
-        { success: false, error: 'This job has already been claimed' },
-        { status: 409 }
-      )
+        { success: false, error: "Invalid action" },
+        { status: 400 },
+      );
+    }
+
+    if (jobData.status !== "available" || jobData.pro_id) {
+      return NextResponse.json(
+        { success: false, error: "This job has already been claimed" },
+        { status: 409 },
+      );
+    }
+
+    if (
+      jobData.expires_at &&
+      new Date(jobData.expires_at).getTime() <= Date.now()
+    ) {
+      await expireStaleAvailableJobs(supabaseAdmin);
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "This job expired because no Pro accepted it within 10 minutes",
+        },
+        { status: 409 },
+      );
+    }
+
+    const { data: employee } = await supabaseAdmin
+      .from("employees")
+      .select("*")
+      .eq("id", resolvedEmployeeId)
+      .maybeSingle();
+    const availabilityByEmployee = await loadAvailabilityByEmployee(
+      supabaseAdmin,
+      [resolvedEmployeeId],
+    );
+    const items = parseItems(orderData.items);
+    const pickupAddress = readString(orderData, [
+      "pickup_address",
+      "pickupAddress",
+    ]);
+    const pickupDate =
+      orderData.scheduled_pickup_date ||
+      orderData.pickup_date ||
+      items.pickupDate;
+    const pickupTimeSlot =
+      orderData.pickup_time_slot || items.pickupTimeSlot || items.pickupSlot;
+    const eligibility = employee
+      ? matchEmployeeToJob({
+          employee,
+          availabilityRows:
+            availabilityByEmployee.get(resolvedEmployeeId) || [],
+          pickupAddress,
+          pickupAddressDetails: parseRecord(
+            orderData.pickup_address_details || items.pickupAddressDetails,
+          ),
+          pickupDate,
+          pickupTimeSlot,
+        })
+      : { eligible: false, reason: "inactive" };
+
+    if (!eligibility.eligible) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            eligibility.reason === "out_of_radius"
+              ? "This pickup is outside your service radius"
+              : "You are not available for this pickup window",
+        },
+        { status: 403 },
+      );
     }
 
     let accepted = await supabaseAdmin
-      .from('pro_jobs')
+      .from("pro_jobs")
       .update({
-        pro_id: employeeId,
-        status: 'accepted',
-        stage: 'assigned',
+        pro_id: resolvedEmployeeId,
+        status: "accepted",
+        stage: "assigned",
         accepted_at: new Date().toISOString(),
         stage_updated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', jobData.id)
-      .eq('status', 'available')
-      .is('pro_id', null)
+      .eq("id", jobData.id)
+      .eq("status", "available")
+      .is("pro_id", null)
       .select()
-      .single()
+      .single();
 
-    if (accepted.error?.code === '23503') {
-      console.warn('[AvailableJobs] pro_id FK rejected, recording accepted status only:', accepted.error.message)
+    if (accepted.error?.code === "23503") {
+      console.warn(
+        "[AvailableJobs] pro_id FK rejected, recording accepted status only:",
+        accepted.error.message,
+      );
       accepted = await supabaseAdmin
-        .from('pro_jobs')
+        .from("pro_jobs")
         .update({
-          status: 'accepted',
-          stage: 'assigned',
+          status: "accepted",
+          stage: "assigned",
           accepted_at: new Date().toISOString(),
           stage_updated_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', jobData.id)
-        .eq('status', 'available')
+        .eq("id", jobData.id)
+        .eq("status", "available")
         .select()
-        .single()
+        .single();
     }
 
     if (accepted.error || !accepted.data) {
-      console.error('[AvailableJobs] Accept failed:', accepted.error)
-      return NextResponse.json({ success: false, error: 'Failed to accept job' }, { status: 500 })
+      console.error("[AvailableJobs] Accept failed:", accepted.error);
+      return NextResponse.json(
+        { success: false, error: "Failed to accept job" },
+        { status: 500 },
+      );
     }
 
-    await updateOrderAssignment(orderData.id, employeeId)
+    await updateOrderAssignment(orderData.id, resolvedEmployeeId);
 
     const { data: proData } = await supabaseAdmin
-      .from('employees')
-      .select('*')
-      .eq('id', employeeId)
-      .maybeSingle()
+      .from("employees")
+      .select("*")
+      .eq("id", resolvedEmployeeId)
+      .maybeSingle();
 
     const { data: customerData } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', orderData.user_id)
-      .maybeSingle()
+      .from("users")
+      .select("*")
+      .eq("id", orderData.user_id)
+      .maybeSingle();
 
     await createUserNotification(orderData.user_id, {
-      type: 'order_assigned',
-      title: 'Your order has a Washlee Pro',
-      message: `${readString(proData, ['name', 'first_name'], 'Your Washlee Pro')} accepted your order.`,
+      type: "order_assigned",
+      title: "Your order has a Washlee Pro",
+      message: `${readString(proData, ["name", "first_name"], "Your Washlee Pro")} accepted your order.`,
       data: {
         orderId: orderData.id,
         jobId: jobData.id,
-        proId: employeeId,
+        proId: resolvedEmployeeId,
       },
-    })
+    });
 
-    await createUserNotification(employeeId, {
-      type: 'job_claimed',
-      title: 'Job claimed',
-      message: 'This pickup is now in your jobs list.',
+    await createUserNotification(resolvedEmployeeId, {
+      type: "job_claimed",
+      title: "Job claimed",
+      message: "This pickup is now in your jobs list.",
       data: {
         orderId: orderData.id,
         jobId: jobData.id,
       },
-    })
+    });
 
     if (customerData?.email && proData) {
       try {
         await sendProAcceptedJobEmail({
           to: customerData.email,
-          customerName: readString(customerData, ['full_name', 'name'], 'Valued Customer'),
-          proName: readString(proData, ['name', 'first_name'], 'Your Washlee Pro'),
-          proPhone: readString(proData, ['phone'], 'Contact via email'),
-          proEmail: readString(proData, ['email'], 'support@washlee.com'),
-          orderAmount: readNumber(orderData, ['total_price']),
+          customerName: readString(
+            customerData,
+            ["full_name", "name"],
+            "Valued Customer",
+          ),
+          proName: readString(
+            proData,
+            ["name", "first_name"],
+            "Your Washlee Pro",
+          ),
+          proPhone: readString(proData, ["phone"], "Contact via email"),
+          proEmail: readString(proData, ["email"], "support@washlee.com"),
+          orderAmount: readNumber(orderData, ["total_price"]),
           orderId: orderData.id,
-        })
+        });
       } catch (emailError) {
-        console.error('[AvailableJobs] Customer email failed:', emailError)
+        console.error("[AvailableJobs] Customer email failed:", emailError);
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Job accepted successfully',
+      message: "Job accepted successfully",
       data: accepted.data,
-    })
+    });
   } catch (error) {
-    console.error('[AvailableJobs] Job action error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to process job action' }, { status: 500 })
+    console.error("[AvailableJobs] Job action error:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to process job action" },
+      { status: 500 },
+    );
   }
 }

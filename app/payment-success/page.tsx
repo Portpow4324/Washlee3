@@ -4,76 +4,69 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import Button from '@/components/Button'
-import { CheckCircle, ArrowRight } from 'lucide-react'
+import { CheckCircle, ArrowRight, Truck, Sparkles, Package, Mail } from 'lucide-react'
 
 function PaymentSuccessContent() {
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const orderId = params.get('orderId')
 
+  const steps = [
+    { icon: Mail, body: 'You’ll receive a confirmation email with the order details.' },
+    { icon: Truck, body: 'Your Washlee Pro arrives in your pickup window.' },
+    { icon: Sparkles, body: 'We sort, wash and fold your laundry with care.' },
+    { icon: Package, body: 'Fresh laundry is delivered back — usually next business day.' },
+  ]
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f7fefe] to-white py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Success Icon */}
-        <div className="text-center mb-8">
-          <div className="inline-flex justify-center items-center w-20 h-20 bg-green-100 rounded-full mb-6">
-            <CheckCircle className="w-12 h-12 text-green-600" />
+    <main className="min-h-screen bg-soft-mint py-12 sm:py-20">
+      <div className="container-narrow">
+        <div className="surface-card p-8 sm:p-12 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-mint mb-5">
+            <CheckCircle className="w-9 h-9 text-primary-deep" />
           </div>
-          <h1 className="text-4xl font-bold text-[#1f2d2b] mb-4">Payment Successful!</h1>
-          <p className="text-lg text-[#6b7b78] mb-8">
-            Your payment has been processed successfully. Your order is now confirmed.
+          <h1 className="text-3xl sm:text-4xl font-bold text-dark mb-2">Payment received</h1>
+          <p className="text-gray text-base sm:text-lg mb-6">Your order is confirmed and we&rsquo;re on it.</p>
+
+          <div className="text-left bg-mint/40 rounded-2xl p-6 mb-8">
+            <p className="text-xs uppercase tracking-wider text-primary-deep font-bold mb-4">What happens next</p>
+            <ol className="space-y-3">
+              {steps.map((step, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white border border-line flex items-center justify-center flex-shrink-0">
+                    <step.icon size={16} className="text-primary-deep" />
+                  </div>
+                  <span className="text-sm text-dark leading-relaxed">{step.body}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            {orderId ? (
+              <Link href={`/tracking?orderId=${orderId}`} className="btn-primary flex-1">
+                Track this order
+                <ArrowRight size={16} />
+              </Link>
+            ) : (
+              <Link href="/dashboard/orders" className="btn-primary flex-1">
+                View my orders
+                <ArrowRight size={16} />
+              </Link>
+            )}
+            <Link href="/dashboard" className="btn-outline flex-1">
+              Go to dashboard
+            </Link>
+          </div>
+
+          <p className="mt-8 text-sm text-gray">
+            Need help?{' '}
+            <Link href="/contact" className="text-primary-deep font-semibold hover:underline">
+              Contact support
+            </Link>
           </p>
         </div>
-
-        {/* Next Steps */}
-        <div className="bg-[#E8FFFB] rounded-lg p-8 mb-8">
-          <h3 className="text-lg font-bold text-[#1f2d2b] mb-4">What Happens Next?</h3>
-          <ul className="space-y-3">
-            <li className="flex items-start gap-3">
-              <span className="text-[#48C9B0] font-bold">1</span>
-              <span className="text-[#1f2d2b]">We'll send you a confirmation email shortly</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#48C9B0] font-bold">2</span>
-              <span className="text-[#1f2d2b]">Our team will pick up your laundry at the scheduled time</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#48C9B0] font-bold">3</span>
-              <span className="text-[#1f2d2b]">We'll professionally wash and prepare your items</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#48C9B0] font-bold">4</span>
-              <span className="text-[#1f2d2b]">Your clean laundry will be delivered back to you</span>
-            </li>
-          </ul>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          {orderId && (
-            <Link href={`/tracking?orderId=${orderId}`} className="flex-1">
-              <Button className="w-full">
-                Track Your Order
-                <ArrowRight size={18} />
-              </Button>
-            </Link>
-          )}
-          <Link href="/dashboard/orders" className="flex-1">
-            <Button variant="outline" className="w-full">
-              View All Orders
-            </Button>
-          </Link>
-        </div>
-
-        {/* Contact Support */}
-        <div className="mt-12 text-center">
-          <p className="text-[#6b7b78] mb-4">Need help?</p>
-          <Link href="/contact" className="text-[#48C9B0] hover:text-[#7FE3D3] font-medium">
-            Contact our support team
-          </Link>
-        </div>
       </div>
-    </div>
+    </main>
   )
 }
 
@@ -81,7 +74,7 @@ export default function PaymentSuccessPage() {
   return (
     <>
       <Header />
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray">Loading…</div>}>
         <PaymentSuccessContent />
       </Suspense>
       <Footer />

@@ -2,23 +2,19 @@
 
 import { useAuth } from '@/lib/AuthContext'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import Footer from '@/components/Footer'
-import Button from '@/components/Button'
-import Card from '@/components/Card'
 import Spinner from '@/components/Spinner'
 import Link from 'next/link'
-import { Gift, Star, TrendingUp, Zap, Crown } from 'lucide-react'
+import { Gift, Star, Crown, Sparkles, ArrowRight, ArrowLeft } from 'lucide-react'
 
 interface WashClubStatus {
   isEnrolled: boolean
   enrollmentDate?: string
   cardsCollected: number
   totalWashes: number
-  nextReward?: string
 }
 
-export default function WashClubPage() {
+export default function DashboardWashClubPage() {
   const { user, loading: authLoading } = useAuth()
   const [clubStatus, setClubStatus] = useState<WashClubStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -29,8 +25,7 @@ export default function WashClubPage() {
     const loadClubStatus = async () => {
       try {
         setIsLoading(true)
-        // TODO: Fetch wash club enrollment status from database
-        // For now, show default status
+        // TODO: Wire to /api/wash-club/membership when available.
         setClubStatus({
           isEnrolled: false,
           cardsCollected: 0,
@@ -57,180 +52,134 @@ export default function WashClubPage() {
     )
   }
 
+  const enrolled = clubStatus?.isEnrolled ?? false
+  const cards = clubStatus?.cardsCollected ?? 0
+  const totalWashes = clubStatus?.totalWashes ?? 0
+  const progress = Math.min(100, Math.floor((cards % 10) * 10))
+
   return (
     <>
-      <main className="min-h-screen bg-gradient-to-b from-[#E8FFFB] to-white py-12 px-4">
-        <div className="max-w-3xl mx-auto">
-          {/* Header */}
-          <div className="mb-12">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-4 bg-gradient-to-br from-[#48C9B0] to-[#7FE3D3] rounded-full">
-                <Gift className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-4xl font-bold text-[#1f2d2b]">Wash Club</h1>
+      <main className="min-h-screen bg-soft-mint pb-16">
+        <div className="container-page py-10">
+          <Link href="/dashboard" className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-6 hover:text-primary transition">
+            <ArrowLeft size={16} />
+            Back to dashboard
+          </Link>
+
+          <div className="flex items-start gap-4 mb-8">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
+              <Gift className="w-6 h-6 text-white" />
             </div>
-            <p className="text-[#6b7b78] text-lg">
-              Earn rewards with every wash and unlock exclusive benefits
-            </p>
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-dark">Wash Club</h1>
+              <p className="text-gray text-base mt-1">Free loyalty rewards. Earn on every wash, no membership fee.</p>
+            </div>
           </div>
 
-          {/* Status Section */}
-          {clubStatus?.isEnrolled ? (
-            <Card className="p-8 mb-8 bg-gradient-to-br from-[#E8FFFB] to-white border-2 border-[#48C9B0]">
+          {/* Status card */}
+          {enrolled ? (
+            <div className="surface-card p-6 sm:p-8 mb-6 bg-gradient-to-br from-mint to-white">
               <div className="flex items-start justify-between mb-6">
                 <div>
-                  <p className="text-[#6b7b78] font-semibold mb-2">Status</p>
-                  <p className="text-3xl font-bold text-[#1f2d2b]">
-                    Active Member
-                  </p>
-                  {clubStatus.enrollmentDate && (
-                    <p className="text-[#6b7b78] text-sm mt-2">
+                  <span className="pill mb-3"><Sparkles size={12} /> Active member</span>
+                  <p className="text-2xl font-bold text-dark">You&rsquo;re in.</p>
+                  {clubStatus?.enrollmentDate && (
+                    <p className="text-sm text-gray mt-1">
                       Member since {new Date(clubStatus.enrollmentDate).toLocaleDateString('en-AU')}
                     </p>
                   )}
                 </div>
-                <Crown className="w-12 h-12 text-[#48C9B0]" />
+                <Crown className="w-10 h-10 text-primary-deep" />
               </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white rounded-lg p-4 text-center">
-                  <p className="text-3xl font-bold text-[#48C9B0]">{clubStatus.cardsCollected}</p>
-                  <p className="text-[#6b7b78] text-sm mt-2">Cards Collected</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white rounded-xl p-4 text-center border border-line">
+                  <p className="text-3xl font-bold text-primary-deep">{cards}</p>
+                  <p className="text-xs text-gray mt-1">Cards collected</p>
                 </div>
-                <div className="bg-white rounded-lg p-4 text-center">
-                  <p className="text-3xl font-bold text-[#48C9B0]">{clubStatus.totalWashes}</p>
-                  <p className="text-[#6b7b78] text-sm mt-2">Total Washes</p>
+                <div className="bg-white rounded-xl p-4 text-center border border-line">
+                  <p className="text-3xl font-bold text-primary-deep">{totalWashes}</p>
+                  <p className="text-xs text-gray mt-1">Total washes</p>
                 </div>
-                <div className="bg-white rounded-lg p-4 text-center">
-                  <p className="text-3xl font-bold text-[#48C9B0]">
-                    {Math.floor((clubStatus.cardsCollected / 10) * 100)}%
-                  </p>
-                  <p className="text-[#6b7b78] text-sm mt-2">To Next Reward</p>
+                <div className="bg-white rounded-xl p-4 text-center border border-line">
+                  <p className="text-3xl font-bold text-primary-deep">{progress}%</p>
+                  <p className="text-xs text-gray mt-1">To next reward</p>
                 </div>
               </div>
-            </Card>
+
+              <div className="mt-6">
+                <div className="h-2 w-full rounded-full bg-line overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-primary to-accent transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray mt-2 text-center">{Math.max(0, 10 - (cards % 10))} more cards to your next reward</p>
+              </div>
+            </div>
           ) : (
-            <Card className="p-8 mb-8 bg-gradient-to-br from-[#E8FFFB] to-white border-2 border-[#48C9B0]">
-              <div className="text-center mb-8">
-                <Gift className="w-16 h-16 text-[#48C9B0] mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-[#1f2d2b] mb-2">
-                  Join Wash Club Today
-                </h2>
-                <p className="text-[#6b7b78] mb-6">
-                  Get exclusive rewards and benefits with every wash
-                </p>
-                <Button className="px-8 py-3 text-lg">
-                  Enroll Now
-                </Button>
+            <div className="surface-card p-8 sm:p-10 mb-6 bg-gradient-to-br from-mint to-white text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-soft mb-4">
+                <Gift className="w-8 h-8 text-primary-deep" />
               </div>
-            </Card>
+              <h2 className="text-2xl font-bold text-dark mb-2">Join Wash Club</h2>
+              <p className="text-gray mb-6 max-w-md mx-auto">
+                Free to join, free forever — earn rewards on every order and unlock perks as you wash more.
+              </p>
+              <Link href="/wash-club" className="btn-primary">
+                Learn more &amp; enroll
+                <ArrowRight size={16} />
+              </Link>
+            </div>
           )}
 
-          {/* How It Works */}
-          <Card className="p-8 mb-8">
-            <h2 className="text-2xl font-bold text-[#1f2d2b] mb-6">How Wash Club Works</h2>
-            <div className="space-y-6">
-              <div className="flex gap-4">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-[#48C9B0] text-white font-bold">
-                    1
+          {/* How it works */}
+          <div className="surface-card p-6 sm:p-8 mb-6">
+            <h2 className="text-xl font-bold text-dark mb-5">How Wash Club works</h2>
+            <ol className="space-y-5">
+              {[
+                { title: 'Earn on every wash', body: 'Every dollar you spend earns one point automatically — no scanning, no codes.' },
+                { title: 'Tier up by spend', body: 'Bronze starts free. Silver, Gold and Platinum unlock as your annual spend grows.' },
+                { title: 'Redeem for credit', body: 'Convert points to credit at checkout, or save them for bigger rewards.' },
+              ].map((step, i) => (
+                <li key={step.title} className="flex gap-4">
+                  <div className="w-9 h-9 rounded-full bg-primary text-white font-bold flex items-center justify-center flex-shrink-0">
+                    {i + 1}
                   </div>
-                </div>
-                <div>
-                  <h3 className="font-bold text-[#1f2d2b] mb-1">Collect Cards</h3>
-                  <p className="text-[#6b7b78]">
-                    Earn one card with every 2kg of laundry (approx 1 bag)
-                  </p>
-                </div>
-              </div>
+                  <div>
+                    <h3 className="font-semibold text-dark mb-1">{step.title}</h3>
+                    <p className="text-sm text-gray">{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
 
-              <div className="flex gap-4">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-[#48C9B0] text-white font-bold">
-                    2
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-bold text-[#1f2d2b] mb-1">Unlock Rewards</h3>
-                  <p className="text-[#6b7b78]">
-                    Collect 10 cards to unlock exclusive rewards and discounts
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-[#48C9B0] text-white font-bold">
-                    3
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-bold text-[#1f2d2b] mb-1">Redeem Perks</h3>
-                  <p className="text-[#6b7b78]">
-                    Get discounts, free services, and VIP benefits as a member
-                  </p>
-                </div>
-              </div>
+          {/* Tier preview */}
+          <div className="surface-card p-6 sm:p-8">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold text-dark">Tier perks</h2>
+              <Link href="/wash-club" className="text-sm font-semibold text-primary-deep hover:underline">See all</Link>
             </div>
-          </Card>
-
-          {/* Rewards Tiers */}
-          <Card className="p-8 mb-8">
-            <h2 className="text-2xl font-bold text-[#1f2d2b] mb-6">Reward Tiers</h2>
-            <div className="space-y-4">
-              <div className="border-2 border-[#48C9B0] rounded-lg p-4 bg-[#E8FFFB]">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-[#1f2d2b]">Silver Member</h3>
-                  <Star className="w-5 h-5 text-yellow-500" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {[
+                { name: 'Silver', icon: Star, perks: ['7.5% reward rate', 'Priority support', 'Monthly bonus points'] },
+                { name: 'Gold', icon: Star, perks: ['10% reward rate', '15% off Express', 'Exclusive deals'] },
+                { name: 'Platinum', icon: Crown, perks: ['12.5% reward rate', '20% off Express', 'Birthday gift'] },
+              ].map((tier) => (
+                <div key={tier.name} className="rounded-xl border border-line bg-white p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <tier.icon size={16} className="text-primary-deep" />
+                    <h3 className="font-bold text-dark">{tier.name}</h3>
+                  </div>
+                  <ul className="space-y-1.5 text-sm text-gray">
+                    {tier.perks.map((p) => (
+                      <li key={p}>• {p}</li>
+                    ))}
+                  </ul>
                 </div>
-                <p className="text-[#6b7b78] text-sm mb-3">First 10 cards collected</p>
-                <div className="space-y-1 text-sm">
-                  <p>✓ 5% discount on all services</p>
-                  <p>✓ Free hang dry service ($16.50 value)</p>
-                  <p>✓ Early access to new services</p>
-                </div>
-              </div>
-
-              <div className="border-2 border-[#48C9B0] rounded-lg p-4 bg-[#E8FFFB]">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-[#1f2d2b]">Gold Member</h3>
-                  <Star className="w-5 h-5 text-yellow-500 fill-current" />
-                </div>
-                <p className="text-[#6b7b78] text-sm mb-3">20+ cards collected</p>
-                <div className="space-y-1 text-sm">
-                  <p>✓ 10% discount on all services</p>
-                  <p>✓ Free hang dry + delicates service ($38.50 value)</p>
-                  <p>✓ Priority customer support</p>
-                  <p>✓ Exclusive member-only deals</p>
-                </div>
-              </div>
-
-              <div className="border-2 border-[#48C9B0] rounded-lg p-4 bg-gradient-to-r from-[#E8FFFB] to-white">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-[#1f2d2b] flex items-center gap-2">
-                    <Crown className="w-5 h-5 text-[#48C9B0]" />
-                    Platinum Member
-                  </h3>
-                  <Zap className="w-5 h-5 text-[#48C9B0]" />
-                </div>
-                <p className="text-[#6b7b78] text-sm mb-3">50+ cards collected</p>
-                <div className="space-y-1 text-sm">
-                  <p>✓ 15% discount on all services</p>
-                  <p>✓ Free premium services package ($100+ value)</p>
-                  <p>✓ VIP customer support 24/7</p>
-                  <p>✓ Exclusive events and early access</p>
-                  <p>✓ Complimentary monthly services</p>
-                </div>
-              </div>
+              ))}
             </div>
-          </Card>
-
-          {/* Back Link */}
-          <div className="text-center">
-            <Link href="/dashboard" className="text-[#48C9B0] hover:text-[#7FE3D3] font-medium">
-              ← Back to Dashboard
-            </Link>
           </div>
         </div>
       </main>

@@ -9,6 +9,14 @@ import Card from '@/components/Card'
 import { grantAdminAccess } from '@/lib/useAdminAccess'
 import { Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
 
+function formatRetryAfter(secondsValue: string | null) {
+  const seconds = Number(secondsValue)
+  if (!Number.isFinite(seconds) || seconds <= 0) return 'a few minutes'
+
+  const minutes = Math.ceil(seconds / 60)
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`
+}
+
 export default function AdminLogin() {
   const router = useRouter()
   const [password, setPassword] = useState('')
@@ -30,7 +38,7 @@ export default function AdminLogin() {
 
       if (!response.ok) {
         if (response.status === 429) {
-          setError('Too many attempts. Please wait a few minutes and try again.')
+          setError(`Too many attempts. Please wait ${formatRetryAfter(response.headers.get('Retry-After'))} and try again.`)
         } else {
           setError('Invalid admin password')
         }

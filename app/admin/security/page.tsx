@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import {
   AlertTriangle,
@@ -12,17 +11,17 @@ import {
   Download,
   Trash2,
   Search,
-  Filter,
   RefreshCw,
-  Settings,
   Info,
   ChevronDown,
   ArrowLeft,
+  Activity,
+  Shield,
+  UserX,
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Spinner from '@/components/Spinner'
-import Button from '@/components/Button'
 import {
   ErrorDetails,
   getErrors,
@@ -36,28 +35,77 @@ import {
 import { findResolution } from '@/lib/issueResolutions'
 
 type FilterType = 'all' | 'critical' | 'high' | 'unresolved'
+const AUTO_REFRESH_INTERVAL_MS = 30_000
+
+type ErrorStats = {
+  totalCount: number
+  unresolvedCount: number
+  criticalCount: number
+  highCount: number
+  byType: Record<string, number>
+}
+
+type SecuritySummary = {
+  ok: boolean
+  setupRequired?: boolean
+  error?: string
+  generatedAt?: string
+  overview?: {
+    authFailuresToday: number
+    adminPathViewsToday: number
+    activeSessions: number
+    openAlerts: number
+    criticalAlerts: number
+    lastEventAt?: string | null
+  }
+  alerts?: Array<{
+    id: string
+    severity: 'info' | 'warning' | 'critical'
+    category: string
+    title: string
+    created_at: string
+  }>
+  monitorRuns?: Array<{
+    id: string
+    check_name: string
+    target: string
+    status: 'ok' | 'warning' | 'critical'
+    created_at: string
+  }>
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return 'No recent events'
+
+  return new Intl.DateTimeFormat('en-AU', {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function signalTone(value: number, criticalValue = 1) {
+  if (value >= criticalValue) return 'text-red-700 bg-red-50 border-red-200'
+  if (value > 0) return 'text-orange-700 bg-orange-50 border-orange-200'
+  return 'text-green-700 bg-green-50 border-green-200'
+}
 
 export default function AdminSecurityDashboard() {
-  const router = useRouter()
   const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [errors, setErrors] = useState<ErrorDetails[]>([])
-  const [stats, setStats] = useState<any>(null)
+  const [stats, setStats] = useState<ErrorStats | null>(null)
+  const [securitySummary, setSecuritySummary] = useState<SecuritySummary | null>(null)
   const [filter, setFilter] = useState<FilterType>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedError, setSelectedError] = useState<ErrorDetails | null>(null)
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [reloading, setReloading] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [lastAutoRefreshAt, setLastAutoRefreshAt] = useState<string | null>(null)
+  const [scanMessage, setScanMessage] = useState('')
 
-  // Load errors on mount and refresh
-  useEffect(() => {
-    if (!hasAdminAccess) return
-
-    refreshErrors()
-    const interval = setInterval(refreshErrors, 5000)
-    return () => clearInterval(interval)
-  }, [filter, searchQuery, hasAdminAccess])
-
-  const refreshErrors = () => {
+  const refreshErrors = useCallback(() => {
     try {
       let allErrors = getErrors()
 
@@ -82,7 +130,76 @@ export default function AdminSecurityDashboard() {
       console.error('Error loading errors:', error)
       setLoading(false)
     }
+  }, [filter, searchQuery])
+
+  const loadSecuritySummary = useCallback(async () => {
+    try {
+      const response = await fetch('/api/analytics/summary', { cache: 'no-store' })
+      if (!response.ok) throw new Error(`Security summary failed: ${response.status}`)
+      setSecuritySummary(await response.json())
+    } catch (error) {
+      setSecuritySummary({
+        ok: false,
+        error: error instanceof Error ? error.message : 'Security summary failed',
+      })
+    }
+  }, [])
+
+  const handleReloadScan = async () => {
+    setReloading(true)
+    setScanMessage('')
+
+    try {
+      refreshErrors()
+      const monitorResponse = await fetch('/api/analytics/monitor', {
+        method: 'POST',
+        cache: 'no-store',
+      })
+
+      if (!monitorResponse.ok) {
+        throw new Error(`Monitor checks failed: ${monitorResponse.status}`)
+      }
+
+      await loadSecuritySummary()
+      setLastAutoRefreshAt(new Date().toISOString())
+      setScanMessage('Reloaded errors, login signals, admin activity, and monitor alerts.')
+    } catch (error) {
+      await loadSecuritySummary()
+      setLastAutoRefreshAt(new Date().toISOString())
+      setScanMessage(error instanceof Error ? error.message : 'Reload scan failed')
+    } finally {
+      setReloading(false)
+    }
   }
+
+  // Load errors and security signals on mount, then keep the local error list fresh.
+  useEffect(() => {
+    if (!hasAdminAccess) return
+
+    let cancelled = false
+
+    const refreshLiveData = async () => {
+      refreshErrors()
+      await loadSecuritySummary()
+      if (!cancelled) setLastAutoRefreshAt(new Date().toISOString())
+    }
+
+    refreshLiveData()
+
+    if (!autoRefresh) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const errorsInterval = setInterval(refreshErrors, 5000)
+    const summaryInterval = setInterval(refreshLiveData, AUTO_REFRESH_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(errorsInterval)
+      clearInterval(summaryInterval)
+    }
+  }, [autoRefresh, hasAdminAccess, loadSecuritySummary, refreshErrors])
 
   const handleResolveError = (errorId: string, notes?: string) => {
     resolveError(errorId, 'admin', notes)
@@ -90,6 +207,7 @@ export default function AdminSecurityDashboard() {
   }
 
   const handleDeleteError = (errorId: string) => {
+    if (!window.confirm('Delete this error log entry? This cannot be undone.')) return
     deleteError(errorId)
     refreshErrors()
   }
@@ -139,19 +257,127 @@ export default function AdminSecurityDashboard() {
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Back Button */}
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-primary hover:text-[#3aad9a] mb-6 font-semibold"
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-6 hover:text-primary"
           >
-            <ArrowLeft size={20} />
-            Back to Admin
-          </button>
+            <ArrowLeft size={14} />
+            Control center
+          </Link>
 
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Security & Debugging</h1>
-            <p className="text-gray-600">Monitor errors, issues, and system health</p>
+          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-950 mb-1">Security &amp; debugging</h1>
+              <p className="text-sm text-gray-600">
+                Live application errors, access signals, monitoring alerts, and known-issue resolution guides.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setAutoRefresh((enabled) => !enabled)}
+                className={`inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold shadow-sm transition ${
+                  autoRefresh
+                    ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <RefreshCw size={16} />
+                Auto refresh {autoRefresh ? 'on (30s)' : 'off'}
+              </button>
+
+              <button
+                onClick={handleReloadScan}
+                disabled={reloading}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-deep disabled:cursor-not-allowed disabled:bg-primary/50"
+              >
+                <RefreshCw size={16} className={reloading ? 'animate-spin' : ''} />
+                {reloading ? 'Reloading...' : 'Reload scan'}
+              </button>
+            </div>
           </div>
+
+          {(scanMessage || securitySummary?.error) && (
+            <div className={`mb-6 rounded-lg border px-4 py-3 text-sm font-semibold ${
+              securitySummary?.error ? 'border-orange-200 bg-orange-50 text-orange-800' : 'border-green-200 bg-green-50 text-green-800'
+            }`}>
+              {scanMessage || securitySummary?.error}
+            </div>
+          )}
+
+          {/* Security Signals */}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8">
+            <div className={`rounded-lg border p-5 ${signalTone(securitySummary?.overview?.criticalAlerts || 0)}`}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">Critical alerts</p>
+                <Shield size={20} />
+              </div>
+              <p className="mt-3 text-3xl font-bold">{securitySummary?.overview?.criticalAlerts || 0}</p>
+              <p className="mt-1 text-xs opacity-80">Open monitor alerts marked critical</p>
+            </div>
+
+            <div className={`rounded-lg border p-5 ${signalTone(securitySummary?.overview?.authFailuresToday || 0, 5)}`}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">Failed logins today</p>
+                <UserX size={20} />
+              </div>
+              <p className="mt-3 text-3xl font-bold">{securitySummary?.overview?.authFailuresToday || 0}</p>
+              <p className="mt-1 text-xs opacity-80">Customer and account login failure events</p>
+            </div>
+
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 text-blue-800">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">Admin views today</p>
+                <Activity size={20} />
+              </div>
+              <p className="mt-3 text-3xl font-bold">{securitySummary?.overview?.adminPathViewsToday || 0}</p>
+              <p className="mt-1 text-xs opacity-80">Visits to /admin routes from analytics</p>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-5 text-gray-800">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">Last signal</p>
+                <RefreshCw size={20} />
+              </div>
+              <p className="mt-3 text-lg font-bold">{formatDateTime(securitySummary?.overview?.lastEventAt)}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                Reloaded {formatDateTime(lastAutoRefreshAt || securitySummary?.generatedAt)}
+              </p>
+            </div>
+          </div>
+
+          {securitySummary?.alerts && securitySummary.alerts.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-xl font-bold text-gray-900">Open Security Alerts</h2>
+                <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+                  {securitySummary.alerts.length} open
+                </span>
+              </div>
+              <div className="space-y-3">
+                {securitySummary.alerts.slice(0, 5).map((alert) => (
+                  <div key={alert.id} className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 p-4">
+                    <div>
+                      <p className="font-semibold text-gray-950">{alert.title}</p>
+                      <p className="text-sm text-gray-500">
+                        {alert.category} / {formatDateTime(alert.created_at)}
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                      alert.severity === 'critical'
+                        ? 'bg-red-100 text-red-700'
+                        : alert.severity === 'warning'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {alert.severity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Stats Cards */}
           {stats && (
@@ -203,7 +429,7 @@ export default function AdminSecurityDashboard() {
             <div className="bg-white rounded-lg shadow p-6 mb-8">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Error Types</h2>
               <div className="grid md:grid-cols-4 gap-4">
-                {Object.entries(stats.byType).map(([type, count]: any) => (
+                {Object.entries(stats.byType).map(([type, count]) => (
                   <div key={type} className="p-4 bg-gray-50 rounded-lg">
                     <p className="text-gray-600 text-sm font-semibold mb-2 capitalize">{type}</p>
                     <p className="text-2xl font-bold text-gray-900">{count}</p>
@@ -242,11 +468,12 @@ export default function AdminSecurityDashboard() {
                 </select>
 
                 <button
-                  onClick={refreshErrors}
+                  onClick={handleReloadScan}
+                  disabled={reloading}
                   className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
                 >
-                  <RefreshCw size={18} />
-                  Refresh
+                  <RefreshCw size={18} className={reloading ? 'animate-spin' : ''} />
+                  Reload scan
                 </button>
 
                 <button

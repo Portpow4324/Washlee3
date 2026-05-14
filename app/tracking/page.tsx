@@ -2,15 +2,12 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Head from 'next/head'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import LiveTracking from '@/components/LiveTracking'
-import Spinner from '@/components/Spinner'
-import { MapPin, Navigation } from 'lucide-react'
+import Link from 'next/link'
+import { MapPin, Navigation, AlertCircle, Phone, ArrowRight, ArrowLeft, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
-
-const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
 interface Order {
   id: string
@@ -28,16 +25,41 @@ interface Order {
   pro_lng?: number
 }
 
+const STATUS_BADGE: Record<string, string> = {
+  confirmed: 'bg-mint text-primary-deep',
+  pending_payment: 'bg-amber-100 text-amber-800',
+  in_progress: 'bg-blue-100 text-blue-800',
+  picked_up: 'bg-blue-100 text-blue-800',
+  washing: 'bg-blue-100 text-blue-800',
+  out_for_delivery: 'bg-blue-100 text-blue-800',
+  completed: 'bg-emerald-100 text-emerald-800',
+  cancelled: 'bg-red-100 text-red-700',
+}
+
+function formatStatus(status?: string): string {
+  if (!status) return ''
+  const cleaned = status.replace(/[_-]/g, ' ')
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+}
+
 function TrackingPageContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('id') || searchParams.get('orderId')
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [proLocation, setProLocation] = useState<any>(null)
-  const [customerLocation, setCustomerLocation] = useState<any>(null)
+  const [proLocation, setProLocation] = useState<{
+    lat: number
+    lng: number
+    status: string
+    name: string
+    phone: string
+    rating?: number
+    vehicle: string
+    eta: string
+  } | null>(null)
+  const [customerLocation, setCustomerLocation] = useState<{ lat: number; lng: number } | null>(null)
 
-  // Fetch order data
   useEffect(() => {
     if (!orderId) {
       setError('No order ID provided')
@@ -48,9 +70,7 @@ function TrackingPageContent() {
     const fetchOrder = async () => {
       try {
         setLoading(true)
-        console.log('[Tracking] Fetching order:', orderId)
 
-        // First try with full columns
         let { data, error: fetchError } = await supabase
           .from('orders')
           .select(`
@@ -65,65 +85,44 @@ function TrackingPageContent() {
           .eq('id', orderId)
           .single()
 
-        // Fallback if columns don't exist
         if (fetchError && fetchError.message?.includes('column')) {
-          console.warn('[Tracking] Some columns missing, trying basic select:', fetchError.message)
           const basicResult = await supabase
             .from('orders')
-            .select(`
-              id,
-              status,
-              user_id,
-              pro_id
-            `)
+            .select(`id, status, user_id, pro_id`)
             .eq('id', orderId)
             .single()
-          
           data = basicResult.data
           fetchError = basicResult.error
         }
 
-        if (fetchError) {
+        if (fetchError || !data) {
           console.error('[Tracking] Error fetching order:', fetchError)
-          setError('Order not found - ' + (fetchError?.message || 'Unknown error'))
+          setError('Order not found' + (fetchError?.message ? ` — ${fetchError.message}` : ''))
           setLoading(false)
           return
         }
 
-        // Fetch customer name
         let customerName = 'Customer'
         if (data.user_id) {
           try {
-            console.log('[Tracking] Fetching customer for user_id:', data.user_id)
-            // Use maybeSingle() to return null instead of error when no rows found
             const { data: customerData, error: customerError } = await supabase
               .from('users')
               .select('name, phone')
               .eq('id', data.user_id)
               .maybeSingle()
-            if (customerError) {
-              console.warn('[Tracking] ⚠️ Error fetching customer:', customerError.code, customerError.message, 'for user_id:', data.user_id)
-            }
             if (customerData && !customerError) {
               customerName = customerData.name || 'Customer'
-              console.log('[Tracking] ✅ Got customer name:', customerName)
-            } else if (!customerError) {
-              console.warn('[Tracking] ⚠️ No customer profile found for user_id:', data.user_id, '- profile may not have been created')
             }
           } catch (err) {
-            console.warn('[Tracking] ⚠️ Exception fetching customer name:', err)
+            console.warn('[Tracking] Error fetching customer name:', err)
           }
-        } else {
-          console.warn('[Tracking] ⚠️ Order has NO user_id')
         }
 
-        // Fetch pro details if assigned
         let proName: string | undefined
         let proPhone: string | undefined
         let proServiceArea: string | undefined
         if (data.pro_id) {
           try {
-            // Use maybeSingle() to handle missing pro profile gracefully
             const { data: proData, error: proError } = await supabase
               .from('users')
               .select('name, phone')
@@ -132,15 +131,11 @@ function TrackingPageContent() {
             if (proData && !proError) {
               proName = proData.name || 'Pro'
               proPhone = proData.phone
-              console.log('[Tracking] ✅ Got pro name:', proName)
-            } else if (!proError) {
-              console.warn('[Tracking] ⚠️ No pro profile found for pro_id:', data.pro_id)
             }
           } catch (err) {
-            console.warn('[Tracking] ⚠️ Could not fetch pro name:', err)
+            console.warn('[Tracking] Could not fetch pro name:', err)
           }
-          
-          // Get service area from pro_inquiries
+
           try {
             const { data: proInquiry, error: inquiryError } = await supabase
               .from('pro_inquiries')
@@ -149,12 +144,9 @@ function TrackingPageContent() {
               .maybeSingle()
             if (proInquiry && !inquiryError && proInquiry.service_area) {
               proServiceArea = proInquiry.service_area
-              console.log('[Tracking] ✅ Got pro service area:', proServiceArea)
-            } else if (!inquiryError) {
-              console.warn('[Tracking] ⚠️ No pro inquiry found for pro_id:', data.pro_id)
             }
           } catch (err) {
-            console.warn('[Tracking] ⚠️ Could not fetch pro service area:', err)
+            console.warn('[Tracking] Could not fetch pro service area:', err)
           }
         }
 
@@ -167,33 +159,16 @@ function TrackingPageContent() {
           pro_service_area: proServiceArea,
           pickup_address: data.pickup_address || undefined,
           delivery_address: data.delivery_address || undefined,
-          weight: data.weight || undefined,
-          scheduled_pickup_date: data.scheduled_pickup_date || undefined
+          weight: (data as { weight?: number }).weight ?? undefined,
+          scheduled_pickup_date: data.scheduled_pickup_date || undefined,
         }
 
         setOrder(transformedOrder)
-        console.log('[Tracking] Loaded order:', transformedOrder)
 
-        // Set up pro location (mock for now - would be real-time in production)
-        if (transformedOrder.pro_name) {
-          setProLocation({
-            lat: -33.8688 + Math.random() * 0.1,
-            lng: 151.2093 + Math.random() * 0.1,
-            status: transformedOrder.status,
-            name: transformedOrder.pro_name,
-            phone: transformedOrder.pro_phone || '+61 2 XXXX XXXX',
-            rating: transformedOrder.pro_rating || 4.8,
-            vehicle: 'Blue Toyota Camry',
-            eta: '8 mins'
-          })
-        }
-
-        // Set customer location (delivery address)
-        setCustomerLocation({
-          lat: -33.8688,
-          lng: 151.2093
-        })
-
+        // Do not seed fake map coordinates or fake Pro ratings. Live tracking
+        // should appear only when a real location stream is available.
+        setProLocation(null)
+        setCustomerLocation(null)
         setLoading(false)
       } catch (err) {
         console.error('[Tracking] Error:', err)
@@ -204,20 +179,14 @@ function TrackingPageContent() {
 
     fetchOrder()
 
-    // Set up real-time subscription for order updates
     const subscription = supabase
       .channel(`order:${orderId}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
-        (payload: any) => {
-          console.log('[Tracking] Real-time update:', payload)
+        (payload: { new?: { status?: string } }) => {
           if (payload.new) {
-            setOrder((prev: any) =>
-              prev
-                ? { ...prev, status: payload.new.status }
-                : null
-            )
+            setOrder((prev) => (prev ? { ...prev, status: payload.new!.status ?? prev.status } : prev))
           }
         }
       )
@@ -230,235 +199,219 @@ function TrackingPageContent() {
 
   if (loading) {
     return (
-      <>
-        {googleMapsApiKey && (
-          <Head>
-            <script
-              src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`}
-              async
-              defer
-            ></script>
-          </Head>
-        )}
-        <div className="min-h-screen bg-light flex flex-col">
-          <Header />
-          <main className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <Spinner />
-              <p className="mt-4 text-gray font-semibold">Loading tracking information...</p>
-            </div>
-          </main>
-          <Footer />
-        </div>
-      </>
+      <div className="min-h-screen bg-soft-mint flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 text-gray">
+            <div className="animate-spin h-8 w-8 rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-sm">Loading tracking…</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
     )
   }
 
   if (error) {
     return (
-      <>
-        {googleMapsApiKey && (
-          <Head>
-            <script
-              src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`}
-              async
-              defer
-            ></script>
-          </Head>
-        )}
-        <div className="min-h-screen bg-light flex flex-col">
-          <Header />
-          <main className="flex-1 flex items-center justify-center px-4">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full text-center border border-red-200">
-              <p className="text-red-600 font-semibold mb-4">⚠️ {error}</p>
-              <p className="text-gray text-sm">
-                Please check the order ID and try again, or contact support@washlee.com
-              </p>
-            </div>
-          </main>
-          <Footer />
-        </div>
-      </>
-    )
-  }
-
-  return (
-    <>
-      {googleMapsApiKey && (
-        <Head>
-          <script
-            src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`}
-            async
-            defer
-          ></script>
-        </Head>
-      )}
-      <div className="min-h-screen bg-light flex flex-col">
+      <div className="min-h-screen bg-soft-mint flex flex-col">
         <Header />
-        <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-12">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-dark mb-2">Track Your Order</h1>
-            <p className="text-gray">Order #{order?.id?.slice(0, 8).toUpperCase()}</p>
-          </div>
-
-          {/* Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main tracking map */}
-            <div className="lg:col-span-2">
-              {order?.status === 'cancelled' ? (
-                <div className="bg-white rounded-lg p-12 border border-red-200 text-center">
-                  <div className="text-5xl mb-4">❌</div>
-                  <h2 className="text-2xl font-bold text-red-700 mb-2">Order Cancelled</h2>
-                  <p className="text-gray mb-6">This order is no longer active and will be removed from your dashboard in 24 hours.</p>
-                  <div className="bg-red-50 rounded-lg p-6 text-left max-w-sm mx-auto">
-                    <p className="text-sm font-semibold text-red-700 mb-3">What happens next:</p>
-                    <ul className="text-sm text-gray space-y-2">
-                      <li>✓ Cancellation confirmation sent to your email</li>
-                      <li>✓ Refund will be processed within 24 hours</li>
-                      <li>✓ Order will be removed from dashboard in 24 hours</li>
-                      <li>✓ You can request details via support@washlee.com.au</li>
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                <LiveTracking
-                  orderId={orderId || ''}
-                  proLocation={proLocation}
-                  customerLocation={customerLocation}
-                  orderStatus={order?.status}
-                />
-              )}
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="surface-card p-8 max-w-md w-full text-center">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4">
+              <AlertCircle size={20} className="text-red-600" />
             </div>
-
-            {/* Order Details Sidebar */}
-            <div className="space-y-6">
-              {/* Cancelled Order Alert */}
-              {order?.status === 'cancelled' && (
-                <div className="bg-red-50 rounded-lg p-6 border border-red-200">
-                  <div className="flex gap-3">
-                    <div className="text-2xl">⚠️</div>
-                    <div>
-                      <h3 className="font-bold text-red-700 mb-2">Order Cancelled</h3>
-                      <p className="text-sm text-red-600 mb-3">
-                        This order has been cancelled. It will be automatically removed from your dashboard in 24 hours.
-                      </p>
-                      <div className="bg-white rounded px-3 py-2 text-xs text-gray">
-                        <p className="font-semibold text-dark mb-1">Next Steps:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li>Check your email for cancellation confirmation</li>
-                          <li>Refund will be processed within 24 hours</li>
-                          <li>Contact support@washlee.com.au for questions</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Order Summary */}
-              <div className="bg-white rounded-lg p-6 border border-gray/10">
-                <h3 className="font-bold text-dark mb-4">Order Details</h3>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-gray uppercase mb-1">Status</p>
-                    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${
-                      order?.status === 'cancelled' 
-                        ? 'bg-red-100 text-red-700' 
-                        : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full ${
-                        order?.status === 'cancelled' 
-                          ? 'bg-red-500' 
-                          : 'bg-blue-500 animate-pulse'
-                      }`} />
-                      {order?.status?.replace(/-/g, ' ')}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray uppercase mb-1">Weight</p>
-                    <p className="font-semibold text-dark">{order?.weight} kg</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray uppercase mb-1">Scheduled Pickup</p>
-                    <p className="font-semibold text-dark">
-                      {order?.scheduled_pickup_date
-                        ? new Date(order.scheduled_pickup_date).toLocaleDateString('en-AU', {
-                            weekday: 'short',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })
-                        : 'Not scheduled'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Address Info */}
-              <div className="bg-white rounded-lg p-6 border border-gray/10">
-                <h3 className="font-bold text-dark mb-4">Addresses</h3>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs text-gray uppercase mb-1 flex items-center gap-1"><MapPin size={14} /> Pickup</p>
-                    <p className="text-sm text-dark">{order?.pickup_address || 'Not provided'}</p>
-                  </div>
-                  <div className="border-t border-gray/10 pt-4">
-                    <p className="text-xs text-gray uppercase mb-1 flex items-center gap-1"><Navigation size={14} /> Delivery</p>
-                    <p className="text-sm text-dark">{order?.delivery_address || 'Not provided'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pro Information */}
-              {order?.pro_name && (
-                <div className="bg-white rounded-lg p-6 border border-gray/10">
-                  <h3 className="font-bold text-dark mb-4">Your Washlee Pro</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-xs text-gray uppercase mb-1">Name</p>
-                      <p className="font-semibold text-dark">{order.pro_name}</p>
-                    </div>
-                    {order.pro_phone && (
-                      <div>
-                        <p className="text-xs text-gray uppercase mb-1">Contact</p>
-                        <p className="font-semibold text-dark">{order.pro_phone}</p>
-                      </div>
-                    )}
-                    {order.pro_service_area && (
-                      <div>
-                        <p className="text-xs text-gray uppercase mb-1">Service Area</p>
-                        <p className="font-semibold text-dark">{order.pro_service_area}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Support */}
-              <div className="bg-mint rounded-lg p-6">
-                <h3 className="font-bold text-dark mb-2">Need Help?</h3>
-                <p className="text-sm text-gray mb-4">Contact us anytime for support</p>
-                <a href="mailto:support@washlee.com" className="text-primary font-semibold hover:underline">
-                  support@washlee.com
-                </a>
-              </div>
+            <h1 className="text-xl font-bold text-dark mb-2">{error}</h1>
+            <p className="text-gray text-sm mb-5">
+              Check the order ID, or open your dashboard for the full list.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link href="/dashboard/orders" className="btn-primary flex-1">
+                <ArrowLeft size={16} />
+                My orders
+              </Link>
+              <Link href="/contact" className="btn-outline flex-1">
+                Contact support
+              </Link>
             </div>
           </div>
         </main>
         <Footer />
       </div>
-    </>
+    )
+  }
+
+  const statusBadgeClass = STATUS_BADGE[order?.status || ''] ?? 'bg-line text-dark'
+
+  return (
+    <div className="min-h-screen bg-soft-mint flex flex-col">
+      <Header />
+      <main className="flex-1 container-page py-8 sm:py-12">
+        <div className="mb-6">
+          <Link
+            href="/dashboard/orders"
+            className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-4 hover:text-primary"
+          >
+            <ArrowLeft size={16} />
+            All orders
+          </Link>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-dark mb-1">Track your order</h1>
+              <p className="text-gray text-sm">Order #{order?.id?.slice(0, 8).toUpperCase()}</p>
+            </div>
+            <span
+              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${statusBadgeClass}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${order?.status === 'cancelled' ? 'bg-red-500' : 'bg-primary-deep animate-pulse'}`} />
+              {formatStatus(order?.status)}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Map / cancelled state */}
+          <div className="lg:col-span-2">
+            {order?.status === 'cancelled' ? (
+              <div className="surface-card p-8 sm:p-12 text-center">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 mb-4">
+                  <AlertCircle size={22} className="text-red-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-dark mb-1">Order cancelled</h2>
+                <p className="text-gray text-sm mb-6">
+                  This order is no longer active. We&rsquo;ll auto-remove it from your dashboard in 24 hours.
+                </p>
+                <div className="rounded-2xl bg-mint/40 border border-primary/15 p-5 text-left max-w-sm mx-auto">
+                  <p className="font-semibold text-dark mb-2 text-sm">What happens next</p>
+                  <ul className="text-sm text-gray space-y-1.5">
+                    <li>• Cancellation confirmation sent to your email</li>
+                    <li>• Refund processed within 24 hours</li>
+                    <li>• Order hidden from dashboard in 24 hours</li>
+                    <li>
+                      • Questions? Email{' '}
+                      <a href="mailto:support@washlee.com.au" className="text-primary-deep font-semibold hover:underline">
+                        support@washlee.com.au
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div className="surface-card p-2 sm:p-3 overflow-hidden">
+                <LiveTracking
+                  orderId={orderId || ''}
+                  proLocation={proLocation ?? undefined}
+                  customerLocation={customerLocation ?? undefined}
+                  orderStatus={order?.status}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <aside className="space-y-4">
+            <div className="surface-card p-6">
+              <h3 className="font-bold text-dark mb-4">Order details</h3>
+              <dl className="space-y-3 text-sm">
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wider text-gray-soft mb-0.5">Weight</dt>
+                  <dd className="font-semibold text-dark">{order?.weight ? `${order.weight}kg` : '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wider text-gray-soft mb-0.5">Scheduled pickup</dt>
+                  <dd className="font-semibold text-dark">
+                    {order?.scheduled_pickup_date
+                      ? new Date(order.scheduled_pickup_date).toLocaleDateString('en-AU', {
+                          weekday: 'short',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })
+                      : 'Not scheduled'}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="surface-card p-6">
+              <h3 className="font-bold text-dark mb-4">Addresses</h3>
+              <div className="space-y-4 text-sm">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-gray-soft mb-1 flex items-center gap-1">
+                    <MapPin size={12} /> Pickup
+                  </p>
+                  <p className="text-dark">{order?.pickup_address || 'Not provided'}</p>
+                </div>
+                <div className="border-t border-line pt-4">
+                  <p className="text-[11px] uppercase tracking-wider text-gray-soft mb-1 flex items-center gap-1">
+                    <Navigation size={12} /> Delivery
+                  </p>
+                  <p className="text-dark">{order?.delivery_address || 'Not provided'}</p>
+                </div>
+              </div>
+            </div>
+
+            {order?.pro_name && (
+              <div className="surface-card p-6">
+                <h3 className="font-bold text-dark mb-4">Your Washlee Pro</h3>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-gray-soft mb-0.5">Name</p>
+                    <p className="font-semibold text-dark">{order.pro_name}</p>
+                  </div>
+                  {order.pro_phone && (
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-gray-soft mb-0.5">Contact</p>
+                      <a
+                        href={`tel:${order.pro_phone}`}
+                        className="inline-flex items-center gap-1.5 font-semibold text-primary-deep hover:underline"
+                      >
+                        <Phone size={14} /> {order.pro_phone}
+                      </a>
+                    </div>
+                  )}
+                  {order.pro_service_area && (
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-gray-soft mb-0.5">Service area</p>
+                      <p className="font-semibold text-dark">{order.pro_service_area}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="surface-card p-6 bg-mint/40">
+              <h3 className="font-bold text-dark mb-1">Need help?</h3>
+              <p className="text-sm text-gray mb-4">Reach out anytime — support replies within one business day.</p>
+              <a
+                href="mailto:support@washlee.com.au"
+                className="inline-flex items-center gap-2 font-semibold text-primary-deep hover:underline text-sm"
+              >
+                <Mail size={14} />
+                support@washlee.com.au
+              </a>
+              <Link href="/dashboard/support" className="btn-outline w-full mt-4 text-sm">
+                Open in-app support
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          </aside>
+        </div>
+      </main>
+      <Footer />
+    </div>
   )
 }
 
 export default function TrackingPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-light">
-        <Spinner />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-soft-mint">
+          <div className="animate-spin h-8 w-8 rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      }
+    >
       <TrackingPageContent />
     </Suspense>
   )

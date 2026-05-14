@@ -2,9 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
-import { CheckCircle, AlertCircle } from 'lucide-react'
-import Button from '@/components/Button'
+import { CheckCircle, AlertCircle, Mail, ArrowRight, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 function VerifyEmailCodeContent() {
@@ -20,20 +18,17 @@ function VerifyEmailCodeContent() {
   const [status, setStatus] = useState<'form' | 'success' | 'error'>('form')
 
   useEffect(() => {
-    // Get email from URL params or localStorage
     const emailParam = searchParams?.get('email')
-    
     if (emailParam) {
       setEmail(decodeURIComponent(emailParam))
+      return
+    }
+    const storedEmail = localStorage.getItem('pendingVerificationEmail')
+    if (storedEmail) {
+      setEmail(storedEmail)
     } else {
-      // Try to get from localStorage (set during login attempt)
-      const storedEmail = localStorage.getItem('pendingVerificationEmail')
-      if (storedEmail) {
-        setEmail(storedEmail)
-      } else {
-        setStatus('error')
-        setError('No email found. Please try signing up or logging in again.')
-      }
+      setStatus('error')
+      setError('No email found. Please sign up or sign in again.')
     }
   }, [searchParams])
 
@@ -45,57 +40,45 @@ function VerifyEmailCodeContent() {
 
     try {
       if (!code.trim() || code.length < 4) {
-        setError('Please enter a valid verification code')
+        setError('Please enter a valid verification code.')
         setIsVerifying(false)
         return
       }
-
       if (!email) {
         setError('Email address not found. Please try again.')
         setIsVerifying(false)
         return
       }
 
-      // Verify the code using our custom API endpoint
-      console.log('[VerifyEmailCode] Verifying code for email:', email)
-      
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code })
+        body: JSON.stringify({ email, code }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        console.error('[VerifyEmailCode] Verification error:', data)
         setError(data.error || 'Invalid verification code. Please try again.')
         setIsVerifying(false)
         return
       }
-
       if (!data.success) {
-        console.error('[VerifyEmailCode] Verification not successful')
         setError('Verification failed. Please try again.')
         setIsVerifying(false)
         return
       }
 
-      console.log('[VerifyEmailCode] ✓ Email verified:', data.userId)
-      setSuccessMessage('✅ Email verified! Redirecting to complete your profile...')
+      setSuccessMessage('Email verified — redirecting…')
       setStatus('success')
-
-      // Store email in localStorage for next step
       localStorage.setItem('verifiedEmail', email)
       localStorage.removeItem('pendingVerificationEmail')
 
-      // Redirect to usage type selection after 2 seconds
-      setTimeout(() => {
-        router.push('/auth/select-usage-type')
-      }, 2000)
-    } catch (err: any) {
+      setTimeout(() => router.push('/auth/select-usage-type'), 1800)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to verify code'
       console.error('[VerifyEmailCode] Error verifying code:', err)
-      setError(err.message || 'Failed to verify code. Please try again.')
+      setError(message)
       setIsVerifying(false)
     }
   }
@@ -112,187 +95,157 @@ function VerifyEmailCodeContent() {
         return
       }
 
-      console.log('[VerifyEmailCode] Resending verification code to:', email)
-
       const response = await fetch('/api/auth/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email }),
       })
-
       const data = await response.json()
 
       if (!response.ok) {
-        console.error('[VerifyEmailCode] Resend error:', data)
-        setError(data.error || 'Failed to resend verification code. Please try again.')
+        setError(data.error || 'Failed to resend verification code.')
         setIsResending(false)
         return
       }
 
-      console.log('[VerifyEmailCode] ✓ Verification code resent successfully')
-      setSuccessMessage('✅ New verification code sent! Check your email.')
+      setSuccessMessage('A fresh code is on its way. Check your inbox.')
       setCode('')
       setIsResending(false)
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to resend verification code'
       console.error('[VerifyEmailCode] Error resending code:', err)
-      setError(err.message || 'Failed to resend verification code. Please try again.')
+      setError(message)
       setIsResending(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4 py-8">
-      <Link href="/" className="absolute top-6 right-6 px-4 py-2 bg-white text-primary rounded-full font-semibold hover:shadow-lg transition">
-        Home
-      </Link>
+    <main className="min-h-screen bg-soft-hero flex flex-col">
+      <header className="container-page py-5 flex items-center justify-between">
+        <Link
+          href="/auth/login"
+          className="inline-flex items-center gap-2 text-primary-deep font-semibold hover:text-primary transition"
+        >
+          <ArrowLeft size={18} />
+          Back to sign in
+        </Link>
+        <Link href="/" className="text-sm font-semibold text-gray hover:text-primary-deep transition">
+          Home
+        </Link>
+      </header>
 
-      <div className="w-full max-w-md">
-        {/* Form State */}
-        {status === 'form' && (
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="text-center mb-8">
-              <div className="inline-block bg-blue-100 rounded-full p-4 mb-4">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h1 className="text-3xl font-bold text-dark">Verify Your Email</h1>
-              <p className="text-gray mt-2">We sent a verification code to:</p>
-              <p className="font-semibold text-primary mt-1">{email}</p>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
-                {error}
-              </div>
-            )}
-
-            {/* Success Message */}
-            {successMessage && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm text-center">
-                {successMessage}
-              </div>
-            )}
-
-            <form onSubmit={handleVerifyCode} className="space-y-5">
-              {/* Code Input */}
-              <div>
-                <label className="block text-sm font-medium text-dark mb-2">
-                  Enter Verification Code
-                </label>
-                <input
-                  type="text"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="Q7ZGM2"
-                  maxLength={10}
-                  required
-                  autoFocus
-                  className="w-full px-4 py-4 border-2 border-gray-300 rounded-lg font-bold text-center text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-                <p className="text-xs text-gray mt-2">The code is in the email we just sent you. It expires in 24 hours.</p>
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 pb-10">
+        <div className="w-full max-w-md animate-slide-up">
+          {status === 'form' && (
+            <div className="surface-card p-6 sm:p-8">
+              <div className="text-center mb-7">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-mint mb-4">
+                  <Mail size={20} className="text-primary-deep" />
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-dark mb-1">Verify your email</h1>
+                <p className="text-sm text-gray">We sent a code to:</p>
+                <p className="font-semibold text-primary-deep break-all mt-1">{email}</p>
               </div>
 
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                disabled={isVerifying}
-                variant="primary"
-                className="w-full mt-8 flex items-center justify-center gap-2"
-              >
-                {isVerifying ? (
-                  <>
-                    <div className="inline-block">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    </div>
-                    Verifying...
-                  </>
-                ) : (
-                  'Verify Email'
-                )}
-              </Button>
+              {error && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 mb-5 flex gap-2">
+                  <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
 
-              {/* Help Text */}
-              <div className="space-y-3 mt-6">
+              {successMessage && (
+                <div className="rounded-xl bg-mint border border-primary/20 px-4 py-3 mb-5 flex items-center gap-2">
+                  <CheckCircle size={18} className="text-primary-deep flex-shrink-0" />
+                  <p className="text-sm font-semibold text-dark">{successMessage}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleVerifyCode} className="space-y-5">
+                <div>
+                  <label htmlFor="code" className="label-field">Verification code</label>
+                  <input
+                    id="code"
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    placeholder="Q7ZGM2"
+                    maxLength={10}
+                    required
+                    autoFocus
+                    autoComplete="one-time-code"
+                    inputMode="text"
+                    className="input-field text-center text-2xl font-bold tracking-[0.4em] uppercase"
+                  />
+                  <p className="text-xs text-gray-soft mt-1.5">The code is in the email we just sent. It expires in 24 hours.</p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isVerifying}
+                  className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isVerifying ? 'Verifying…' : 'Verify email'}
+                  {!isVerifying && <ArrowRight size={16} />}
+                </button>
+
                 <p className="text-center text-sm text-gray">
-                  Didn't receive the code?{' '}
+                  Didn&rsquo;t receive it?{' '}
                   <button
                     type="button"
                     disabled={isResending}
                     onClick={handleResendCode}
-                    className="text-primary font-semibold hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-primary-deep font-semibold hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isResending ? 'Sending...' : 'Resend Code'}
+                    {isResending ? 'Sending…' : 'Resend code'}
                   </button>
                 </p>
-                <p className="text-center text-xs text-gray">
-                  <button
-                    type="button"
-                    onClick={() => router.push('/auth/login')}
-                    className="text-primary hover:underline"
-                  >
-                    Back to Login
-                  </button>
-                </p>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Success State */}
-        {status === 'success' && (
-          <div className="text-center">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-6" />
-            <h1 className="text-3xl font-bold text-dark mb-2">Email Verified! 🎉</h1>
-            <p className="text-gray mb-6">
-              Great! Your email has been confirmed. Let's complete your profile setup.
-            </p>
-            <p className="text-sm text-gray">Redirecting to profile setup...</p>
-          </div>
-        )}
-
-        {/* Error State */}
-        {status === 'error' && (
-          <div className="text-center">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
-            <h1 className="text-3xl font-bold text-dark mb-2">Something Went Wrong</h1>
-            <p className="text-gray mb-8">{error}</p>
-            <div className="space-y-3">
-              <Button
-                onClick={() => router.push('/auth/login')}
-                variant="primary"
-                className="w-full"
-              >
-                Back to Login
-              </Button>
-              <Button
-                onClick={() => router.push('/')}
-                variant="outline"
-                className="w-full"
-              >
-                Back to Home
-              </Button>
+              </form>
             </div>
-          </div>
-        )}
+          )}
+
+          {status === 'success' && (
+            <div className="surface-card p-8 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-mint mb-4">
+                <CheckCircle className="w-8 h-8 text-primary-deep" />
+              </div>
+              <h1 className="text-2xl font-bold text-dark mb-1">Email verified</h1>
+              <p className="text-gray text-sm">{successMessage || 'Redirecting to set up your profile…'}</p>
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="surface-card p-8 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 mb-4">
+                <AlertCircle className="w-8 h-8 text-red-600" />
+              </div>
+              <h1 className="text-2xl font-bold text-dark mb-2">Something went wrong</h1>
+              <p className="text-gray text-sm mb-6">{error}</p>
+              <div className="space-y-3">
+                <button onClick={() => router.push('/auth/login')} className="btn-primary w-full">
+                  Back to sign in
+                </button>
+                <Link href="/" className="btn-outline w-full">
+                  Back to home
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </main>
   )
 }
 
 export default function VerifyEmailCodePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-mint to-white">
-        <div className="text-center">
-          <div className="inline-block">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-          <p className="text-gray mt-4">Loading...</p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-gray">
+          <div className="animate-spin h-8 w-8 rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      </div>
-    }>
+      }
+    >
       <VerifyEmailCodeContent />
     </Suspense>
   )

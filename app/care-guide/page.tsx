@@ -2,422 +2,178 @@
 
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import Card from '@/components/Card'
-import { Check, AlertCircle, Droplets, Wind, Zap, Shirt } from 'lucide-react'
+import Link from 'next/link'
+import {
+  Check,
+  AlertCircle,
+  Droplets,
+  Wind,
+  Zap,
+  Shirt,
+  ArrowRight,
+  Thermometer,
+} from 'lucide-react'
+
+const standards = [
+  { icon: Thermometer, title: 'Right temperature', body: 'Cold for darks and delicates, warm for everyday loads, hot only when fabrics call for it.' },
+  { icon: Wind, title: 'Right cycle', body: 'Gentle, normal, or heavy chosen by load — never the same dial for everything.' },
+  { icon: Droplets, title: 'Eco detergent', body: 'pH-neutral, dye-safe, low-fragrance detergent by default. Tell us if you have a preference.' },
+  { icon: Zap, title: 'Smart drying', body: 'Tumble at low or medium heat, with hang dry available for delicates and stretchy fabrics.' },
+]
+
+const fabrics = [
+  {
+    fabric: 'Cotton',
+    blurb: 'Most-used fabric we handle.',
+    care: ['Warm wash, normal cycle', 'Standard detergent', 'Tumble dry medium', 'Light shrinkage possible (1–2%)'],
+  },
+  {
+    fabric: 'Polyester &amp; blends',
+    blurb: 'Durable and colour-fast.',
+    care: ['Warm wash, gentle cycle', 'Standard detergent', 'Tumble dry low', 'Resistant to shrinking'],
+  },
+  {
+    fabric: 'Wool &amp; cashmere',
+    blurb: 'Treated as delicates.',
+    care: ['Cold wash, wool-specific detergent', 'Hang dry — no machine', 'Reshape while damp', 'Notes welcome'],
+  },
+  {
+    fabric: 'Activewear',
+    blurb: 'Stretch + moisture-wick.',
+    care: ['Cold wash, gentle', 'No fabric softener', 'Tumble dry low or hang', 'Skip dryer sheets'],
+  },
+  {
+    fabric: 'Denim',
+    blurb: 'Loved by us, kept dark.',
+    care: ['Cold wash inside-out', 'Colour-safe detergent', 'Tumble dry low', 'Some fade is normal'],
+  },
+  {
+    fabric: 'Linen',
+    blurb: 'Crisp and breezy.',
+    care: ['Warm wash, gentle', 'Mild detergent', 'Hang dry', 'Iron damp for best finish'],
+  },
+]
+
+const dontAccept = [
+  'Items with hazardous materials or contents',
+  'Flammable materials or garments',
+  'Items with sharp metal hardware that could damage other items',
+  'Leather or suede garments',
+  'Fur coats or fur-trimmed items',
+  'Items visibly damaged or falling apart',
+]
+
+const specialNotes = [
+  'Embellished items (sequins, beads) — we may need to hand wash',
+  'Swimwear &amp; lingerie — flag in booking notes',
+  'Vintage pieces — message us first if you&rsquo;re unsure',
+  'Visible stains — call them out so we can pre-treat',
+]
 
 export default function CareGuidePage() {
   return (
     <>
       <Header />
 
-      {/* Hero */}  
-      <section className="bg-gradient-to-br from-mint to-white py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <Shirt size={60} className="text-primary mx-auto mb-6" />
-          <h1 className="text-5xl sm:text-6xl font-bold text-dark mb-6">How Washlee Cares for Your Clothes</h1>
-          <p className="text-xl text-gray max-w-2xl mx-auto">
-            Every fabric is different. That's why we treat every garment with specialized care tailored to its needs.
+      <section className="bg-soft-hero">
+        <div className="container-page py-14 sm:py-24">
+          <div className="max-w-2xl">
+            <span className="pill mb-4">
+              <Shirt size={14} /> Care guide
+            </span>
+            <h1 className="h1 text-dark text-balance mb-4">How we care for your clothes.</h1>
+            <p className="text-lg text-gray leading-relaxed">
+              Every fabric is different. Here&rsquo;s how Washlee Pros sort, wash, dry, and fold so your wardrobe lasts longer.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="container-page py-14">
+        <div className="text-center mb-10">
+          <h2 className="section-title">Our care standards</h2>
+          <p className="section-subtitle">The defaults we apply to every order.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {standards.map((s) => (
+            <div key={s.title} className="surface-card p-6">
+              <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center mb-4">
+                <s.icon size={18} className="text-primary-deep" />
+              </div>
+              <h3 className="font-bold text-dark mb-1.5">{s.title}</h3>
+              <p className="text-sm text-gray leading-relaxed">{s.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-soft-mint">
+        <div className="container-page py-14">
+          <div className="text-center mb-10">
+            <h2 className="section-title">Fabric-by-fabric</h2>
+            <p className="section-subtitle">A quick guide to what we do with each material.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+            {fabrics.map((f) => (
+              <div key={f.fabric} className="surface-card p-6">
+                <h3
+                  className="font-bold text-dark mb-1"
+                  dangerouslySetInnerHTML={{ __html: f.fabric }}
+                />
+                <p className="text-xs text-gray-soft mb-3">{f.blurb}</p>
+                <ul className="space-y-1.5 text-sm text-gray">
+                  {f.care.map((c) => (
+                    <li key={c} className="flex items-start gap-1.5">
+                      <Check size={14} className="text-primary-deep flex-shrink-0 mt-0.5" />
+                      <span>{c}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="container-page py-14">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+          <div className="surface-card p-6 border-red-200 bg-red-50">
+            <h3 className="font-bold text-dark mb-3 flex items-center gap-2">
+              <AlertCircle size={18} className="text-red-600" /> What we can&rsquo;t accept
+            </h3>
+            <ul className="space-y-1.5 text-sm text-dark">
+              {dontAccept.map((item) => (
+                <li key={item}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="surface-card p-6 border-amber-200 bg-amber-50">
+            <h3 className="font-bold text-dark mb-3 flex items-center gap-2">
+              <AlertCircle size={18} className="text-amber-700" /> Flag at booking
+            </h3>
+            <ul className="space-y-1.5 text-sm text-dark">
+              {specialNotes.map((item) => (
+                <li key={item} dangerouslySetInnerHTML={{ __html: `• ${item}` }} />
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="surface-card mt-6 p-6 max-w-4xl mx-auto bg-mint/40 border-primary/15">
+          <p className="text-sm text-dark">
+            <strong>Always check labels.</strong> If a label says &ldquo;hand wash&rdquo; or &ldquo;dry clean only&rdquo;, mention it in your booking notes and we&rsquo;ll handle it appropriately.
           </p>
         </div>
       </section>
 
-      {/* Care Standards */}
-      <section className="section bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-dark text-center mb-12">Our Care Standards</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                icon: <Droplets size={32} className="text-primary" />,
-                title: 'Temperature Control',
-                desc: 'Water temperature precisely matched to fabric requirements (cold, warm, hot)',
-              },
-              {
-                icon: <Wind size={32} className="text-primary" />,
-                title: 'Cycle Selection',
-                desc: 'Gentle, normal, or heavy cycles based on fabric type and soil level',
-              },
-              {
-                icon: <Zap size={32} className="text-primary" />,
-                title: 'Detergent Choice',
-                desc: 'pH-neutral, dye-safe detergents that preserve color and fabric integrity',
-              },
-              {
-                icon: <Check size={32} className="text-primary" />,
-                title: 'Drying Methods',
-                desc: 'Air dry, low tumble, or specialized techniques depending on material',
-              },
-            ].map((item, i) => (
-              <Card key={i} className="text-center">
-                <div className="flex justify-center mb-4">{item.icon}</div>
-                <h3 className="font-bold text-dark mb-2">{item.title}</h3>
-                <p className="text-sm text-gray">{item.desc}</p>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Fabric Guide */}
-      <section className="section bg-light">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-dark text-center mb-12">Fabric-Specific Care</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[
-              {
-                fabric: 'Cotton',
-                description: 'The most versatile fabric we handle',
-                care: [
-                  '• Machine wash: warm water, normal cycle',
-                  '• Detergent: standard, any brand',
-                  '• Drying: tumble dry medium heat',
-                  '• Iron: medium heat if needed',
-                  '• Note: May shrink slightly (1-2%)',
-                ],
-                icon: '🧵',
-              },
-              {
-                fabric: 'Polyester',
-                description: 'Durable synthetic that holds color well',
-                care: [
-                  '• Machine wash: warm water, gentle cycle',
-                  '• Detergent: any type',
-                  '• Drying: tumble dry low heat',
-                  '• Iron: low heat if needed',
-                  '• Note: Resistant to shrinking and fading',
-                ],
-                icon: '✨',
-              },
-              {
-                fabric: 'Silk',
-                description: 'Delicate, requires special handling',
-                care: [
-                  '• Hand wash or delicate cycle recommended',
-                  '• Cold water with silk-specific detergent',
-                  '• Never wring or twist',
-                  '• Air dry only (never tumble dry)',
-                  '• Iron: very low heat or steam',
-                ],
-                icon: '👑',
-              },
-              {
-                fabric: 'Wool',
-                description: 'Natural fiber that can felt if mistreated',
-                care: [
-                  '• Wool cycle: cold water, gentle detergent',
-                  '• Avoid hot water (causes shrinking)',
-                  '• Air dry lying flat',
-                  '• Never wring or machine spin dry',
-                  '• Note: May feel itchy until washed',
-                ],
-                icon: '🧶',
-              },
-              {
-                fabric: 'Linen',
-                description: 'Strong fiber that softens with washing',
-                care: [
-                  '• Machine wash: warm water, normal cycle',
-                  '• Gentle detergent (avoid bleach)',
-                  '• Tumble dry low to medium heat',
-                  '• Iron: medium-high heat',
-                  '• Note: Wrinkles easily (use promptly)',
-                ],
-                icon: '🌾',
-              },
-              {
-                fabric: 'Delicates',
-                description: 'Lace, netting, thin materials',
-                care: [
-                  '• Hand wash or delicate cycle',
-                  '• Cold water, gentle detergent',
-                  '• Use mesh wash bag in machine',
-                  '• Air dry only',
-                  '• Iron: very low heat or none',
-                ],
-                icon: '💎',
-              },
-              {
-                fabric: 'Denim',
-                description: 'Heavy-duty cotton blend',
-                care: [
-                  '• Machine wash: cold water, normal cycle',
-                  '• Turn inside-out to preserve color',
-                  '• Tumble dry medium heat',
-                  '• Can be air dried to reduce fading',
-                  '• Note: May bleed dye initially',
-                ],
-                icon: '👖',
-              },
-              {
-                fabric: 'Synthetics',
-                description: 'Blends and technical fabrics',
-                care: [
-                  '• Check care label for specific instructions',
-                  '• Usually warm water, gentle cycle',
-                  '• Tumble dry low heat',
-                  '• Avoid high temperatures',
-                  '• Note: Wrinkle-resistant (minimal ironing)',
-                ],
-                icon: '🏃',
-              },
-            ].map((item, i) => (
-              <Card key={i} hoverable>
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-4xl">{item.icon}</span>
-                  <div>
-                    <h3 className="text-2xl font-bold text-dark">{item.fabric}</h3>
-                    <p className="text-sm text-gray">{item.description}</p>
-                  </div>
-                </div>
-                <ul className="space-y-1 text-sm text-gray">
-                  {item.care.map((line, j) => (
-                    <li key={j}>{line}</li>
-                  ))}
-                </ul>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Stain Treatment */}
-      <section className="section bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-dark text-center mb-12">Stain Treatment Process</h2>
-          
-          <Card className="mb-8 bg-mint border-2 border-primary/20">
-            <p className="text-lg text-dark">
-              <span className="font-bold">Pre-treatment:</span> Our team inspects and pre-treats visible stains with specialized solutions before washing. Different stains require different treatments.
-            </p>
-          </Card>
-
-          <div className="space-y-6">
-            {[
-              {
-                stain: 'Oil & Grease',
-                symptoms: 'Shiny spots that won\'t wash out with water',
-                treatment: 'Apply degreaser, let sit 30min, then wash in warm water with detergent',
-                difficulty: '⭐ Easy',
-              },
-              {
-                stain: 'Wine, Juice & Berries',
-                symptoms: 'Red/purple discoloration',
-                treatment: 'Rinse with cold water, apply oxygen-based cleaner, let sit, then wash',
-                difficulty: '⭐⭐ Medium',
-              },
-              {
-                stain: 'Blood',
-                symptoms: 'Brown or dark spots (visible when dry)',
-                treatment: 'Rinse with cold water (never hot!), apply enzyme cleaner, wash in cold',
-                difficulty: '⭐⭐ Medium',
-              },
-              {
-                stain: 'Chocolate & Mud',
-                symptoms: 'Brown stains, may be waxy',
-                treatment: 'Let dry completely, brush off, then treat with enzyme cleaner',
-                difficulty: '⭐ Easy',
-              },
-              {
-                stain: 'Coffee & Tea',
-                symptoms: 'Brown discoloration',
-                treatment: 'Rinse with cold water, apply oxygen bleach, let sit 30min, wash warm',
-                difficulty: '⭐ Easy',
-              },
-              {
-                stain: 'Ink & Pen',
-                symptoms: 'Blue, black, or colored marks',
-                treatment: 'Dab with rubbing alcohol, rinse, then wash. May need professional treatment',
-                difficulty: '⭐⭐⭐ Difficult',
-              },
-              {
-                stain: 'Grass',
-                symptoms: 'Green or tan marks',
-                treatment: 'Apply enzyme cleaner or rubbing alcohol, let sit 30min, wash warm',
-                difficulty: '⭐⭐ Medium',
-              },
-              {
-                stain: 'Make-up',
-                symptoms: 'Colored residue, usually red/brown',
-                treatment: 'Apply makeup remover or rubbing alcohol, gently dab, rinse, wash cold',
-                difficulty: '⭐⭐ Medium',
-              },
-            ].map((item, i) => (
-              <Card key={i}>
-                <div className="flex items-start gap-4">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-dark mb-2">{item.stain}</h3>
-                    <p className="text-sm text-gray mb-2"><span className="font-semibold">Looks like:</span> {item.symptoms}</p>
-                    <p className="text-sm text-gray mb-3"><span className="font-semibold">Treatment:</span> {item.treatment}</p>
-                  </div>
-                  <div className="text-right text-lg font-semibold text-primary whitespace-nowrap">
-                    {item.difficulty}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          <Card className="mt-8 bg-light border-2 border-gray/20">
-            <h3 className="font-bold text-dark mb-3 flex items-center gap-2">
-              <AlertCircle size={20} className="text-primary" />
-              Pro Tips
-            </h3>
-            <ul className="space-y-2 text-gray">
-              <li>• <span className="font-semibold">Fresh stains are easier:</span> Report immediately for best results</li>
-              <li>• <span className="font-semibold">Cold water first:</span> Hot water can set many stains permanently</li>
-              <li>• <span className="font-semibold">Blot, don't rub:</span> Rubbing pushes stain deeper into fibers</li>
-              <li>• <span className="font-semibold">Test treatments first:</span> Check colorfastness on hidden area</li>
-              <li>• <span className="font-semibold">Never iron a stain:</span> Heat sets the stain permanently</li>
-            </ul>
-          </Card>
-        </div>
-      </section>
-
-      {/* Special Services */}
-      <section className="section bg-light">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-dark text-center mb-12">Specialty Care Services</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[
-              {
-                service: 'Hand Washing',
-                description: 'Gentle hand-washing for delicate items like lingerie, swimwear, and hand-knits',
-                best_for: 'Silk, cashmere, lace, vintage items',
-                price: '+$2.00/item',
-              },
-              {
-                service: 'Delicate Cycle',
-                description: 'Specialized washing with reduced agitation and cool water',
-                best_for: 'Silks, wools, blended delicates',
-                price: '+$1.00/item',
-              },
-              {
-                service: 'Dry Clean Only Care',
-                description: 'Professional dry cleaning for items marked "dry clean only"',
-                best_for: 'Structured jackets, wool coats, formal wear',
-                price: '+$4.00/item',
-              },
-              {
-                service: 'Air Dry Only',
-                description: 'No machine drying - items air-dried on racks',
-                best_for: 'Elastic items, knits, stretch fabrics',
-                price: '+$1.50/order',
-              },
-              {
-                service: 'Iron & Press',
-                description: 'Professional pressing with steam or dry iron as appropriate',
-                best_for: 'Dress shirts, linens, professional clothing',
-                price: '+$2.50/item',
-              },
-              {
-                service: 'Stain Pre-Treatment',
-                description: 'Priority stain treatment before washing',
-                best_for: 'Visible stains, delicate fabrics with spots',
-                price: '+$3.00/item',
-              },
-            ].map((item, i) => (
-              <Card key={i} hoverable>
-                <h3 className="text-xl font-bold text-dark mb-2">{item.service}</h3>
-                <p className="text-gray text-sm mb-3">{item.description}</p>
-                <div className="flex justify-between items-end border-t border-gray/10 pt-3">
-                  <div>
-                    <p className="text-xs text-gray">Best for:</p>
-                    <p className="text-sm font-semibold text-dark">{item.best_for}</p>
-                  </div>
-                  <p className="text-primary font-bold text-lg">{item.price}</p>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* What Not To Send */}
-      <section className="section bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-dark text-center mb-12">Items We Don't Handle</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card className="border-2 border-red-200 bg-red-50">
-              <h3 className="font-bold text-dark mb-4 flex items-center gap-2">
-                <AlertCircle size={20} className="text-red-500" />
-                We Can't Accept
-              </h3>
-              <ul className="space-y-2 text-gray">
-                <li>❌ Items with hazardous materials or contents</li>
-                <li>❌ Flammable materials or garments</li>
-                <li>❌ Items with metal buckles or hardware (risk of damage)</li>
-                <li>❌ Leatherwear or suede garments</li>
-                <li>❌ Fur coats or fur-trimmed items</li>
-                <li>❌ Items visibly damaged or falling apart</li>
-              </ul>
-            </Card>
-
-            <Card className="border-2 border-yellow-200 bg-yellow-50">
-              <h3 className="font-bold text-dark mb-4 flex items-center gap-2">
-                <AlertCircle size={20} className="text-yellow-600" />
-                Special Handling Items
-              </h3>
-              <ul className="space-y-2 text-gray">
-                <li>⚠️ Embellished items (sequins, beads) - possible extra charge</li>
-                <li>⚠️ Swimwear & lingerie - hand wash available</li>
-                <li>⚠️ Activewear - special moisture-wicking care</li>
-                <li>⚠️ Vintage pieces - we recommend contacting us first</li>
-                <li>⚠️ Items with stains - pre-treatment may be needed</li>
-              </ul>
-            </Card>
-          </div>
-
-          <Card className="mt-8 bg-mint border-2 border-primary/20">
-            <h3 className="font-bold text-dark mb-3">Always Check Labels</h3>
-            <p className="text-gray">
-              Before sending items, always check the care label. If it says "dry clean only," we can handle it with our specialty dry cleaning service. If it says "hand wash only," we can hand wash it. When in doubt, include a note in your order with special instructions.
-            </p>
-          </Card>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="section bg-light">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-dark text-center mb-12">Care & Handling FAQ</h2>
-          
-          <div className="space-y-4">
-            {[
-              {
-                q: 'Will my dark jeans fade?',
-                a: 'Some fading is normal with denim, but we minimize it by using cold water and turning items inside-out. We use color-safe detergent to preserve your investment.',
-              },
-              {
-                q: 'Why do socks sometimes disappear?',
-                a: 'We have a system to prevent this! Socks are collected in a mesh bag during washing. But with millions of loads, occasionally one escapes. Report it and we\'ll replace it.',
-              },
-              {
-                q: 'Can you handle wool without shrinking it?',
-                a: 'Yes! We use wool-specific detergent, cold water, and gentle agitation. Professional wool washing is actually gentler than home washing.',
-              },
-              {
-                q: 'What happens to lint?',
-                a: 'We use lint traps and professional-grade dryers. Your clothes come back lint-free. If lint transfer occurs, our guarantee covers it.',
-              },
-              {
-                q: 'Do you use fabric softener?',
-                a: 'We use premium liquid softener (not sheets) for most items. We can skip it if requested—just note in your order.',
-              },
-              {
-                q: 'How do you handle wrinkles?',
-                a: 'We remove items promptly from the dryer to minimize wrinkles. Professional pressing is available for an additional fee.',
-              },
-            ].map((item, i) => (
-              <Card key={i}>
-                <h3 className="font-bold text-dark mb-2">{item.q}</h3>
-                <p className="text-gray">{item.a}</p>
-              </Card>
-            ))}
-          </div>
+      <section className="container-page pb-16">
+        <div className="surface-card p-8 sm:p-10 bg-gradient-to-br from-mint to-white text-center">
+          <h2 className="h3 text-dark mb-2">Ready to send a load?</h2>
+          <p className="text-gray mb-6 max-w-xl mx-auto">$7.50/kg standard, $12.50/kg express, $75 minimum. Care notes welcome.</p>
+          <Link href="/booking" className="btn-primary inline-flex">
+            Book a pickup
+            <ArrowRight size={16} />
+          </Link>
         </div>
       </section>
 

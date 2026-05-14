@@ -2,315 +2,306 @@
 
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import Button from '@/components/Button'
-import Card from '@/components/Card'
 import Link from 'next/link'
-import Image from 'next/image'
-import { CheckCircle, TrendingUp, Clock, Star } from 'lucide-react'
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  ArrowRight,
+  Briefcase,
+  Clock,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Truck,
+  CheckCircle,
+  HelpCircle,
+} from 'lucide-react'
 
-export default function BecomePro() {
+const benefits = [
+  {
+    icon: Briefcase,
+    title: 'Commission per order',
+    body: 'You&rsquo;re paid for every completed order. Bigger or further jobs pay more — no flat hourly rate.',
+  },
+  {
+    icon: Clock,
+    title: 'You set the schedule',
+    body: 'Accept the jobs you want, when you want. Decline anything that doesn&rsquo;t fit your day.',
+  },
+  {
+    icon: Star,
+    title: 'Build your rating',
+    body: 'Customer ratings and on-time delivery shape which orders surface in your feed first.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Protected by default',
+    body: 'Coverage during pickup, washing, and delivery. Support team in your corner if anything goes wrong.',
+  },
+]
+
+const steps = [
+  { title: 'Apply', body: 'Tell us about you and your vehicle. Five minutes, online.' },
+  { title: 'Verify', body: 'ID + national police check + ABN confirmation. Usually 2–3 business days.' },
+  { title: 'Onboard', body: 'Quick walkthrough of the Pro app, pickup standards, and care basics.' },
+  { title: 'Accept jobs', body: 'New orders show up in your area. Accept what suits you and get paid weekly.' },
+]
+
+const requirements = [
+  '18+ with the right to work in Australia',
+  'Valid Australian driver licence and reliable vehicle',
+  'Smartphone (iOS or Android) with mobile data',
+  'Active ABN as an independent contractor',
+  'Pass an identity and national police check',
+]
+
+const faqs = [
+  {
+    q: 'How does pay work?',
+    a: 'You&rsquo;re paid commission per completed order — no hourly wage, no salary. Each job shows the payout up-front before you accept it. You also keep 100% of any tips.',
+  },
+  {
+    q: 'When are payouts?',
+    a: 'Weekly payouts go out every Monday for jobs completed the previous week, into the Australian bank account you set up in your profile.',
+  },
+  {
+    q: 'Am I an employee?',
+    a: 'No. Washlee Pros are independent contractors operating under their own ABN. You&rsquo;re responsible for your own super, tax (including GST if applicable), and insurance arrangements.',
+  },
+  {
+    q: 'What does it cost to join?',
+    a: 'Nothing up-front. You provide your own vehicle, fuel, and smartphone. We provide the platform, customer demand, and access to partner laundry facilities.',
+  },
+  {
+    q: 'Where do I work?',
+    a: 'Currently across Greater Melbourne. We&rsquo;ll point you to nearby orders based on your home base and availability.',
+  },
+  {
+    q: 'Can I decline jobs?',
+    a: 'Always. Declines don&rsquo;t affect your ability to see future orders.',
+  },
+]
+
+export default function ProPage() {
   const router = useRouter()
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    city: '',
-  })
-  const [activeCard, setActiveCard] = useState<number | null>(null)
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
-
-  const handleCardClick = (index: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setActiveCard(activeCard === index ? null : index)
-  }
-
-  const handlePageClick = () => {
-    setActiveCard(null)
-  }
 
   return (
-    <div onClick={handlePageClick}>
+    <>
       <Header />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-mint to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h1 className="text-5xl sm:text-6xl font-bold text-dark mb-6">
-                Earn Money Doing What You Love
+      <section className="bg-soft-hero">
+        <div className="container-page py-14 sm:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-7 animate-slide-up">
+              <span className="pill mb-4">
+                <Briefcase size={14} /> Become a Washlee Pro
+              </span>
+              <h1 className="h1 text-dark text-balance mb-4">
+                Independent work in Melbourne.
+                <br />
+                <span className="text-primary">Paid per order, not per hour.</span>
               </h1>
-              <p className="text-xl text-gray mb-8">
-                Become a Washlee Pro and earn flexible income by providing professional laundry services to your community.
+              <p className="text-lg text-gray leading-relaxed mb-8 max-w-xl">
+                Set your own schedule, accept the orders you want, and get paid weekly. You&rsquo;re an
+                independent contractor — work as much or as little as suits you.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" onClick={() => router.push('/auth/pro-signup-form')}>Apply Now</Button>
-                <a href="#learn-more" className="flex items-center justify-center gap-2 px-6 py-3 text-primary font-semibold">
-                  Learn More ↓
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push('/auth/pro-signup-form')}
+                  className="btn-primary shadow-glow"
+                >
+                  Apply to drive
+                  <ArrowRight size={16} />
+                </button>
+                <a href="#how-it-works" className="btn-outline">
+                  How it works
                 </a>
               </div>
             </div>
-            <div className="rounded-2xl h-96 overflow-hidden shadow-lg">
-              <Image
-                src="/pro-hero.jpg"
-                alt="Washlee Pro"
-                width={500}
-                height={400}
-                className="w-full h-full object-cover"
-              />
+
+            <div className="lg:col-span-5">
+              <div className="surface-card p-6 sm:p-8 bg-gradient-to-br from-mint to-white">
+                <p className="text-xs uppercase tracking-wider font-bold text-primary-deep mb-4">
+                  At a glance
+                </p>
+                <ul className="space-y-3 text-sm">
+                  <li className="flex items-center justify-between">
+                    <span className="text-gray">Pay model</span>
+                    <span className="font-bold text-dark">Commission per order</span>
+                  </li>
+                  <li className="flex items-center justify-between">
+                    <span className="text-gray">Payout</span>
+                    <span className="font-bold text-dark">Weekly, to your bank</span>
+                  </li>
+                  <li className="flex items-center justify-between">
+                    <span className="text-gray">Schedule</span>
+                    <span className="font-bold text-dark">100% flexible</span>
+                  </li>
+                  <li className="flex items-center justify-between">
+                    <span className="text-gray">Service area</span>
+                    <span className="font-bold text-dark">Greater Melbourne</span>
+                  </li>
+                  <li className="flex items-center justify-between">
+                    <span className="text-gray">Cost to join</span>
+                    <span className="font-bold text-dark">$0</span>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="section bg-white">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            { number: '500+', label: 'Pros Earning This Week' },
-            { number: '$70k+', label: 'Highest Annual Earnings' },
-            { number: '4.9★', label: 'Customer Rating' },
-          ].map((stat, i) => (
-            <div key={i} className="text-center">
-              <p className="text-5xl font-bold text-primary mb-2">{stat.number}</p>
-              <p className="text-gray text-lg">{stat.label}</p>
+      {/* Benefits */}
+      <section className="container-page py-14 sm:py-20">
+        <div className="text-center mb-10">
+          <h2 className="section-title">Why drive for Washlee</h2>
+          <p className="section-subtitle">Independent work, real demand, simple payouts.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {benefits.map((b) => (
+            <div key={b.title} className="surface-card p-6">
+              <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center mb-4">
+                <b.icon size={18} className="text-primary-deep" />
+              </div>
+              <h3 className="font-bold text-dark mb-1.5">{b.title}</h3>
+              <p
+                className="text-sm text-gray leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: b.body }}
+              />
             </div>
           ))}
         </div>
       </section>
 
-      {/* Why Join */}
-      <section className="section bg-light" id="learn-more">
-        <h2 className="text-4xl font-bold text-dark mb-12 text-center">Why Join Washlee?</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-          {[
-            {
-              icon: TrendingUp,
-              title: 'Earn Per Order',
-              description: 'Get paid for every order you complete. Accept jobs that match your earning goals—earn more by doing more.',
-            },
-            {
-              icon: Clock,
-              title: 'Flexible Schedule',
-              description: 'Work the hours that fit your life. Accept or decline jobs as you please.',
-            },
-            {
-              icon: Star,
-              title: 'Build Your Rating',
-              description: 'Earn 5-star ratings and grow your customer base for more opportunities.',
-            },
-            {
-              icon: CheckCircle,
-              title: 'Professional Support',
-              description: 'Dedicated support team available 24/7 to help with any issues.',
-            },
-          ].map((benefit, i) => {
-            const Icon = benefit.icon
-            return (
-              <Card key={i} hoverable>
-                <Icon className="w-12 h-12 text-primary mb-4" />
-                <h3 className="font-bold text-lg text-dark mb-3">{benefit.title}</h3>
-                <p className="text-gray">{benefit.description}</p>
-              </Card>
-            )
-          })}
+      {/* How it works */}
+      <section id="how-it-works" className="bg-soft-mint">
+        <div className="container-page py-14 sm:py-20">
+          <div className="text-center mb-10">
+            <h2 className="section-title">How it works</h2>
+            <p className="section-subtitle">Four steps from application to your first payout.</p>
+          </div>
+          <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {steps.map((s, i) => (
+              <li key={s.title} className="surface-card p-6">
+                <div className="w-9 h-9 rounded-full bg-primary text-white font-bold flex items-center justify-center mb-3">
+                  {i + 1}
+                </div>
+                <h3 className="font-bold text-dark mb-1.5">{s.title}</h3>
+                <p className="text-sm text-gray leading-relaxed">{s.body}</p>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
-      {/* How It Works for Pros */}
-      <section className="section bg-white">
-        <h2 className="text-4xl font-bold text-dark mb-12 text-center">How It Works for Washlee Pros</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-          {[
-            {
-              number: 1,
-              title: 'Accept Order',
-              description: 'Browse available orders in your area and accept jobs that fit your schedule',
-            },
-            {
-              number: 2,
-              title: 'Pickup',
-              description: 'Collect laundry from customer location',
-            },
-            {
-              number: 3,
-              title: 'Wash & Care',
-              description: 'Professional laundry handling with quality assurance',
-            },
-            {
-              number: 4,
-              title: 'Deliver & Get Paid',
-              description: 'Return clean laundry and earn your commission plus 100% of tips',
-            },
-          ].map((step, i) => (
-            <Card key={i} hoverable className="text-center">
-              <div className="bg-primary text-white rounded-full w-12 h-12 flex items-center justify-center font-bold text-lg mb-4 mx-auto">
-                {step.number}
-              </div>
-              <h3 className="font-bold text-dark mb-2">{step.title}</h3>
-              <p className="text-sm text-gray">{step.description}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* Earnings */}
-      <section className="section bg-light">
-        <h2 className="text-4xl font-bold text-dark mb-12 text-center">Sample Earnings</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-          {[
-            {
-              title: 'Casual',
-              orders: '8-12 orders/week',
-              earnings: '$280-400/week',
-              annual: '$15K-20K/year',
-              badge: 'Flexible',
-            },
-            {
-              title: 'Regular Pro',
-              orders: '25-35 orders/week',
-              earnings: '$700-1,050/week',
-              annual: '$35K-52K/year',
-              highlight: true,
-              badge: 'Most Popular',
-            },
-            {
-              title: 'Elite Earner',
-              orders: '40+ orders/week',
-              earnings: '$1,400+/week',
-              annual: '$70K+/year',
-              badge: 'Top 10%',
-            },
-          ].map((tier, i) => (
-            <div
-              key={i}
-              onClick={(e) => handleCardClick(i, e)}
-              className={`rounded-xl p-8 relative transition-all duration-300 ease-in-out cursor-pointer border-2 ${
-                activeCard === i
-                  ? 'bg-white text-dark shadow-2xl border-primary scale-105'
-                  : tier.highlight
-                  ? 'bg-accent text-dark shadow-lg border-primary scale-105'
-                  : 'bg-white text-dark border-gray/20 hover:border-primary hover:shadow-lg'
-              }`}
-            >
-              {tier.badge && (
-                <span className={`text-xs font-bold px-3 py-1 rounded-full mb-3 inline-block ${
-                  tier.highlight
-                    ? 'bg-primary text-white'
-                    : 'bg-primary/10 text-primary'
-                }`}>
-                  {tier.badge}
-                </span>
-              )}
-              <h3 className="text-2xl font-bold mb-4 text-dark">{tier.title}</h3>
-              <div className="space-y-4 mb-6">
-                <div>
-                  <p className="text-sm text-gray mb-1">Orders Per Week</p>
-                  <p className="text-2xl font-bold text-dark">{tier.orders}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray mb-1">Weekly Earnings</p>
-                  <p className="text-2xl font-bold text-primary">{tier.earnings}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray mb-1">Annual Potential</p>
-                  <p className="text-3xl font-bold text-dark">{tier.annual}</p>
-                </div>
-              </div>
-              <Link href="#" className="block" onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                router.push('/auth/pro-signup-form')
-              }}>
-                <Button size="lg" className={`w-full`}>Apply Now</Button>
-              </Link>
+      {/* Pay model */}
+      <section className="container-page py-14">
+        <div className="surface-card p-6 sm:p-10 max-w-4xl mx-auto bg-gradient-to-br from-mint to-white">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            <div className="md:col-span-7">
+              <span className="pill mb-3">
+                <Sparkles size={14} /> Independent contractor
+              </span>
+              <h2 className="h3 text-dark mb-3">Paid for every completed order</h2>
+              <p className="text-gray text-base leading-relaxed mb-4">
+                Each order shows you the payout before you accept. Larger loads, longer distances, and
+                Express jobs pay more. There&rsquo;s no hourly rate, salary, or wage — you decide how much
+                you want to earn by choosing the jobs you accept.
+              </p>
+              <ul className="space-y-2 text-sm text-dark">
+                <li className="flex items-start gap-2"><CheckCircle size={16} className="text-primary-deep mt-0.5" /> 100% of customer tips</li>
+                <li className="flex items-start gap-2"><CheckCircle size={16} className="text-primary-deep mt-0.5" /> Weekly payouts to your AU bank account</li>
+                <li className="flex items-start gap-2"><CheckCircle size={16} className="text-primary-deep mt-0.5" /> Real-time earnings in the Pro app</li>
+              </ul>
             </div>
-          ))}
+            <div className="md:col-span-5">
+              <div className="surface-card p-5 bg-white">
+                <p className="text-xs uppercase tracking-wider font-bold text-gray-soft mb-2">
+                  Payout cadence
+                </p>
+                <ul className="space-y-2 text-sm text-dark">
+                  <li className="flex items-center justify-between"><span className="text-gray">Earnings cycle</span><span className="font-semibold">Mon–Sun</span></li>
+                  <li className="flex items-center justify-between"><span className="text-gray">Payout day</span><span className="font-semibold">Every Monday</span></li>
+                  <li className="flex items-center justify-between"><span className="text-gray">Method</span><span className="font-semibold">AU bank transfer</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Requirements */}
-      <section className="section bg-white">
-        <h2 className="text-4xl font-bold text-dark mb-12 text-center">Requirements</h2>
-
-        <div className="max-w-3xl mx-auto">
-          <Card>
-            <h3 className="text-2xl font-bold text-dark mb-6">Must Have</h3>
-            <ul className="space-y-4">
-              {[
-                'Be 18+ years old',
-                'Have a valid driver\'s license and reliable vehicle',
-                'Pass a background check (ABN verification)',
-                'Have a smartphone (iOS or Android)',
-                'Be comfortable handling laundry professionally',
-                'Provide your own transport (vehicle fuel/maintenance)',
-              ].map((req, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <CheckCircle className="text-primary mt-1 flex-shrink-0" size={20} />
-                  <span className="text-dark">{req}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
+      <section className="container-page py-14">
+        <div className="text-center mb-8">
+          <h2 className="section-title">What you&rsquo;ll need</h2>
+        </div>
+        <div className="surface-card p-6 sm:p-8 max-w-2xl mx-auto">
+          <ul className="space-y-3">
+            {requirements.map((r) => (
+              <li key={r} className="flex items-start gap-3 text-sm text-dark">
+                <CheckCircle size={18} className="text-primary-deep flex-shrink-0 mt-0.5" />
+                <span>{r}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="section bg-white">
-        <h2 className="text-4xl font-bold text-dark mb-12 text-center">Pro FAQ</h2>
+      <section className="bg-soft-mint">
+        <div className="container-page py-14">
+          <div className="text-center mb-10">
+            <h2 className="section-title">Pro FAQ</h2>
+            <p className="section-subtitle">The basics, answered.</p>
+          </div>
+          <div className="max-w-2xl mx-auto space-y-3">
+            {faqs.map((faq) => (
+              <details key={faq.q} className="group surface-card p-5">
+                <summary className="flex items-center justify-between cursor-pointer list-none">
+                  <span className="font-semibold text-dark pr-4 flex items-center gap-2">
+                    <HelpCircle size={16} className="text-primary-deep flex-shrink-0" />
+                    {faq.q}
+                  </span>
+                  <span className="text-primary-deep transition group-open:rotate-180" aria-hidden>
+                    ⌄
+                  </span>
+                </summary>
+                <p className="text-sm text-gray leading-relaxed mt-3">{faq.a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
 
-        <div className="max-w-2xl mx-auto space-y-4">
-          {[
-            {
-              q: 'How much does it cost to join?',
-              a: 'Free! There are no upfront fees to become a Washlee Pro. You\'ll need your own vehicle and smartphone to get started.',
-            },
-            {
-              q: 'Do I need my own laundry equipment?',
-              a: 'No. We provide access to professional-grade equipment at our facilities. You just provide the transportation and service.',
-            },
-            {
-              q: 'How often can I work?',
-              a: 'Completely flexible. Accept the jobs you want, when you want. Work full-time, part-time, or on your own schedule.',
-            },
-            {
-              q: 'How much can I earn per order?',
-              a: 'You earn a commission per completed order ($15-50+ depending on location, order size, and complexity) plus 100% of customer tips. Larger or specialty orders pay more.',
-            },
-            {
-              q: 'When do I get paid?',
-              a: 'Payments are processed weekly via direct deposit every Monday for work completed the previous week.',
-            },
-            {
-              q: 'Will I receive tax documentation?',
-              a: 'As an independent contractor, you\'ll receive annual income statements for tax purposes. Keep records of your earnings for your records.',
-            },
-            {
-              q: 'What if I decline an order?',
-              a: 'No penalties! You can accept or decline any order. Your acceptance rate doesn\'t affect your ability to get future orders.',
-            },
-            {
-              q: 'How is my rating calculated?',
-              a: 'Ratings are based on customer reviews, on-time delivery, and professional service. Your rating helps you qualify for better-paying orders.',
-            },
-          ].map((faq, i) => (
-            <div key={i} className="border border-gray rounded-lg p-6">
-              <h3 className="font-bold text-dark mb-2">{faq.q}</h3>
-              <p className="text-gray">{faq.a}</p>
-            </div>
-          ))}
+      {/* CTA */}
+      <section className="container-page py-16">
+        <div className="surface-card p-8 sm:p-12 bg-gradient-to-br from-primary to-accent text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">Ready to drive?</h2>
+          <p className="text-white/90 mb-6 max-w-xl mx-auto">
+            Apply in five minutes. We&rsquo;ll review your details and reach out within a couple of business days.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              type="button"
+              onClick={() => router.push('/auth/pro-signup-form')}
+              className="inline-flex items-center justify-center gap-2 bg-white text-primary-deep font-bold px-8 py-3 rounded-full hover:shadow-lg transition min-h-[48px]"
+            >
+              <Truck size={16} />
+              Apply now
+            </button>
+            <Link
+              href="/auth/employee-signin"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold text-white border border-white/30 hover:bg-white/10 transition min-h-[48px]"
+            >
+              I&rsquo;m already a Pro
+            </Link>
+          </div>
         </div>
       </section>
 
       <Footer />
-    </div>
+    </>
   )
 }

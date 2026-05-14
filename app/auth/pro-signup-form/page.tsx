@@ -993,7 +993,7 @@ function ProSignupFormContent() {
               value={formData.firstName}
               onChange={handleChange}
               placeholder="John"
-              className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
               required
             />
           </div>
@@ -1005,7 +1005,7 @@ function ProSignupFormContent() {
               value={formData.lastName}
               onChange={handleChange}
               placeholder="Doe"
-              className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
               required
             />
           </div>
@@ -1019,7 +1019,7 @@ function ProSignupFormContent() {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="john.doe@gmail.com"
-                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-12 pr-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
                 required
               />
               {!validateEmail(formData.email) && formData.email && (
@@ -1029,7 +1029,7 @@ function ProSignupFormContent() {
                 </div>
               )}
               {showEmailSuggestions && emailSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray rounded-lg shadow-lg z-10">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-line rounded-xl shadow-lg z-10">
                   {emailSuggestions.map((suggestion, idx) => (
                     <button
                       key={idx}
@@ -1053,7 +1053,7 @@ function ProSignupFormContent() {
                 value={formData.phone}
                 onChange={handleChange}
                 placeholder="02 XXXX XXXX or 04XX XXX XXX"
-                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-12 pr-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
                 required
               />
               {!validateAustralianPhone(formData.phone) && formData.phone && (
@@ -1072,7 +1072,7 @@ function ProSignupFormContent() {
                 name="state"
                 value={formData.state}
                 onChange={handleChange}
-                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
+                className="w-full pl-12 pr-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition appearance-none"
                 required
               >
                 <option value="">Choose a state...</option>
@@ -1097,7 +1097,7 @@ function ProSignupFormContent() {
                   fetchWorkAddressPredictions(e.target.value)
                 }}
                 placeholder="Enter your work location or main service area"
-                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-12 pr-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
                 autoComplete="off"
                 required
               />
@@ -1107,7 +1107,7 @@ function ProSignupFormContent() {
                 </div>
               )}
               {showWorkAddressPredictions && workAddressPredictions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-line rounded-xl shadow-lg z-10 max-h-60 overflow-y-auto">
                   {workAddressPredictions.map((prediction, idx) => (
                     <button
                       key={idx}
@@ -1140,7 +1140,7 @@ function ProSignupFormContent() {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full pl-12 pr-12 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-12 pr-12 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
                 required
               />
               <button
@@ -1185,7 +1185,7 @@ function ProSignupFormContent() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-12 pr-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
                 required
               />
             </div>
@@ -1208,7 +1208,7 @@ function ProSignupFormContent() {
                     setFormData({ ...formData, termsAccepted: false })
                   }
                 }}
-                className="w-5 h-5 rounded border-2 border-gray mt-0.5 cursor-pointer accent-primary flex-shrink-0"
+                className="w-5 h-5 rounded border-2 border-line mt-0.5 cursor-pointer accent-primary flex-shrink-0"
                 required
               />
               <div className="flex-1">
@@ -1243,7 +1243,7 @@ function ProSignupFormContent() {
           </div>
 
           {/* Divider */}
-          <div className="py-4 border-t border-gray/20 border-b border-gray/20">
+          <div className="py-4 border-t border-line border-b border-line">
             <p className="text-xs text-gray text-center">
               Already have a customer account?{' '}
               <button
@@ -1296,7 +1296,7 @@ function ProSignupFormContent() {
                   value={formData.emailVerificationCode}
                   onChange={handleChange}
                   placeholder="Enter 6-digit code"
-                  className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-center text-2xl tracking-widest"
+                  className="w-full px-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition text-center text-2xl tracking-widest"
                   maxLength={6}
                 />
                 <div className="flex justify-between items-center mt-4">
@@ -1345,7 +1345,7 @@ function ProSignupFormContent() {
                   value={formData.phoneVerificationCode}
                   onChange={handleChange}
                   placeholder="Enter 6-digit code"
-                  className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-center text-2xl tracking-widest"
+                  className="w-full px-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition text-center text-2xl tracking-widest"
                   maxLength={6}
                 />
                 <div className="flex justify-between items-center mt-4">
@@ -1404,7 +1404,7 @@ function ProSignupFormContent() {
                   fetchWorkAddressPredictions(e.target.value)
                 }}
                 placeholder="Enter your service area address"
-                className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-12 pr-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
                 autoComplete="off"
                 required
               />
@@ -1414,7 +1414,7 @@ function ProSignupFormContent() {
                 </div>
               )}
               {showWorkAddressPredictions && workAddressPredictions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-line rounded-xl shadow-lg z-10 max-h-60 overflow-y-auto">
                   {workAddressPredictions.map((prediction, idx) => (
                     <button
                       key={idx}
@@ -1450,14 +1450,14 @@ function ProSignupFormContent() {
             <label className="block text-sm font-semibold text-dark mb-3">
               I confirm this address is where I'll provide laundry services
             </label>
-            <div className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+            <div className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
               onClick={() => setWorkAddressVerified(!workAddressVerified)}
             >
               <input
                 type="checkbox"
                 checked={workAddressVerified}
                 onChange={() => {}}
-                className="w-5 h-5 rounded border-2 border-gray accent-primary"
+                className="w-5 h-5 rounded border-2 border-line accent-primary"
               />
               <span className="text-dark font-medium">Yes, this is my service location</span>
             </div>
@@ -1483,7 +1483,7 @@ function ProSignupFormContent() {
             <p className="text-sm text-gray mb-4">
               Please upload a clear photo of your driver's license or government-issued ID.
             </p>
-            <div className="border-2 border-dashed border-gray rounded-lg p-8 text-center">
+            <div className="border-2 border-dashed border-line rounded-2xl p-8 text-center bg-mint/30">
               <Upload size={48} className="text-gray mx-auto mb-4" />
               <label className="cursor-pointer">
                 <p className="font-semibold text-dark mb-2">Click to upload or drag and drop</p>
@@ -1563,7 +1563,7 @@ function ProSignupFormContent() {
             <label className="block text-sm font-semibold text-dark mb-4">When are you available?</label>
             <div className="grid grid-cols-2 gap-3">
               {Object.keys(formData.availability).map((day) => (
-                <label key={day} className="flex items-center gap-2 p-3 border border-gray rounded-lg hover:bg-light transition cursor-pointer">
+                <label key={day} className="flex items-center gap-2 p-3 border border-line rounded-xl hover:bg-mint/30 transition cursor-pointer">
                   <input
                     type="checkbox"
                     name={`availability.${day}`}
@@ -1584,7 +1584,7 @@ function ProSignupFormContent() {
               onChange={handleChange}
               placeholder="Tell us how we can better serve you or any questions you have..."
               rows={4}
-              className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              className="w-full px-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition resize-none"
             />
           </div>
         </div>
@@ -1605,7 +1605,7 @@ function ProSignupFormContent() {
                 Do you have the right to work in Australia (Australian citizen, PR, or valid visa)?*
               </label>
               <div className="space-y-2">
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, hasWorkRight: true })}
                 >
                   <input
@@ -1617,7 +1617,7 @@ function ProSignupFormContent() {
                   />
                   <span className="text-dark font-medium">Yes</span>
                 </label>
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, hasWorkRight: false })}
                 >
                   <input
@@ -1637,7 +1637,7 @@ function ProSignupFormContent() {
                 Do you have a valid driver's license and are at least 18 years old?*
               </label>
               <div className="space-y-2">
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, hasValidLicense: true })}
                 >
                   <input
@@ -1649,7 +1649,7 @@ function ProSignupFormContent() {
                   />
                   <span className="text-dark font-medium">Yes</span>
                 </label>
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, hasValidLicense: false })}
                 >
                   <input
@@ -1669,7 +1669,7 @@ function ProSignupFormContent() {
                 Do you have reliable transportation for pickups and deliveries?*
               </label>
               <div className="space-y-2">
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, hasTransport: true })}
                 >
                   <input
@@ -1681,7 +1681,7 @@ function ProSignupFormContent() {
                   />
                   <span className="text-dark font-medium">Yes</span>
                 </label>
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, hasTransport: false })}
                 >
                   <input
@@ -1701,7 +1701,7 @@ function ProSignupFormContent() {
                 Do you have access to laundry equipment (washing machines, dryers)?*
               </label>
               <div className="space-y-2">
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, hasEquipment: true })}
                 >
                   <input
@@ -1713,7 +1713,7 @@ function ProSignupFormContent() {
                   />
                   <span className="text-dark font-medium">Yes</span>
                 </label>
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, hasEquipment: false })}
                 >
                   <input
@@ -1733,7 +1733,7 @@ function ProSignupFormContent() {
                 I confirm that all information provided is true and accurate*
               </label>
               <div className="space-y-2">
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, ageVerified: true })}
                 >
                   <input
@@ -1745,7 +1745,7 @@ function ProSignupFormContent() {
                   />
                   <span className="text-dark font-medium">I Confirm</span>
                 </label>
-                <label className="flex items-center gap-3 p-4 border-2 border-gray rounded-lg cursor-pointer hover:border-primary transition"
+                <label className="flex items-center gap-3 p-4 border-2 border-line rounded-2xl cursor-pointer hover:border-primary hover:bg-mint/40 transition"
                   onClick={() => setFormData({ ...formData, ageVerified: false })}
                 >
                   <input
@@ -1781,7 +1781,7 @@ function ProSignupFormContent() {
               onChange={handleChange}
               placeholder="e.g., 5 years experience in dry cleaning, expert in stain removal, trained in delicate fabric care, etc."
               rows={6}
-              className="w-full px-4 py-3 border border-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              className="w-full px-4 py-3 border border-line rounded-xl text-base text-dark placeholder:text-gray-soft focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition resize-none"
               required
             />
             <p className="text-xs text-gray mt-2">Minimum 50 characters required</p>
@@ -1794,35 +1794,35 @@ function ProSignupFormContent() {
   // Success screen
   if (currentStep === steps.length) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-mint to-white flex items-center justify-center px-4">
-        <div className="w-full max-w-md text-center">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="flex justify-center mb-6">
-              <CheckCircle size={64} className="text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold text-dark mb-3">Application Submitted!</h1>
-            <p className="text-gray mb-2">Thank you for applying to become a Washlee Pro.</p>
-            
-            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 my-6">
-              <div className="flex items-center gap-2 justify-center mb-2">
-                <Clock size={20} className="text-yellow-600" />
-                <span className="font-semibold text-yellow-900">Application Status: Pending Review</span>
-              </div>
-              <p className="text-sm text-yellow-800">
-                Our team is reviewing your application. You'll hear from us within 24-48 hours.
-              </p>
-            </div>
-            
-            <p className="text-sm text-gray mb-6">
-              In the meantime, check out our Pro Support Help Center to learn more about being a Washlee Pro.
-            </p>
-            
-            <Link href="/pro-support/help-center" className="inline-block">
-              <Button>View Help Center</Button>
-            </Link>
+      <main className="min-h-screen bg-soft-hero flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md surface-card p-8 text-center animate-slide-up">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-mint mb-4">
+            <CheckCircle size={32} className="text-primary-deep" />
           </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-dark mb-2">Application submitted</h1>
+          <p className="text-sm text-gray mb-5">
+            Thanks for applying to become a Washlee Pro. We&rsquo;ll review your details and reach out shortly.
+          </p>
+
+          <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 mb-5 text-left">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Clock size={16} className="text-amber-700 flex-shrink-0" />
+              <span className="font-semibold text-amber-900 text-sm">Pending review</span>
+            </div>
+            <p className="text-xs text-amber-800">
+              Most reviews complete within 1–2 Australian business days. You&rsquo;ll hear from us by email.
+            </p>
+          </div>
+
+          <p className="text-xs text-gray mb-5">
+            While you wait, the Pro Support hub has guides on care standards, pickups, and weekly payouts.
+          </p>
+
+          <Link href="/pro-support/help-center" className="btn-primary w-full">
+            Open Pro Support
+          </Link>
         </div>
-      </div>
+      </main>
     )
   }
 
@@ -1844,76 +1844,81 @@ function ProSignupFormContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-mint to-white flex flex-col">
+    <main className="min-h-screen bg-soft-hero flex flex-col">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur border-b border-gray/20 py-4 px-4">
+      <header className="bg-white/85 backdrop-blur border-b border-line py-3 px-4 sticky top-0 z-30">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          {/* Logo - Clickable to Home */}
           <Link href="/" className="flex items-center gap-2 group hover:opacity-80 transition">
             <Image
               src="/logo-washlee.png"
               alt="Washlee"
-              width={40}
-              height={40}
-              className="w-10 h-10"
+              width={36}
+              height={36}
+              className="w-9 h-9 rounded-full object-cover shadow-soft"
             />
-            <span className="text-xl font-bold text-dark group-hover:text-primary transition">Washlee</span>
+            <span className="text-lg font-bold text-dark group-hover:text-primary-deep transition">Washlee</span>
           </Link>
 
-          {/* Help Icon Button */}
           <button
+            type="button"
             onClick={() => router.push('/pro-support/help-center')}
-            className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-primary text-primary hover:bg-primary hover:text-white transition"
-            title="Help Center"
+            className="inline-flex items-center justify-center w-10 h-10 rounded-full border border-line text-primary-deep hover:border-primary hover:bg-mint transition"
+            title="Pro support"
+            aria-label="Pro support"
           >
-            <HelpCircle size={20} />
+            <HelpCircle size={18} />
           </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
+      <div className="flex-1 flex items-start justify-center px-4 py-8 sm:py-10">
+        <div className="w-full max-w-md animate-slide-up">
+        {/* Top back link */}
         <button
+          type="button"
           onClick={() => currentStep > 0 ? setCurrentStep(currentStep - 1) : router.back()}
-          className="absolute top-20 left-6 p-2 hover:bg-white rounded-full transition"
-          title="Go back"
+          className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-5 hover:text-primary"
         >
-          <ArrowLeft size={24} className="text-primary" />
+          <ArrowLeft size={14} />
+          Back
         </button>
-        <div className="w-full max-w-md">
-        {/* Progress Bar */}
-        <div className="mb-8">
+
+        {/* Progress */}
+        <div className="mb-6">
           <div className="flex justify-between mb-2">
-            <span className="text-sm font-semibold text-dark">Step {currentStep + 1} of {steps.length}</span>
-            <span className="text-sm text-gray">{Math.round(progress)}%</span>
+            <span className="text-xs font-bold text-dark uppercase tracking-wider">Step {currentStep + 1} of {steps.length}</span>
+            <span className="text-xs text-gray-soft">{Math.round(progress)}%</span>
           </div>
-          <div className="h-2 bg-gray rounded-full overflow-hidden">
+          <div className="h-1.5 bg-line rounded-full overflow-hidden">
             <div
-              className="h-full bg-primary transition-all duration-300"
+              className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+        <div className="surface-card p-6 sm:p-8 mb-5">
           {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
-              {error}
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 mb-5 text-sm text-red-800 flex gap-2">
+              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
           {/* Success */}
           {successMessage && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm">
-              {successMessage}
+            <div className="rounded-xl bg-mint border border-primary/20 px-4 py-3 mb-5 text-sm text-dark flex gap-2">
+              <CheckCircle size={16} className="text-primary-deep flex-shrink-0 mt-0.5" />
+              <span>{successMessage}</span>
             </div>
           )}
 
           {/* Title */}
-          <h1 className="text-2xl font-bold text-dark mb-2">{step.title}</h1>
-          <p className="text-gray mb-6">{step.description}</p>
+          <h1 className="text-2xl font-bold text-dark mb-1">{step.title}</h1>
+          <p className="text-sm text-gray mb-6">{step.description}</p>
 
           {/* Info for Existing Customers */}
           {currentStep === 0 && isLoggedInUser && (
@@ -1970,30 +1975,31 @@ function ProSignupFormContent() {
           {/* Navigation */}
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={() => currentStep > 0 ? setCurrentStep(currentStep - 1) : router.back()}
-              className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition flex items-center justify-center gap-2"
+              className="btn-outline flex-1 text-sm"
             >
               Back
             </button>
-            <Button
+            <button
+              type="button"
               onClick={handleNext}
-              size="lg"
-              className="flex-1 flex items-center justify-center gap-2"
               disabled={!isStepValid() || isLoading}
+              className="btn-primary flex-1 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
               title={!isStepValid() && currentStep === 0 ? 'Please complete all fields and accept the terms' : ''}
             >
-              {isLoading ? <Spinner /> : 'Next'}
-            </Button>
+              {isLoading ? 'Working…' : 'Next'}
+            </button>
           </div>
         </div>
 
         {/* Step Indicators */}
-        <div className="flex justify-center gap-2">
+        <div className="flex justify-center gap-1.5 mb-6">
           {steps.map((_, i) => (
             <div
               key={i}
-              className={`h-2 rounded-full transition-all ${
-                i <= currentStep ? 'bg-primary w-4' : 'bg-gray w-2'
+              className={`h-1.5 rounded-full transition-all ${
+                i <= currentStep ? 'bg-primary w-6' : 'bg-line w-2'
               }`}
             />
           ))}
@@ -2003,43 +2009,43 @@ function ProSignupFormContent() {
 
       {/* Terms & Conditions Modal */}
       {showTermsModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-50 p-4">
+          <div className="surface-card max-w-3xl w-full max-h-[90vh] flex flex-col p-0 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b-2 border-gray/20 bg-gradient-to-r from-mint/10 to-primary/5">
+            <div className="flex items-center justify-between p-6 border-b border-line bg-gradient-to-r from-mint/40 to-white">
               <div>
-                <h2 className="text-3xl font-bold text-dark">Terms & Conditions</h2>
-                <p className="text-sm text-gray mt-1">Please read and scroll to accept</p>
+                <h2 className="text-2xl font-bold text-dark">Terms &amp; conditions</h2>
+                <p className="text-sm text-gray mt-1">Please read in full and scroll to the bottom to accept.</p>
               </div>
               <button
-                onClick={() => {
-                  setShowTermsModal(false)
-                }}
-                className="p-2 hover:bg-light rounded-full transition"
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="p-2 hover:bg-mint rounded-full transition"
                 title="Close"
+                aria-label="Close terms"
               >
-                <X size={28} className="text-dark" />
+                <X size={20} className="text-dark" />
               </button>
             </div>
 
             {/* Scroll Progress Indicator */}
             <div className="px-6 pt-4 pb-2">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray">Scroll Progress</span>
-                <span className="text-xs font-semibold text-primary">{termsScrolled ? '✓ Complete' : 'Scroll to bottom'}</span>
+                <span className="text-[11px] uppercase tracking-wider font-bold text-gray-soft">Reading progress</span>
+                <span className={`text-xs font-semibold ${termsScrolled ? 'text-primary-deep' : 'text-gray'}`}>
+                  {termsScrolled ? '✓ Ready to accept' : 'Scroll to bottom'}
+                </span>
               </div>
-              <div className="h-1 bg-gray/20 rounded-full overflow-hidden">
+              <div className="h-1 bg-line rounded-full overflow-hidden">
                 <div
-                  className={`h-full transition-all duration-300 ${termsScrolled ? 'bg-primary w-full' : 'bg-primary'}`}
-                  style={{
-                    width: termsScrolled ? '100%' : '0%',
-                  }}
+                  className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300"
+                  style={{ width: termsScrolled ? '100%' : '0%' }}
                 />
               </div>
             </div>
 
             {/* Content */}
-            <div 
+            <div
               className="flex-1 overflow-y-auto p-6 text-sm text-gray space-y-6"
               onScroll={(e) => {
                 const element = e.currentTarget
@@ -2050,65 +2056,54 @@ function ProSignupFormContent() {
               <div className="prose prose-sm max-w-none text-gray whitespace-pre-wrap font-normal leading-relaxed">
                 {WASHLEE_TERMS}
               </div>
-              
-              {/* Sticky bottom hint */}
+
               {!termsScrolled && (
-                <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
-                  <p className="text-xs text-yellow-900 font-medium">
-                    👇 Please scroll down to the bottom to accept the terms
+                <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                  <p className="text-xs text-amber-900 font-medium">
+                    Scroll to the bottom of the document to enable the Accept button.
                   </p>
                 </div>
               )}
             </div>
 
             {/* Footer - Sticky */}
-            <div className="border-t-2 border-gray/20 p-6 bg-gradient-to-r from-light/50 to-white flex gap-3">
+            <div className="border-t border-line p-5 bg-white flex gap-3">
               <button
-                onClick={() => {
-                  setShowTermsModal(false)
-                  // Don't change formData, user can try again
-                }}
-                className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition active:scale-95"
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="btn-outline flex-1 text-sm"
                 title="Decline and close"
               >
                 Decline
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setFormData({ ...formData, termsAccepted: true })
                   setShowTermsModal(false)
-                  
-                  // If user clicked "Already have account" link, advance to Step 1
                   if (redirectToProSignin && isLoggedInUser) {
                     setRedirectToProSignin(false)
-                    console.log('[ProSignup] Logged-in user accepted terms, advancing to Step 1')
-                    setTimeout(() => {
-                      setCurrentStep(1)
-                    }, 100)
+                    setTimeout(() => setCurrentStep(1), 100)
                   }
                 }}
                 disabled={!termsScrolled}
-                className={`flex-1 py-3 rounded-lg font-bold transition transform active:scale-95 flex items-center justify-center gap-2 ${
-                  termsScrolled
-                    ? 'bg-primary text-white hover:bg-primary/90 shadow-lg hover:shadow-xl cursor-pointer'
-                    : 'bg-gray/20 text-gray cursor-not-allowed opacity-50'
-                }`}
+                className="btn-primary flex-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 title={termsScrolled ? 'Accept and continue' : 'Scroll down to unlock'}
               >
                 {termsScrolled ? (
                   <>
-                    <CheckCircle size={20} />
-                    <span>I Accept & Agree</span>
+                    <CheckCircle size={16} />
+                    <span>I accept &amp; agree</span>
                   </>
                 ) : (
-                  'Scroll to Bottom to Accept'
+                  'Scroll to bottom to accept'
                 )}
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </main>
   )
 }
 

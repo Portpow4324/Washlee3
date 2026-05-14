@@ -84,11 +84,11 @@ export default function HelpCenter() {
   const faqs = [
     {
       question: "What areas do you deliver to?",
-      answer: "Washlee is currently available in major metropolitan areas including San Francisco, Oakland, Berkeley, and surrounding regions. We're expanding to new areas regularly! Check our service map in the app to see if your location is covered."
+      answer: "Washlee currently services Greater Melbourne. Enter your suburb on the booking page to confirm we cover you. We're expanding regularly."
     },
     {
       question: "How much does Washlee cost?",
-      answer: "Our base price is $3.00 per kilogram. Standard delivery is included. Same-day delivery is available for an additional $5.00."
+      answer: "Our base price is $7.50 per kilogram for standard wash & fold, with a $75 minimum order. Pickup and delivery are free. Express same-day is $12.50/kg, subject to availability."
     },
     {
       question: "How long does it take?",
@@ -248,14 +248,14 @@ export default function HelpCenter() {
                 <p className="text-mint text-sm">24/7 support</p>
               </div>
               <div className="text-center">
-                <div className="text-4xl mb-2">📞</div>
-                <h3 className="font-bold mb-2">Phone Support</h3>
-                <p className="text-mint text-sm">1-800-WASHLEE</p>
+                <div className="text-4xl mb-2">💬</div>
+                <h3 className="font-bold mb-2">In-app chat</h3>
+                <p className="text-mint text-sm">Open from any active order</p>
               </div>
               <div className="text-center">
                 <div className="text-4xl mb-2">📧</div>
-                <h3 className="font-bold mb-2">Email Us</h3>
-                <p className="text-mint text-sm">support@washlee.com</p>
+                <h3 className="font-bold mb-2">Email us</h3>
+                <p className="text-mint text-sm">support@washlee.com.au</p>
               </div>
             </div>
           </div>

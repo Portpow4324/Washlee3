@@ -2,141 +2,70 @@ import { NextRequest, NextResponse } from 'next/server'
 
 /**
  * GET /api/services?language={language}&includeAddOns={includeAddOns}
- * Returns all available services with pricing and details
+ * Returns the current Washlee service catalogue.
+ *
+ * Canonical pricing — kept in sync with lib/mobilePricing.ts:
+ *   - Standard wash & fold: $7.50/kg
+ *   - Express same-day:     $12.50/kg
+ *   - Delicates / special care: same per-kg rate as standard
+ *   - Minimum order: $75 (AUD, GST inclusive)
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const language = searchParams.get('language') || 'en'
     const includeAddOns = searchParams.get('includeAddOns') !== 'false'
 
     const services = [
       {
         id: 'standard_wash',
-        name: 'Standard Wash',
-        description: 'Regular washing for everyday clothing',
-        basePrice: 3.00,
+        name: 'Standard wash & fold',
+        description: 'Sorted, washed, and folded. Delivered next business day.',
+        basePrice: 7.5,
         priceUnit: 'per_kg',
         icon: '👕',
-        duration: '24-48 hours',
-        addOns: includeAddOns ? [
-          'stain_treatment',
-          'hang_dry',
-          'express_service'
-        ] : []
+        duration: 'Next business day',
+        addOns: includeAddOns ? ['hang_dry'] : [],
       },
       {
-        id: 'dry_clean',
-        name: 'Dry Cleaning',
-        description: 'Professional dry cleaning for delicate fabrics',
-        basePrice: 5.00,
-        priceUnit: 'per_kg',
-        icon: '👔',
-        duration: '48-72 hours',
-        addOns: includeAddOns ? [
-          'stain_treatment',
-          'comforter_clean',
-          'express_service'
-        ] : []
-      },
-      {
-        id: 'delicates',
-        name: 'Delicates Care',
-        description: 'Hand wash care for silk, wool, and delicate items',
-        basePrice: 6.00,
-        priceUnit: 'per_kg',
-        icon: '✨',
-        duration: '24-48 hours',
-        addOns: includeAddOns ? [
-          'stain_treatment',
-          'hang_dry'
-        ] : []
-      },
-      {
-        id: 'comforter_clean',
-        name: 'Comforter & Bedding',
-        description: 'Specialized cleaning for comforters, duvets, and large bedding',
-        basePrice: 25.00,
-        priceUnit: 'per_item',
-        icon: '🛏️',
-        duration: '48-72 hours',
-        addOns: includeAddOns ? [
-          'express_service',
-          'stain_treatment'
-        ] : []
-      },
-      {
-        id: 'leather_suede',
-        name: 'Leather & Suede',
-        description: 'Expert care for leather and suede garments',
-        basePrice: 8.00,
-        priceUnit: 'per_kg',
-        icon: '🧥',
-        duration: '72 hours',
-        addOns: includeAddOns ? [
-          'conditioning',
-          'waterproofing'
-        ] : []
-      },
-      {
-        id: 'express_service',
-        name: 'Express Service',
-        description: 'Fast turnaround - ready in 12-18 hours',
-        basePrice: 7.00,
+        id: 'express_wash',
+        name: 'Express same-day',
+        description: 'Order before noon, back the same evening by 7pm.',
+        basePrice: 12.5,
         priceUnit: 'per_kg',
         icon: '⚡',
-        duration: '12-18 hours',
-        addOns: includeAddOns ? [
-          'stain_treatment',
-          'hang_dry'
-        ] : []
-      }
+        duration: 'Same day',
+        addOns: includeAddOns ? ['hang_dry'] : [],
+      },
+      {
+        id: 'delicates_care',
+        name: 'Delicates / special care',
+        description:
+          'Gentle handling for items that need extra care — same per-kg rate as standard. Add care notes at booking.',
+        basePrice: 7.5,
+        priceUnit: 'per_kg',
+        icon: '✨',
+        duration: 'Next business day',
+        addOns: includeAddOns ? ['hang_dry'] : [],
+      },
     ]
 
-    const addOns = includeAddOns ? [
-      {
-        id: 'stain_treatment',
-        name: 'Stain Treatment',
-        price: 2.00,
-        description: 'Professional stain removal treatment'
-      },
-      {
-        id: 'hang_dry',
-        name: 'Hang Dry',
-        price: 1.50,
-        description: 'Air dry instead of machine dry'
-      },
-      {
-        id: 'express_service',
-        name: 'Express Service',
-        price: 7.00,
-        description: '12-18 hour turnaround'
-      },
-      {
-        id: 'comforter_clean',
-        name: 'Comforter Cleaning',
-        price: 25.00,
-        description: 'Professional comforter cleaning'
-      },
-      {
-        id: 'conditioning',
-        name: 'Leather Conditioning',
-        price: 5.00,
-        description: 'Conditioning treatment for leather'
-      },
-      {
-        id: 'waterproofing',
-        name: 'Waterproofing Treatment',
-        price: 8.00,
-        description: 'Waterproof coating application'
-      }
-    ] : []
+    const addOns = includeAddOns
+      ? [
+          {
+            id: 'hang_dry',
+            name: 'Hang dry',
+            price: 16.5,
+            description: 'Air-dried on racks instead of tumble dry.',
+          },
+        ]
+      : []
 
     return NextResponse.json({
       success: true,
       services,
       addOns,
-      currency: 'USD'
+      currency: 'AUD',
+      minimumOrder: 75,
     })
   } catch (error) {
     console.error('[SERVICES-ERROR]', error)

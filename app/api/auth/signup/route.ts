@@ -19,8 +19,39 @@ type SupabaseInsertClient = {
   }
 }
 
+const ATTRIBUTION_KEYS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_content',
+  'utm_term',
+  'promo',
+  'ref',
+  'channel',
+  'campaign_id',
+  'landing_page',
+  'first_utm_source',
+  'first_utm_medium',
+  'first_utm_campaign',
+] as const
+
 function asRecord(error: unknown): ErrorLike {
   return error && typeof error === 'object' ? error as ErrorLike : {}
+}
+
+function sanitizeAttribution(input: unknown): Record<string, string> | null {
+  if (!input || typeof input !== 'object') return null
+  const source = input as Record<string, unknown>
+  const result: Record<string, string> = {}
+
+  ATTRIBUTION_KEYS.forEach((key) => {
+    const value = source[key]
+    if (typeof value === 'string' && value.trim()) {
+      result[key] = value.trim().slice(0, 500)
+    }
+  })
+
+  return Object.keys(result).length > 0 ? result : null
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -94,6 +125,7 @@ export async function POST(request: NextRequest) {
     })
 
     const { email, password, name, phone, userType, state, personalUse, address, city, postcode, country, latitude, longitude, serviceRadiusKm } = body
+    const marketingAttribution = sanitizeAttribution(body.marketingAttribution)
 
     // Validate input
     if (!email || !password || !name || !userType) {
@@ -166,6 +198,7 @@ export async function POST(request: NextRequest) {
         // Timestamps
         created_at: new Date().toISOString(),
         phone_verified: false,
+        marketing_attribution: marketingAttribution,
       },
       email_confirm: false  // User must confirm email before logging in
     })
@@ -225,6 +258,7 @@ export async function POST(request: NextRequest) {
         personal_use: personalUse || false,
         created_at: new Date().toISOString(),
         phone_verified: false,
+        marketing_attribution: marketingAttribution,
       },
     })
 

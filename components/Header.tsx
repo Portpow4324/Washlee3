@@ -82,7 +82,6 @@ export default function Header() {
   const pagesWithoutBackButton = [
     '/how-it-works',
     '/pricing',
-    '/subscriptions',
     '/wholesale',
     '/faq',
     '/wash-club',
@@ -205,17 +204,17 @@ export default function Header() {
                 <ArrowLeft size={24} className="text-primary" />
               </button>
             )}
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-[80px] h-[80px] rounded-full overflow-hidden flex-shrink-0">
+            <Link href="/" className="flex items-center gap-2.5" aria-label="Washlee home">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 shadow-soft">
                 <Image
                   src="/logo-washlee.png"
-                  alt="Washlee Logo"
-                  width={80}
-                  height={80}
+                  alt=""
+                  width={48}
+                  height={48}
                   className="w-full h-full object-cover"
                 />
               </div>
-              <span className="font-bold text-xl text-dark hidden sm:inline">Washlee</span>
+              <span className="font-bold text-lg text-dark">Washlee</span>
             </Link>
           </div>
 
@@ -230,9 +229,6 @@ export default function Header() {
             <Link href="/pricing" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Pricing
             </Link>
-            <Link href="/subscriptions" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
-              Plans
-            </Link>
             <Link href="/wholesale" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Wholesale
             </Link>
@@ -240,7 +236,7 @@ export default function Header() {
               FAQ
             </Link>
             <Link href="/wash-club" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
-              WASH Club
+              Wash Club
             </Link>
             <Link href="/pro" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Pro
@@ -252,9 +248,11 @@ export default function Header() {
               <>
                 <Link
                   href="/booking"
-                  className="px-6 py-2.5 bg-primary text-white rounded-full hover:shadow-lg transition font-bold text-lg"
+                  className="px-5 py-2.5 bg-primary text-white rounded-full hover:shadow-lg transition font-bold text-base whitespace-nowrap"
+                  data-analytics-event="booking_started"
+                  data-analytics-label="header_book_pickup_signed_in"
                 >
-                  Book Now
+                  Book Pickup
                 </Link>
                 
                 
@@ -397,18 +395,29 @@ export default function Header() {
               </>
             ) : (
               <>
-                {/* Sign In Button */}
                 <Link
                   href="/auth/signin"
-                  className="px-6 py-3 text-dark bg-white rounded-full shadow-md hover:shadow-lg transition font-semibold text-lg"
+                  className="px-4 py-2.5 text-dark bg-white rounded-full hover:bg-mint transition font-semibold text-base whitespace-nowrap"
+                  data-analytics-event="login_started"
+                  data-analytics-label="header_sign_in"
                 >
                   Sign In
                 </Link>
                 <Link
-                  href="/auth/signup"
-                  className="px-5 py-2.5 bg-primary text-white rounded-full hover:shadow-lg transition font-bold text-base"
+                  href="/auth/signup-customer"
+                  className="px-4 py-2.5 text-primary-deep bg-white border border-line rounded-full hover:border-primary hover:bg-mint transition font-semibold text-base whitespace-nowrap"
+                  data-analytics-event="customer_signup_started"
+                  data-analytics-label="header_sign_up"
                 >
-                  Get Started
+                  Sign Up
+                </Link>
+                <Link
+                  href="/booking"
+                  className="px-5 py-2.5 bg-primary text-white rounded-full hover:shadow-lg transition font-bold text-base whitespace-nowrap"
+                  data-analytics-event="booking_started"
+                  data-analytics-label="header_book_pickup"
+                >
+                  Book Pickup
                 </Link>
               </>
             )}
@@ -435,9 +444,6 @@ export default function Header() {
             <Link href="/pricing" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
               Pricing
             </Link>
-            <Link href="/subscriptions" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
-              Plans
-            </Link>
             <Link href="/wholesale" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
               Wholesale
             </Link>
@@ -445,13 +451,13 @@ export default function Header() {
               FAQ
             </Link>
             <Link href="/wash-club" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
-              WASH Club
+              Wash Club
             </Link>
             <Link href="/pro" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
               Pro
             </Link>
-            <Link href="/app-info" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
-              App Info
+            <Link href="/mobile-app" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
+              Mobile app
             </Link>
             <hr className="my-2" />
             {isAuthenticated && !loading ? (
@@ -460,8 +466,10 @@ export default function Header() {
                   href="/booking"
                   className="block px-4 py-3 bg-primary text-white rounded-full transition font-semibold text-base"
                   onClick={() => setIsOpen(false)}
+                  data-analytics-event="booking_started"
+                  data-analytics-label="mobile_header_book_pickup_signed_in"
                 >
-                  Book Now
+                  Book Pickup
                 </Link>
                 <div className="px-4 py-3 bg-gradient-to-r from-mint to-primary/10 border-l-4 border-primary rounded flex items-center gap-3">
                   <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white">
@@ -539,11 +547,32 @@ export default function Header() {
               </>
             ) : (
               <>
-                <Link href="/auth/signin" className="block px-4 py-3 text-white bg-primary rounded-full transition font-semibold text-base">
-                  Sign In
+                <Link
+                  href="/booking"
+                  className="block px-4 py-3 bg-primary text-white rounded-full font-bold text-base text-center"
+                  onClick={() => setIsOpen(false)}
+                  data-analytics-event="booking_started"
+                  data-analytics-label="mobile_header_book_pickup"
+                >
+                  Book Pickup
                 </Link>
-                <Link href="/auth/signup" className="block px-4 py-3 bg-primary text-white rounded-full font-bold text-base">
-                  Get Started
+                <Link
+                  href="/auth/signup-customer"
+                  className="block px-4 py-3 text-primary-deep bg-white border border-line rounded-full transition font-semibold text-base text-center hover:bg-mint"
+                  onClick={() => setIsOpen(false)}
+                  data-analytics-event="customer_signup_started"
+                  data-analytics-label="mobile_header_sign_up"
+                >
+                  Sign Up
+                </Link>
+                <Link
+                  href="/auth/signin"
+                  className="block px-4 py-3 text-dark bg-white rounded-full transition font-semibold text-base text-center hover:bg-mint"
+                  onClick={() => setIsOpen(false)}
+                  data-analytics-event="login_started"
+                  data-analytics-label="mobile_header_sign_in"
+                >
+                  Sign In
                 </Link>
               </>
             )}

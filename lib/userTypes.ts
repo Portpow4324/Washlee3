@@ -2,7 +2,7 @@
  * User Types & Interfaces for Washlee
  * 
  * Central hub: users/{uid}
- * Specific data: customers/{uid}, employees/{uid}, loyalty_programs/{uid}, subscriptions/{uid}
+ * Specific data: customers/{uid}, employees/{uid}, loyalty_programs/{uid}
  * 
  * A user can have multiple roles stored in users/{uid}.userTypes array
  */
@@ -19,7 +19,7 @@ export type UserRole = 'customer' | 'employee' | 'loyalty' | 'subscription' | 'a
 export type CustomerStatus = 'active' | 'suspended' | 'inactive'
 export type EmployeeStatus = 'pending' | 'active' | 'suspended' | 'inactive'
 export type LoyaltyTier = 'bronze' | 'silver' | 'gold' | 'platinum'
-export type SubscriptionPlan = 'starter' | 'professional' | 'washly'
+export type SubscriptionPlan = 'none'
 export type SubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'pending'
 export type BillingCycle = 'monthly' | 'quarterly' | 'annual'
 
@@ -32,7 +32,7 @@ export type BillingCycle = 'monthly' | 'quarterly' | 'annual'
  * 
  * This is the central metadata document for every user.
  * It determines:
- * - What roles the user has (customer, employee, loyalty, subscription)
+ * - What roles the user has (customer, employee, loyalty, legacy subscription)
  * - Quick access to status of each role
  * - Billing & account information
  * - Which is the primary role
@@ -46,7 +46,7 @@ export interface UserMetadata {
   phone: string
 
   // Multi-role Support
-  userTypes: UserRole[]                    // e.g., ['customer', 'loyalty', 'subscription']
+  userTypes: UserRole[]                    // e.g., ['customer', 'loyalty']
   primaryUserType: UserRole                // e.g., 'customer' (the main role)
 
   // Role-Specific Metadata (quick lookup)
@@ -131,7 +131,7 @@ export interface CustomerProfile {
   // Preferences
   preferenceMarketingTexts: boolean
   preferenceAccountTexts: boolean
-  selectedPlan: 'none' | 'starter' | 'professional' | 'washly'
+  selectedPlan: 'none'
 
   // Statistics
   totalOrders: number

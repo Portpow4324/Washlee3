@@ -1,7 +1,12 @@
 /**
- * Dynamic Pricing Engine for Washlee
+ * Dynamic Pricing Engine for Washlee (admin sandbox / what-if previews)
+ *
+ * NOTE: The customer-facing booking flow uses lib/mobilePricing.ts (which is
+ * the canonical source for $7.50/kg standard, $12.50/kg express, $75 minimum
+ * AUD). This engine is only consumed by /admin/pricing/rules for modelling.
+ *
  * Calculates real-time pricing based on multiple factors:
- * - Base price ($3.00 per kg)
+ * - Base price ($7.50 per kg, AUD)
  * - Demand multiplier (rush hours)
  * - Weather impact
  * - Distance surcharge
@@ -10,7 +15,7 @@
 
 interface PricingFactors {
   weightKg: number
-  serviceType: 'standard' | 'express' | 'delicate' | 'comforter'
+  serviceType: 'standard' | 'express' | 'delicate'
   distanceKm: number
   isRushHour: boolean
   weatherCondition: 'clear' | 'rain' | 'snow'
@@ -36,15 +41,14 @@ interface PricingBreakdown {
   }
 }
 
-// Configuration constants
-const BASE_PRICE_PER_KG = 3.0
-const MIN_ORDER = 5.0 // $5 minimum order
+// Configuration constants (AUD)
+const BASE_PRICE_PER_KG = 7.5
+const MIN_ORDER = 75 // $75 minimum order, GST inclusive
 
 const SERVICE_PREMIUMS: Record<string, number> = {
   standard: 0,
-  express: 0.5, // 50% premium
-  delicate: 0.3, // 30% premium
-  comforter: 0.4, // 40% premium
+  express: 12.5 / BASE_PRICE_PER_KG - 1, // canonical $12.50/kg express rate
+  delicate: 0, // delicates / special care uses the standard per-kg rate
 }
 
 const DISTANCE_RATE = 0.5 // $0.50 per km
@@ -192,7 +196,7 @@ export function calculatePrice(factors: PricingFactors): PricingBreakdown {
  */
 export function getPricingPreview(
   distanceKm: number = 5,
-  serviceType: 'standard' | 'express' | 'delicate' | 'comforter' = 'standard',
+  serviceType: 'standard' | 'express' | 'delicate' = 'standard',
   weatherCondition: 'clear' | 'rain' | 'snow' = 'clear',
   locationZone: 'downtown' | 'suburban' | 'rural' = 'suburban'
 ): Record<number, PricingBreakdown> {

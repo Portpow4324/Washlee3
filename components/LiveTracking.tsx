@@ -10,7 +10,7 @@ interface ProLocation {
   status: string
   name: string
   phone: string
-  rating: number
+  rating?: number
   eta?: string
   vehicle?: string
 }
@@ -41,13 +41,18 @@ export default function LiveTracking({
   const customerMarkerRef = useRef<any>(null)
   const routeRef = useRef<any>(null)
 
+  const hasMapData = Boolean(proLocation || customerLocation)
+
   // Initialize map
   useEffect(() => {
     if (!mapRef.current || !window.google) return
+    const defaultCenter = proLocation
+      ? { lat: proLocation.lat, lng: proLocation.lng }
+      : customerLocation ?? { lat: -37.8136, lng: 144.9631 }
 
     const newMap = new window.google.maps.Map(mapRef.current, {
       zoom: 14,
-      center: proLocation ? { lat: proLocation.lat, lng: proLocation.lng } : { lat: -33.8688, lng: 151.2093 },
+      center: defaultCenter,
       mapTypeControl: false,
       fullscreenControl: false,
       streetViewControl: false,
@@ -111,7 +116,7 @@ export default function LiveTracking({
         <div style="font-family: sans-serif; font-size: 12px; color: #1f2d2b;">
           <strong>${proLocation.name}</strong><br/>
           Status: ${proLocation.status}<br/>
-          Rating: ⭐ ${proLocation.rating}
+          ${typeof proLocation.rating === 'number' ? `Rating: ${proLocation.rating}/5` : 'Rating: Not enough reviews yet'}
         </div>
       `
     })
@@ -226,6 +231,34 @@ export default function LiveTracking({
     map.fitBounds(bounds, 100)
   }, [map, proLocation, customerLocation])
 
+  if (!hasMapData) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray/10 min-h-96 flex flex-col items-center justify-center text-center p-8">
+          <div className="animate-pulse mb-4">
+            <div className="w-12 h-12 bg-primary/20 rounded-full mx-auto flex items-center justify-center">
+              <MapPin size={24} className="text-primary" />
+            </div>
+          </div>
+          <p className="text-gray font-semibold">Waiting for live tracking</p>
+          <p className="text-xs text-gray/70 mt-2 max-w-sm">
+            Real-time map tracking will appear once a Washlee Pro is assigned and a real location stream is available.
+          </p>
+        </div>
+
+        <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-6 border border-primary/20">
+          <h3 className="font-bold text-dark mb-2">Real-time tracking</h3>
+          <p className="text-gray mb-4">
+            A Washlee Pro will be assigned to your order soon. We do not show sample map locations or sample ratings.
+          </p>
+          <p className="text-sm text-gray">
+            Map ready - waiting for Pro assignment and live coordinates
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Map */}
@@ -256,10 +289,12 @@ export default function LiveTracking({
                   <p className="text-sm text-gray mb-1">Name</p>
                   <p className="font-semibold text-dark">{proLocation.name}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray mb-1">Rating</p>
-                  <p className="font-semibold text-dark">⭐ {proLocation.rating} / 5.0</p>
-                </div>
+                {typeof proLocation.rating === 'number' && (
+                  <div>
+                    <p className="text-sm text-gray mb-1">Rating</p>
+                    <p className="font-semibold text-dark">{proLocation.rating} / 5.0</p>
+                  </div>
+                )}
                 {proLocation.vehicle && (
                   <div>
                     <p className="text-sm text-gray mb-1">Vehicle</p>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getBearerUser, hasAdminSession } from '@/lib/security/apiAuth'
 import { cleanString } from '@/lib/security/validation'
+import { withSignedOrderProofPhotos } from '@/lib/mobileBackend'
 
 function sanitizePublicItems(items: unknown) {
   if (!items || typeof items !== 'object' || Array.isArray(items)) return items
@@ -52,6 +53,9 @@ export async function GET(request: NextRequest) {
     const canViewPrivateDetails =
       adminSession ||
       Boolean(authenticatedUser && (authenticatedUser.id === order.user_id || authenticatedUser.id === order.pro_id))
+    const signedOrder = canViewPrivateDetails
+      ? await withSignedOrderProofPhotos(supabase, order)
+      : order
 
     // Extract pricing from order
     const totalPrice = order.total_price || 0
@@ -140,6 +144,10 @@ export async function GET(request: NextRequest) {
       pickupTimeStatus: items?.pickupTimeStatus || 'pro_to_confirm',
       scheduledDeliveryDate: order.scheduled_delivery_date || items?.deliveryDate,
       deliveryTimeSlot: order.delivery_time_slot || items?.deliveryTimeSlot,
+      proof_photos: signedOrder.proof_photos || {},
+      proofPhotos: signedOrder.proof_photos || {},
+      status_history: order.status_history || [],
+      stage_status: order.stage_status,
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       job: job ? {

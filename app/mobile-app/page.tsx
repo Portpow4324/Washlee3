@@ -2,207 +2,297 @@
 
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import { Download, Smartphone, Zap, MapPin, Clock, Shield } from 'lucide-react'
+import Link from 'next/link'
+import {
+  Smartphone,
+  MapPin,
+  Bell,
+  Sparkles,
+  Apple,
+  Play,
+  ArrowRight,
+  Gift,
+  Clock,
+  Star,
+  CheckCircle,
+  ShieldCheck,
+  Wifi,
+} from 'lucide-react'
+import PhoneMockup from '@/components/marketing/PhoneMockup'
+import {
+  HomeAppScreen,
+  BookingAppScreen,
+  TrackingAppScreen,
+  RewardsAppScreen,
+} from '@/components/marketing/AppScreens'
+import Reveal from '@/components/marketing/Reveal'
+
+const features = [
+  {
+    icon: MapPin,
+    title: 'Real-time tracking',
+    body: 'Watch your Pro on the way to pickup or delivery, with live ETAs.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Book in under a minute',
+    body: 'Save your address, default load size, and care notes. Re-book in two taps.',
+  },
+  {
+    icon: Bell,
+    title: 'Smart push updates',
+    body: 'Quiet by default — pickup confirmed, on the way, delivered. Nothing else.',
+  },
+  {
+    icon: Gift,
+    title: 'Wash Club built in',
+    body: 'See your points balance, tier progress, and credit anytime. Free loyalty, no fees.',
+  },
+  {
+    icon: Clock,
+    title: 'Reschedule on the fly',
+    body: 'Move pickup or delivery from your phone — no calls, no chats, no friction.',
+  },
+  {
+    icon: Smartphone,
+    title: 'Made for thumbs',
+    body: 'Designed mobile-first so big buttons are exactly where you expect them.',
+  },
+]
+
+const screens = [
+  { component: HomeAppScreen, label: 'Home', sub: 'Quick book and recent orders' },
+  { component: BookingAppScreen, label: 'Booking', sub: 'Pick a slot and care notes' },
+  { component: TrackingAppScreen, label: 'Tracking', sub: 'Live map and ETA' },
+  { component: RewardsAppScreen, label: 'Rewards', sub: 'Wash Club tier and perks' },
+]
 
 export default function MobileAppPage() {
   return (
     <>
       <Header />
-      <div className="min-h-screen bg-gray-50">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-primary to-primary/80 text-white py-16 px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <Smartphone className="mx-auto mb-6" size={64} />
-            <h1 className="text-5xl font-bold mb-4">Washlee Mobile App</h1>
-            <p className="text-xl text-primary-light mb-8">Manage your laundry on the go. Book, track, and relax.</p>
-            <div className="flex justify-center gap-4 flex-wrap">
-              <a
-                href="https://apps.apple.com"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-white text-primary rounded-lg hover:bg-gray-100 transition font-semibold"
-              >
-                <Download size={20} />
-                App Store
-              </a>
-              <a
-                href="https://play.google.com"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-white text-primary rounded-lg hover:bg-gray-100 transition font-semibold"
-              >
-                <Download size={20} />
-                Google Play
-              </a>
+
+      {/* Hero — dark band, three phone mockups */}
+      <section className="relative overflow-hidden bg-dark text-white">
+        <div aria-hidden className="pointer-events-none absolute -top-32 left-1/4 h-80 w-80 rounded-full bg-primary/30 blur-3xl animate-blob" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-32 right-1/4 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-blob" style={{ animationDelay: '2s' }} />
+
+        <div className="relative container-page py-14 sm:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-6 animate-slide-up">
+              <span className="pill bg-white/10 text-white mb-4">
+                <Smartphone size={14} /> Washlee mobile app
+              </span>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-balance mb-4">
+                Laundry, in your pocket.
+              </h1>
+              <p className="text-lg text-white/75 leading-relaxed mb-8 max-w-md">
+                Book a pickup, track your order live, message your Pro, and watch your Wash Club rewards grow — all from one app.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <a
+                  href="https://apps.apple.com/app/washlee"
+                  className="group inline-flex items-center justify-center gap-3 rounded-2xl bg-white px-5 py-3 text-dark hover:bg-mint transition min-h-[56px]"
+                >
+                  <Apple size={26} />
+                  <span className="text-left">
+                    <span className="block text-[10px] uppercase tracking-wider opacity-60">Download on the</span>
+                    <span className="block text-base font-bold">App Store</span>
+                  </span>
+                </a>
+                <a
+                  href="https://play.google.com/store/apps/details?id=com.washlee"
+                  className="group inline-flex items-center justify-center gap-3 rounded-2xl bg-white/10 border border-white/15 px-5 py-3 text-white hover:bg-white/20 transition min-h-[56px]"
+                >
+                  <Play size={26} />
+                  <span className="text-left">
+                    <span className="block text-[10px] uppercase tracking-wider opacity-70">Get it on</span>
+                    <span className="block text-base font-bold">Google Play</span>
+                  </span>
+                </a>
+              </div>
+              <p className="text-xs text-white/55">Or use Washlee on the web — works great on any browser.</p>
+
+              {/* Trust mini-row */}
+              <ul className="mt-8 grid grid-cols-3 gap-3 max-w-md">
+                <li className="rounded-xl bg-white/5 px-3 py-2 text-center">
+                  <p className="text-xl font-bold text-white">~ 60s</p>
+                  <p className="text-[10px] uppercase tracking-wider text-white/55">to book</p>
+                </li>
+                <li className="rounded-xl bg-white/5 px-3 py-2 text-center">
+                  <p className="text-xl font-bold text-white">Next day</p>
+                  <p className="text-[10px] uppercase tracking-wider text-white/55">standard</p>
+                </li>
+                <li className="rounded-xl bg-white/5 px-3 py-2 text-center">
+                  <p className="text-xl font-bold text-white">Free</p>
+                  <p className="text-[10px] uppercase tracking-wider text-white/55">Wash Club</p>
+                </li>
+              </ul>
+            </div>
+
+            {/* Three phones */}
+            <div className="lg:col-span-6">
+              <div className="relative flex items-end justify-center gap-3 sm:gap-5 lg:gap-6">
+                <Reveal delay={0.05} className="hidden sm:block translate-y-8">
+                  <div className="rotate-[-6deg]">
+                    <PhoneMockup className="w-[170px]" tone="cream" label="Booking screen">
+                      <BookingAppScreen />
+                    </PhoneMockup>
+                  </div>
+                </Reveal>
+                <Reveal delay={0.15} className="z-10">
+                  <div className="animate-float-slow">
+                    <PhoneMockup className="w-[230px] sm:w-[260px]" tone="dark" label="Home screen">
+                      <HomeAppScreen />
+                    </PhoneMockup>
+                  </div>
+                </Reveal>
+                <Reveal delay={0.25} className="hidden sm:block translate-y-8">
+                  <div className="rotate-[6deg]">
+                    <PhoneMockup className="w-[170px]" tone="mint" label="Tracking screen">
+                      <TrackingAppScreen />
+                    </PhoneMockup>
+                  </div>
+                </Reveal>
+              </div>
             </div>
           </div>
         </div>
+      </section>
 
-        <div className="max-w-4xl mx-auto py-12 px-4">
-          {/* Key Features */}
-          <section className="mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Why Get the App?</h2>
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* Real-time Tracking */}
-              <div className="bg-white rounded-lg shadow-lg p-8">
-                <div className="flex items-start gap-4">
-                  <MapPin className="text-primary flex-shrink-0" size={32} />
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">Real-time Tracking</h3>
-                    <p className="text-gray-600">
-                      Know exactly where your laundry is at every step. Get notifications when we're on the way.
-                    </p>
+      {/* Screens at a glance */}
+      <section className="bg-soft-mint">
+        <div className="section">
+          <div className="text-center mb-10">
+            <Reveal>
+              <h2 className="section-title">Screens at a glance</h2>
+              <p className="section-subtitle">A peek at the customer app. (CSS previews — real screenshots dropping in soon.)</p>
+            </Reveal>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            {screens.map((s, i) => {
+              const Screen = s.component
+              return (
+                <Reveal key={s.label} delay={i * 0.05}>
+                  <div className="flex flex-col items-center text-center">
+                    <PhoneMockup className="w-full max-w-[200px]" tone="dark" label={`${s.label} screen`}>
+                      <Screen />
+                    </PhoneMockup>
+                    <p className="mt-4 text-sm font-bold text-dark">{s.label}</p>
+                    <p className="text-xs text-gray">{s.sub}</p>
                   </div>
-                </div>
-              </div>
-
-              {/* Quick Booking */}
-              <div className="bg-white rounded-lg shadow-lg p-8">
-                <div className="flex items-start gap-4">
-                  <Zap className="text-primary flex-shrink-0" size={32} />
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">Quick Booking</h3>
-                    <p className="text-gray-600">
-                      Book a pickup in seconds. Schedule recurring orders or book on demand, your choice.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Push Notifications */}
-              <div className="bg-white rounded-lg shadow-lg p-8">
-                <div className="flex items-start gap-4">
-                  <Clock className="text-primary flex-shrink-0" size={32} />
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">Smart Notifications</h3>
-                    <p className="text-gray-600">
-                      Get reminders for scheduled pickups and instant updates when your laundry is ready.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment */}
-              <div className="bg-white rounded-lg shadow-lg p-8">
-                <div className="flex items-start gap-4">
-                  <Shield className="text-primary flex-shrink-0" size={32} />
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">Secure Payments</h3>
-                    <p className="text-gray-600">
-                      Save multiple payment methods. Fast, secure checkout with no hidden fees.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Screenshots Section */}
-          <section className="mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">App Features</h2>
-            <div className="bg-white rounded-lg shadow-lg p-8">
-              <div className="grid md:grid-cols-3 gap-6 text-center">
-                <div>
-                  <div className="bg-gray-100 rounded-lg h-48 mb-4 flex items-center justify-center">
-                    <div className="text-center">
-                      <Smartphone className="mx-auto text-gray-400 mb-2" size={48} />
-                      <p className="text-gray-500 text-sm">Booking Screen</p>
-                    </div>
-                  </div>
-                  <h4 className="font-bold text-gray-900">Easy Booking</h4>
-                  <p className="text-gray-600 text-sm mt-2">Schedule pickups with just a few taps</p>
-                </div>
-
-                <div>
-                  <div className="bg-gray-100 rounded-lg h-48 mb-4 flex items-center justify-center">
-                    <div className="text-center">
-                      <MapPin className="mx-auto text-gray-400 mb-2" size={48} />
-                      <p className="text-gray-500 text-sm">Tracking Screen</p>
-                    </div>
-                  </div>
-                  <h4 className="font-bold text-gray-900">Live Tracking</h4>
-                  <p className="text-gray-600 text-sm mt-2">Follow your laundry in real-time</p>
-                </div>
-
-                <div>
-                  <div className="bg-gray-100 rounded-lg h-48 mb-4 flex items-center justify-center">
-                    <div className="text-center">
-                      <Zap className="mx-auto text-gray-400 mb-2" size={48} />
-                      <p className="text-gray-500 text-sm">Account Screen</p>
-                    </div>
-                  </div>
-                  <h4 className="font-bold text-gray-900">Manage Account</h4>
-                  <p className="text-gray-600 text-sm mt-2">View history, payments, and settings</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Download CTA */}
-          <section className="bg-gradient-to-r from-primary to-primary/80 text-white rounded-lg shadow-lg p-12 text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Ready to Simplify Your Laundry?</h2>
-            <p className="text-primary-light text-lg mb-8">Download the Washlee app and get $5 off your first order</p>
-            <div className="flex justify-center gap-4 flex-wrap">
-              <a
-                href="https://apps.apple.com"
-                className="inline-flex items-center gap-2 px-8 py-3 bg-white text-primary rounded-lg hover:bg-gray-100 transition font-semibold"
-              >
-                <Download size={20} />
-                Download on App Store
-              </a>
-              <a
-                href="https://play.google.com"
-                className="inline-flex items-center gap-2 px-8 py-3 border-2 border-white text-white rounded-lg hover:bg-white/10 transition font-semibold"
-              >
-                <Download size={20} />
-                Get it on Google Play
-              </a>
-            </div>
-          </section>
-
-          {/* FAQ */}
-          <section>
-            <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Frequently Asked Questions</h2>
-            <div className="space-y-4">
-              <details className="bg-white rounded-lg shadow p-6 cursor-pointer">
-                <summary className="font-bold text-gray-900 flex justify-between items-center">
-                  Is the app free to download?
-                  <span>+</span>
-                </summary>
-                <p className="text-gray-600 mt-4">
-                  Yes! The Washlee app is completely free to download. You only pay for the laundry services you use.
-                </p>
-              </details>
-
-              <details className="bg-white rounded-lg shadow p-6 cursor-pointer">
-                <summary className="font-bold text-gray-900 flex justify-between items-center">
-                  What devices does the app support?
-                  <span>+</span>
-                </summary>
-                <p className="text-gray-600 mt-4">
-                  The Washlee app is available on iOS (iPhone/iPad) and Android devices. Download from the App Store or Google Play.
-                </p>
-              </details>
-
-              <details className="bg-white rounded-lg shadow p-6 cursor-pointer">
-                <summary className="font-bold text-gray-900 flex justify-between items-center">
-                  Can I use Washlee without the app?
-                  <span>+</span>
-                </summary>
-                <p className="text-gray-600 mt-4">
-                  Absolutely! You can book and manage your orders on our website at washlee.com.au. The app is just for convenience.
-                </p>
-              </details>
-
-              <details className="bg-white rounded-lg shadow p-6 cursor-pointer">
-                <summary className="font-bold text-gray-900 flex justify-between items-center">
-                  How do I get the $5 first-order discount?
-                  <span>+</span>
-                </summary>
-                <p className="text-gray-600 mt-4">
-                  The discount is automatically applied when you download the app and create a new account. Use code APPFIRST5 at checkout.
-                </p>
-              </details>
-            </div>
-          </section>
+                </Reveal>
+              )
+            })}
+          </div>
+          <p className="mt-8 text-center text-xs text-gray-soft">
+            TODO: replace with real screenshots in <code className="font-mono text-[11px]">/public/marketing/app-screen-*.png</code>.
+          </p>
         </div>
-      </div>
+      </section>
+
+      {/* Features grid */}
+      <section className="bg-white">
+        <div className="section">
+          <div className="text-center mb-10">
+            <Reveal>
+              <h2 className="section-title">What you get in the app</h2>
+              <p className="section-subtitle">Same backend as the web — picks up where you left off across devices.</p>
+            </Reveal>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {features.map((f, i) => (
+              <Reveal key={f.title} delay={i * 0.05}>
+                <div className="surface-card card-hover p-6 h-full">
+                  <div className="w-11 h-11 rounded-xl bg-mint flex items-center justify-center mb-4">
+                    <f.icon size={20} className="text-primary-deep" />
+                  </div>
+                  <h3 className="font-bold text-dark mb-1.5">{f.title}</h3>
+                  <p className="text-sm text-gray leading-relaxed">{f.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Why install */}
+      <section className="bg-soft-hero">
+        <div className="section">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-7">
+              <Reveal>
+                <h2 className="h2 text-dark mb-4">Why bother installing?</h2>
+                <p className="text-gray text-base sm:text-lg leading-relaxed mb-6 max-w-xl">
+                  Three things you can&rsquo;t get on the website: live push notifications when your Pro is on the way,
+                  one-tap rebook from your home screen, and offline access to recent orders.
+                </p>
+              </Reveal>
+              <ul className="space-y-3 max-w-xl">
+                {[
+                  { icon: Bell, title: 'Live push, not email pings', body: 'Pickup confirmed, on the way, delivered. Quiet by default.' },
+                  { icon: Wifi, title: 'Recent orders cached offline', body: 'Quickly check your last order even on flaky tram Wi-Fi.' },
+                  { icon: ShieldCheck, title: 'Biometric login', body: 'Face ID and Android biometrics — no password to mistype.' },
+                  { icon: Star, title: 'One-tap rebook', body: 'Swap your last order onto next Tuesday with one button.' },
+                ].map((line, i) => (
+                  <Reveal key={line.title} delay={0.05 + i * 0.05}>
+                    <li className="flex items-start gap-3 surface-card card-hover p-4">
+                      <div className="w-9 h-9 rounded-lg bg-mint flex items-center justify-center flex-shrink-0">
+                        <line.icon size={16} className="text-primary-deep" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-dark text-sm">{line.title}</p>
+                        <p className="text-xs text-gray leading-relaxed mt-0.5">{line.body}</p>
+                      </div>
+                    </li>
+                  </Reveal>
+                ))}
+              </ul>
+            </div>
+
+            <div className="lg:col-span-5 flex justify-center">
+              <Reveal delay={0.1}>
+                <div className="animate-float">
+                  <PhoneMockup className="w-[260px]" tone="dark" label="Rewards screen preview">
+                    <RewardsAppScreen />
+                  </PhoneMockup>
+                </div>
+              </Reveal>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="container-page pb-16">
+        <Reveal>
+          <div className="surface-card overflow-hidden bg-gradient-to-br from-mint to-white">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center p-8 sm:p-10">
+              <div>
+                <h2 className="h3 text-dark mb-2">Don&rsquo;t want the app?</h2>
+                <p className="text-gray text-sm sm:text-base max-w-md">No worries — Washlee runs in any modern browser, and your account syncs everywhere.</p>
+                <ul className="mt-4 grid grid-cols-2 gap-2 text-xs text-dark">
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-primary" /> Same backend</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-primary" /> Same prices</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-primary" /> Same rewards</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-primary" /> No download</li>
+                </ul>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 md:justify-end">
+                <Link href="/booking" className="btn-primary">
+                  Book in browser
+                  <ArrowRight size={16} />
+                </Link>
+                <Link href="/how-it-works" className="btn-outline">
+                  How it works
+                </Link>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
       <Footer />
     </>
   )

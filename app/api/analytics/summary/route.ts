@@ -18,6 +18,13 @@ type AnalyticsSession = {
   session_id?: string | null
 }
 
+type QueryResult<T> = {
+  data: T[]
+  error: string | null
+}
+
+const SUMMARY_QUERY_TIMEOUT_MS = 3_500
+
 function increment(map: CountMap, key: string | null | undefined) {
   const safeKey = key || 'unknown'
   map[safeKey] = (map[safeKey] || 0) + 1
@@ -45,6 +52,36 @@ function startOfToday() {
   return date.toISOString()
 }
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string') return message
+  }
+  return String(error)
+}
+
+async function runSummaryQuery<T>(
+  label: string,
+  query: (signal: AbortSignal) => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>
+): Promise<QueryResult<T>> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), SUMMARY_QUERY_TIMEOUT_MS)
+
+  try {
+    const result = await query(controller.signal)
+    if (result.error) {
+      return { data: [], error: `${label}: ${result.error.message || 'query failed'}` }
+    }
+
+    return { data: Array.isArray(result.data) ? result.data : [], error: null }
+  } catch (error) {
+    return { data: [], error: `${label}: ${errorMessage(error)}` }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export async function GET() {
   try {
     const supabase = getSupabaseAdmin()
@@ -54,26 +91,36 @@ export async function GET() {
 
     const [todayEventsResult, recentEventsResult, activeSessionsResult, alertsResult, monitorRunsResult] =
       await Promise.all([
-        supabase.from('analytics_events').select('*').gte('created_at', today).order('created_at', { ascending: false }).limit(1000),
-        supabase.from('analytics_events').select('*').gte('created_at', thirtyDaysAgo).order('created_at', { ascending: false }).limit(5000),
-        supabase.from('analytics_sessions').select('*').gte('last_seen_at', activeSince).order('last_seen_at', { ascending: false }).limit(500),
-        supabase.from('security_alerts').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(20),
-        supabase.from('monitor_runs').select('*').order('created_at', { ascending: false }).limit(20),
+        runSummaryQuery<AnalyticsEvent>('today events', (signal) =>
+          supabase.from('analytics_events').select('*').gte('created_at', today).order('created_at', { ascending: false }).limit(1000).abortSignal(signal)
+        ),
+        runSummaryQuery<AnalyticsEvent>('recent events', (signal) =>
+          supabase.from('analytics_events').select('*').gte('created_at', thirtyDaysAgo).order('created_at', { ascending: false }).limit(5000).abortSignal(signal)
+        ),
+        runSummaryQuery<AnalyticsSession>('active sessions', (signal) =>
+          supabase.from('analytics_sessions').select('*').gte('last_seen_at', activeSince).order('last_seen_at', { ascending: false }).limit(500).abortSignal(signal)
+        ),
+        runSummaryQuery<Record<string, any>>('security alerts', (signal) =>
+          supabase.from('security_alerts').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(20).abortSignal(signal)
+        ),
+        runSummaryQuery<Record<string, any>>('monitor runs', (signal) =>
+          supabase.from('monitor_runs').select('*').order('created_at', { ascending: false }).limit(20).abortSignal(signal)
+        ),
       ])
 
     const queryErrors = [todayEventsResult, recentEventsResult, activeSessionsResult, alertsResult, monitorRunsResult]
-      .map((result) => result.error?.message)
+      .map((result) => result.error)
       .filter(Boolean)
 
     if (queryErrors.length > 0) {
-      throw new Error(queryErrors.join('; '))
+      console.warn('[analytics/summary] partial data:', queryErrors.join('; '))
     }
 
-    const todayEvents = todayEventsResult.data || []
-    const recentEvents = recentEventsResult.data || []
-    const activeSessions = activeSessionsResult.data || []
-    const alerts = alertsResult.data || []
-    const monitorRuns = monitorRunsResult.data || []
+    const todayEvents = todayEventsResult.data
+    const recentEvents = recentEventsResult.data
+    const activeSessions = activeSessionsResult.data
+    const alerts = alertsResult.data
+    const monitorRuns = monitorRunsResult.data
 
     const todayEventRows = Array.isArray(todayEvents) ? (todayEvents as AnalyticsEvent[]) : []
     const recentEventRows = Array.isArray(recentEvents) ? (recentEvents as AnalyticsEvent[]) : []
@@ -115,7 +162,9 @@ export async function GET() {
     const lastEventAt = recentEventRows[0]?.created_at || null
 
     return NextResponse.json({
-      ok: true,
+      ok: queryErrors.length === 0,
+      degraded: queryErrors.length > 0,
+      queryErrors,
       generatedAt: new Date().toISOString(),
       overview: {
         visitorsToday: new Set(todayEventRows.map((event) => event.session_id)).size,

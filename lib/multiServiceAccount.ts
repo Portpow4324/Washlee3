@@ -62,8 +62,8 @@ export async function createAdminUser(
         user_type: 'admin',
         admin_since: new Date().toISOString(),
         subscription: {
-          plan: 'washly',
-          status: 'active'
+          plan: 'none',
+          status: 'inactive'
         },
         permissions: {
           can_view_analytics: true,

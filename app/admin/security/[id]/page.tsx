@@ -1,8 +1,9 @@
 'use client'
 
-import { useRouter, useParams } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useRequireAdminAccess } from '@/lib/useAdminAccess'
+import Link from 'next/link'
 import {
   ArrowLeft,
   Copy,
@@ -17,7 +18,6 @@ import Spinner from '@/components/Spinner'
 import { getResolutionsByCategory, issueResolutions } from '@/lib/issueResolutions'
 
 export default function ResolutionGuidePage() {
-  const router = useRouter()
   const params = useParams()
   const { checkingAdminAccess } = useRequireAdminAccess()
   const [resolution, setResolution] = useState<any>(null)
@@ -53,13 +53,13 @@ export default function ResolutionGuidePage() {
         <Header />
         <div className="min-h-screen bg-gray-50 py-12 px-4">
           <div className="max-w-4xl mx-auto">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center gap-2 text-primary hover:text-[#3aad9a] mb-6 font-semibold"
+            <Link
+              href="/admin/security"
+              className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-6 hover:text-primary"
             >
-              <ArrowLeft size={20} />
-              Back
-            </button>
+              <ArrowLeft size={14} />
+              Back to security
+            </Link>
             <div className="bg-white rounded-lg shadow p-12 text-center">
               <AlertCircle className="mx-auto text-gray-400 mb-4" size={48} />
               <p className="text-gray-600 text-lg">Resolution guide not found</p>
@@ -77,13 +77,13 @@ export default function ResolutionGuidePage() {
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-primary hover:text-[#3aad9a] mb-6 font-semibold"
+          <Link
+            href="/admin/security"
+            className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-6 hover:text-primary"
           >
-            <ArrowLeft size={20} />
-            Back
-          </button>
+            <ArrowLeft size={14} />
+            Back to security
+          </Link>
 
           {/* Header */}
           <div className="bg-white rounded-lg shadow p-8 mb-8">
@@ -164,7 +164,7 @@ export default function ResolutionGuidePage() {
                     <div className="bg-gray-50 rounded-lg p-4 mb-4 relative">
                       <button
                         onClick={() => copyToClipboard(step.code, idx)}
-                        className="absolute top-3 right-3 px-3 py-1 bg-primary text-white text-xs rounded hover:bg-[#3aad9a] transition flex items-center gap-2"
+                        className="absolute top-3 right-3 px-3 py-1 bg-primary text-white text-xs rounded hover:bg-primary-deep transition flex items-center gap-2"
                       >
                         <Copy size={14} />
                         {copiedCode === idx ? 'Copied!' : 'Copy'}
@@ -248,12 +248,13 @@ export default function ResolutionGuidePage() {
 
           {/* Back to Dashboard Button */}
           <div className="text-center">
-            <button
-              onClick={() => router.push('/admin/security')}
-              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-[#3aad9a] transition font-semibold"
+            <Link
+              href="/admin/security"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-full hover:bg-primary-deep transition font-semibold"
             >
-              Back to Security Dashboard
-            </button>
+              <ArrowLeft size={14} />
+              Back to security dashboard
+            </Link>
           </div>
         </div>
       </div>

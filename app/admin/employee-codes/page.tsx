@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -9,15 +8,16 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Spinner from '@/components/Spinner'
 import {
-  ChevronLeft,
+  ArrowLeft,
   Copy,
   Download,
   Plus,
   AlertCircle,
   CheckCircle,
-  DollarSign,
+  Hash,
   FileText,
 } from 'lucide-react'
+import Link from 'next/link'
 
 interface GeneratedCode {
   code: string
@@ -26,7 +26,6 @@ interface GeneratedCode {
 }
 
 export default function EmployeeCodesPage() {
-  const router = useRouter()
   const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [codeCount, setCodeCount] = useState(10)
   const [codeFormat, setCodeFormat] = useState<'standard' | 'payslip'>('standard')
@@ -109,20 +108,23 @@ export default function EmployeeCodesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-light flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-12">
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-10">
         {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => router.push('/admin')}
-            className="text-primary hover:text-primary/80 font-semibold mb-4 flex items-center gap-2"
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-primary-deep font-semibold text-sm mb-3 hover:text-primary"
           >
-            ← Back to Admin
-          </button>
-          <h1 className="text-4xl font-bold text-dark mb-2">Employee Code Generator</h1>
-          <p className="text-gray">Generate unique employee/payslip identification codes</p>
+            <ArrowLeft size={14} />
+            Control center
+          </Link>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-950 mb-1">Employee code generator</h1>
+          <p className="text-sm text-gray-600">
+            Pre-mint Pro IDs (or payslip codes) ready to assign to new applicants once approved.
+          </p>
         </div>
 
         {/* Success/Error Messages */}
@@ -157,11 +159,11 @@ export default function EmployeeCodesPage() {
                   }`}
                 >
                   <div className="font-bold text-dark flex items-center gap-2">
-                    <DollarSign size={20} />
-                    Standard Employee ID
+                    <Hash size={20} />
+                    Standard Pro ID
                   </div>
                   <p className="text-xs text-gray mt-2">123456</p>
-                  <p className="text-xs text-gray mt-1">Short Pro app sign-in ID</p>
+                  <p className="text-xs text-gray mt-1">Six-digit Pro app sign-in ID</p>
                 </button>
 
                 <button
