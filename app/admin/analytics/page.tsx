@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabaseClient'
 import { useRequireAdminAccess } from '@/lib/useAdminAccess'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -36,6 +35,17 @@ interface ProStats {
   totalEarnings: number
 }
 
+interface AnalyticsApiResponse {
+  success?: boolean
+  degraded?: boolean
+  queryErrors?: string[]
+  analytics?: AnalyticsData
+  revenueData?: RevenueChartData[]
+  orderStatusData?: OrderStatusItem[]
+  topPros?: ProStats[]
+  error?: string
+}
+
 export default function AnalyticsDashboard() {
   const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [analytics, setAnalytics] = useState<AnalyticsData>({
@@ -51,6 +61,7 @@ export default function AnalyticsDashboard() {
   const [topPros, setTopPros] = useState<ProStats[]>([])
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d'>('30d')
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null)
 
   const COLORS = ['#2EAB95', '#48C9B0', '#7FE3D3', '#E8FFFB', '#9BA8A6']
 
@@ -61,116 +72,43 @@ export default function AnalyticsDashboard() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true)
-      const days = getDaysInRange()
-      const startDate = new Date()
-      startDate.setDate(startDate.getDate() - days)
+      setAnalyticsError(null)
 
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('id, status, total_price, created_at, pro_id, employees(name)')
-        .gte('created_at', startDate.toISOString())
-        .order('created_at', { ascending: false })
+      const response = await fetch('/api/admin/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_analytics_dashboard',
+          adminId: 'password-admin',
+          dateRange: `${getDaysInRange()}days`,
+        }),
+      })
 
-      if (ordersError) throw ordersError
-
-      const { count: totalUsers } = await supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
-
-      const totalRevenue = (orders || []).reduce((sum: number, order: any) => sum + (order.total_price || 0), 0)
-      const totalOrdersCount = orders?.length || 0
-      const completedOrdersCount = (orders || []).filter((o: any) => o.status === 'delivered').length
-      const averageOrderValue = totalOrdersCount > 0 ? totalRevenue / totalOrdersCount : 0
-
-      const dailyRevenue: Record<string, number> = {}
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date()
-        date.setDate(date.getDate() - i)
-        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        dailyRevenue[dateStr] = 0
+      const data = (await response.json().catch(() => ({}))) as AnalyticsApiResponse
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Analytics could not be loaded.')
       }
 
-      ;(orders || []).forEach((order: any) => {
-        const orderDate = new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        if (orderDate in dailyRevenue) {
-          dailyRevenue[orderDate] += order.total_price || 0
-        }
+      setAnalytics(data.analytics || {
+        totalRevenue: 0,
+        totalOrders: 0,
+        completedOrders: 0,
+        totalUsers: 0,
+        averageOrderValue: 0,
+        revenueGrowth: 0,
       })
+      setRevenueData(data.revenueData || [])
+      setOrderStatusData(data.orderStatusData || [])
+      setTopPros(data.topPros || [])
 
-      const revenueChartData = Object.entries(dailyRevenue).map(([date, revenue]: [string, number]) => ({
-        date,
-        revenue: Math.round(revenue * 100) / 100,
-      }))
-
-      const statusCount: Record<string, number> = {
-        pending: 0,
-        confirmed: 0,
-        'in-transit': 0,
-        delivered: 0,
-        cancelled: 0,
+      if (data.degraded && data.queryErrors?.length) {
+        setAnalyticsError(data.queryErrors[0])
       }
-      ;(orders || []).forEach((order: any) => {
-        const status = order.status || 'pending'
-        if (status in statusCount) {
-          statusCount[status]++
-        }
-      })
-
-      const orderStatusChartData = Object.entries(statusCount).map(([status, count]: [string, number]) => ({
-        status: status.charAt(0).toUpperCase() + status.slice(1),
-        count,
-      }))
-
-      const proOrderCount: Record<string, { name: string; orders: number; revenue: number }> = {}
-      ;(orders || []).forEach((order: any) => {
-        if (order.pro_id) {
-          const proId = order.pro_id
-          const proName = order.employees?.name || 'Unknown'
-          if (!proOrderCount[proId]) {
-            proOrderCount[proId] = {
-              name: proName,
-              orders: 0,
-              revenue: 0,
-            }
-          }
-          proOrderCount[proId].orders++
-          proOrderCount[proId].revenue += order.total_price || 0
-        }
-      })
-
-      const topProsData = Object.entries(proOrderCount)
-        .map(([proId, data]) => ({
-          proId,
-          proName: data.name,
-          ordersCompleted: data.orders,
-          totalEarnings: data.revenue,
-        }))
-        .sort((a, b) => b.ordersCompleted - a.ordersCompleted)
-        .slice(0, 5)
-
-      const midDate = new Date()
-      midDate.setDate(midDate.getDate() - Math.floor(days / 2))
-      const firstHalf = (orders || [])
-        .filter((o: any) => new Date(o.created_at) < midDate)
-        .reduce((sum: number, o: any) => sum + (o.total_price || 0), 0)
-      const secondHalf = (orders || [])
-        .filter((o: any) => new Date(o.created_at) >= midDate)
-        .reduce((sum: number, o: any) => sum + (o.total_price || 0), 0)
-      const revenueGrowth = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf * 100) : 0
-
-      setAnalytics({
-        totalRevenue,
-        totalOrders: totalOrdersCount,
-        completedOrders: completedOrdersCount,
-        totalUsers: totalUsers || 0,
-        averageOrderValue,
-        revenueGrowth: Math.round(revenueGrowth * 10) / 10,
-      })
-      setRevenueData(revenueChartData)
-      setOrderStatusData(orderStatusChartData)
-      setTopPros(topProsData)
     } catch (error) {
-      console.error('Error:', error)
+      setAnalyticsError(error instanceof Error ? error.message : 'Analytics could not be loaded.')
+      setRevenueData([])
+      setOrderStatusData([])
+      setTopPros([])
     } finally {
       setLoading(false)
     }
@@ -216,6 +154,12 @@ export default function AnalyticsDashboard() {
         <p className="text-sm text-gray-600 mb-8">
           Live revenue, order, and Pro performance from Supabase. AUD totals.
         </p>
+
+        {analyticsError && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Analytics loaded with limited data: {analyticsError}
+          </div>
+        )}
 
         <div className="flex gap-2 mb-8">
           {(['7d', '30d', '90d'] as const).map((range) => (

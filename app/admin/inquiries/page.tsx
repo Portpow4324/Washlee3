@@ -55,6 +55,7 @@ export default function InquiriesManagement() {
   const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!hasAdminAccess) return
@@ -64,13 +65,14 @@ export default function InquiriesManagement() {
   const loadInquiries = async () => {
     try {
       setIsLoading(true)
+      setError(null)
       const response = await fetch('/api/inquiries/list')
       if (!response.ok) throw new Error('Failed to load inquiries')
       
       const data = await response.json()
       setInquiries(data.inquiries || [])
     } catch (error) {
-      console.error('Error loading inquiries:', error)
+      setError(error instanceof Error ? error.message : 'Could not load inquiries.')
     } finally {
       setIsLoading(false)
     }
@@ -102,8 +104,9 @@ export default function InquiriesManagement() {
       setSelectedInquiry(null)
       setShowApprovalModal(false)
     } catch (error) {
-      console.error('Error approving inquiry:', error)
-      alert('Failed to approve inquiry')
+      const message = error instanceof Error ? error.message : 'Failed to approve inquiry'
+      setError(message)
+      alert(message)
     } finally {
       setActionLoading(false)
     }
@@ -140,8 +143,9 @@ export default function InquiriesManagement() {
       setShowApprovalModal(false)
       setRejectionReason('')
     } catch (error) {
-      console.error('Error rejecting inquiry:', error)
-      alert('Failed to reject inquiry')
+      const message = error instanceof Error ? error.message : 'Failed to reject inquiry'
+      setError(message)
+      alert(message)
     } finally {
       setActionLoading(false)
     }
@@ -199,6 +203,12 @@ export default function InquiriesManagement() {
         <p className="text-sm text-gray mb-8">
           Inbound Pro applications. Review the work-rights checklist, ID document, and notes — Pros are independent contractors paid commission per completed order.
         </p>
+
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
 
         {/* Status Filter */}
         <div className="flex gap-2 mb-8 flex-wrap">

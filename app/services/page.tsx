@@ -12,7 +12,12 @@ import {
   Shield,
   Sparkles,
   Wind,
+  MapPin,
 } from 'lucide-react'
+import PhotoSlot from '@/components/marketing/PhotoSlot'
+import Reveal from '@/components/marketing/Reveal'
+import PhoneMockup from '@/components/marketing/PhoneMockup'
+import { TrackingAppScreen } from '@/components/marketing/AppScreens'
 
 const services = [
   {
@@ -28,6 +33,7 @@ const services = [
       '$75 minimum order',
     ],
     turnaround: 'Next business day',
+    photo: { src: '/marketing/service-standard.jpg', hint: 'Neat folded everyday wash on a tray.' },
   },
   {
     icon: Sparkles,
@@ -42,6 +48,7 @@ const services = [
       '$75 minimum order still applies',
     ],
     turnaround: 'Same day by 7pm',
+    photo: { src: '/marketing/service-express.jpg', hint: 'Phone showing Express tracking next to a packed laundry bag.' },
   },
   {
     icon: Droplets,
@@ -56,6 +63,7 @@ const services = [
       'Dry-clean-only items are not treated as standard laundry',
     ],
     turnaround: 'Next business day',
+    photo: { src: '/marketing/service-delicates.jpg', hint: 'Silk blouse or wool sweater being folded gently.' },
   },
 ]
 
@@ -91,29 +99,59 @@ export default function ServicesPage() {
     <>
       <Header />
 
-      <section className="bg-soft-hero">
-        <div className="container-page py-14 sm:py-24">
-          <div className="max-w-3xl">
-            <span className="pill mb-4">
-              <Shirt size={14} />
-              Washlee services
-            </span>
-            <h1 className="h1 text-dark text-balance mb-4">
-              Laundry pickup and delivery for everyday Melbourne loads.
-            </h1>
-            <p className="text-lg text-gray leading-relaxed mb-8">
-              Choose standard, express, or special-care handling. Pricing is simple:
-              $7.50/kg for standard wash & fold, $12.50/kg for express same-day,
-              and a $75 minimum order.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link href="/booking" className="btn-primary">
-                Book a pickup
-                <ArrowRight size={16} />
-              </Link>
-              <Link href="/pricing" className="btn-outline">
-                See pricing
-              </Link>
+      <section className="relative overflow-hidden bg-soft-hero">
+        <div aria-hidden className="pointer-events-none absolute -top-20 -left-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl animate-blob" />
+        <div aria-hidden className="pointer-events-none absolute top-1/3 right-0 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-blob" style={{ animationDelay: '2s' }} />
+
+        <div className="relative container-page py-14 sm:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-7 animate-slide-up">
+              <span className="pill mb-4">
+                <Shirt size={14} />
+                Washlee services
+              </span>
+              <h1 className="h1 text-dark text-balance mb-4">
+                Laundry pickup and delivery for everyday Melbourne loads.
+              </h1>
+              <p className="text-lg text-gray leading-relaxed mb-6 max-w-xl">
+                Choose standard, express, or special-care handling. Pricing is simple:
+                $7.50/kg for standard wash &amp; fold, $12.50/kg for express same-day,
+                and a $75 minimum order.
+              </p>
+              <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-dark mb-8">
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Free pickup &amp; delivery</li>
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Damage protection</li>
+                <li className="inline-flex items-center gap-2"><MapPin size={16} className="text-primary" /> Greater Melbourne</li>
+              </ul>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link href="/booking" className="btn-primary shadow-glow">
+                  Book a pickup
+                  <ArrowRight size={16} />
+                </Link>
+                <Link href="/pricing" className="btn-outline">
+                  See pricing
+                </Link>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 relative">
+              <Reveal as="fade" delay={0.05}>
+                <PhotoSlot
+                  src="/marketing/folded-laundry.jpg"
+                  alt="Folded clean laundry in a bright Melbourne home"
+                  aspect="aspect-[4/5]"
+                  placeholderHint="Folded clean laundry on a light timber surface, soft natural light."
+                  priority
+                  caption="Standard, Express, or special-care · $75 minimum order"
+                />
+              </Reveal>
+              <div className="pointer-events-none absolute -right-4 sm:-right-6 lg:-right-8 -bottom-6 sm:-bottom-8 w-[140px] sm:w-[160px] animate-float-slow">
+                <div className="rotate-[-5deg]">
+                  <PhoneMockup tone="dark" label="Order tracking preview">
+                    <TrackingAppScreen />
+                  </PhoneMockup>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -121,38 +159,53 @@ export default function ServicesPage() {
 
       <section className="container-page py-14">
         <div className="text-center mb-10">
-          <h2 className="section-title">Choose your service</h2>
-          <p className="section-subtitle">
-            Three real options, all built around pickup, washing, folding, and delivery.
-          </p>
+          <Reveal>
+            <h2 className="section-title">Choose your service</h2>
+            <p className="section-subtitle">
+              Three real options, all built around pickup, washing, folding, and delivery.
+            </p>
+          </Reveal>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {services.map((service) => {
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {services.map((service, i) => {
             const Icon = service.icon
             return (
-              <article key={service.name} className="surface-card p-6 sm:p-7 flex flex-col">
-                <div className="w-11 h-11 rounded-xl bg-mint flex items-center justify-center mb-4">
-                  <Icon size={20} className="text-primary-deep" />
-                </div>
-                <div className="mb-4">
-                  <h3 className="text-xl font-bold text-dark mb-1">{service.name}</h3>
-                  <p className="text-2xl font-bold text-primary-deep">{service.price}</p>
-                </div>
-                <p className="text-sm text-gray leading-relaxed mb-5">{service.description}</p>
-                <ul className="space-y-2 text-sm text-dark flex-1">
-                  {service.points.map((point) => (
-                    <li key={point} className="flex items-start gap-2">
-                      <CheckCircle size={15} className="text-primary-deep flex-shrink-0 mt-0.5" />
-                      <span>{point}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-6 pt-5 border-t border-line flex items-center gap-2 text-sm text-gray">
-                  <Clock size={15} className="text-primary-deep" />
-                  <span>{service.turnaround}</span>
-                </div>
-              </article>
+              <Reveal key={service.name} delay={i * 0.06}>
+                <article className="surface-card card-hover overflow-hidden flex flex-col h-full">
+                  <PhotoSlot
+                    src={service.photo.src}
+                    alt={`${service.name} — Washlee service`}
+                    aspect="aspect-[4/3]"
+                    className="rounded-none border-0 border-b border-line"
+                    placeholderHint={service.photo.hint}
+                    rounded="lg"
+                    tone={i % 2 === 0 ? 'mint' : 'warm'}
+                  />
+                  <div className="p-6 sm:p-7 flex flex-col flex-1">
+                    <div className="w-11 h-11 rounded-xl bg-mint flex items-center justify-center mb-4">
+                      <Icon size={20} className="text-primary-deep" />
+                    </div>
+                    <div className="mb-4">
+                      <h3 className="text-xl font-bold text-dark mb-1">{service.name}</h3>
+                      <p className="text-2xl font-bold text-primary-deep">{service.price}</p>
+                    </div>
+                    <p className="text-sm text-gray leading-relaxed mb-5">{service.description}</p>
+                    <ul className="space-y-2 text-sm text-dark flex-1">
+                      {service.points.map((point) => (
+                        <li key={point} className="flex items-start gap-2">
+                          <CheckCircle size={15} className="text-primary-deep flex-shrink-0 mt-0.5" />
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-6 pt-5 border-t border-line flex items-center gap-2 text-sm text-gray">
+                      <Clock size={15} className="text-primary-deep" />
+                      <span>{service.turnaround}</span>
+                    </div>
+                  </div>
+                </article>
+              </Reveal>
             )
           })}
         </div>

@@ -11,10 +11,9 @@ import { getDeliveryMetrics, calculateDeliveryWindows, suggestDeliverySpeed, typ
 import { getAttributionMetadata, trackWashleeEvent } from '@/lib/analytics/client'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import Button from '@/components/Button'
-import Card from '@/components/Card'
-import { Clock, MapPin, Droplet, Wind, Truck, CheckCircle, ChevronRight, AlertCircle, Mail, Phone, X, Info, Zap, FileText, Check, AlertTriangle, ListTodo, Zap as Lightning, DollarSign } from 'lucide-react'
+import { Clock, MapPin, Droplet, Wind, Truck, CheckCircle, ChevronRight, ChevronLeft, AlertCircle, X, Info, Zap, FileText, Check, AlertTriangle, ListTodo, DollarSign, ArrowLeft, Package, Sparkles, ShieldCheck, Shirt, Calendar, Home as HomeIcon } from 'lucide-react'
 import Spinner from '@/components/Spinner'
+import PhotoSlot from '@/components/marketing/PhotoSlot'
 import { AddressParts } from '@/lib/googlePlaces'
 
 const validateEmail = (email: string): boolean => {
@@ -341,8 +340,13 @@ export default function BookingHybrid() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray">Loading...</p>
+      <div className="min-h-screen bg-soft-hero flex items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-4 text-center animate-slide-up">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-md ring-1 ring-line">
+            <Spinner />
+          </div>
+          <p className="text-sm font-semibold text-gray">Getting your booking ready…</p>
+        </div>
       </div>
     )
   }
@@ -861,52 +865,55 @@ export default function BookingHybrid() {
 
   if (paymentWindowClosed) {
     return (
-      <div className="min-h-screen bg-light flex flex-col">
+      <div className="min-h-screen bg-soft-hero flex flex-col">
         <Header />
-        <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12">
-          <Card className="text-center p-12 border-red-200 bg-red-50">
-            <div className="mb-6 relative">
-              <AlertTriangle size={60} className="mx-auto text-red-600" />
+        <main className="flex-1 flex items-center justify-center w-full px-4 py-12">
+          <div className="surface-card relative w-full max-w-md p-8 sm:p-10 text-center animate-slide-up">
+            <button
+              onClick={() => {
+                setPaymentWindowClosed(false)
+                setOrderConfirmed(false)
+                setError('')
+              }}
+              className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition"
+              aria-label="Dismiss"
+            >
+              <X size={18} />
+            </button>
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <AlertTriangle size={30} />
+            </div>
+            <h1 className="text-2xl font-bold text-dark mb-2">Payment not completed</h1>
+            <p className="text-gray text-sm mb-2">It looks like the payment window closed before payment finished.</p>
+            <p className="text-gray text-sm mb-7">
+              Your order{' '}
+              {orderId && <span className="font-semibold text-dark">#{orderId.slice(0, 8).toUpperCase()}</span>}
+              {' '}has been created, but payment wasn&rsquo;t processed.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => {
                   setPaymentWindowClosed(false)
                   setOrderConfirmed(false)
                   setError('')
                 }}
-                className="absolute top-0 right-0 p-2 hover:bg-red-200 rounded-full transition"
+                className="btn-primary flex-1 shadow-glow"
               >
-                <X size={24} className="text-red-600" />
+                Try again
               </button>
-            </div>
-            <h1 className="text-3xl font-bold text-red-600 mb-2">Payment Not Completed</h1>
-            <p className="text-gray mb-6">It looks like you closed the payment window or didn't complete payment.</p>
-            <p className="text-gray mb-8">Your order <span className="font-semibold text-dark">{orderId}</span> has been created, but payment wasn't processed. Would you like to try again?</p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                onClick={() => {
-                  setPaymentWindowClosed(false)
-                  setOrderConfirmed(false)
-                  setError('')
-                  // Optionally can retry payment here if needed
-                }}
-                className="bg-primary hover:bg-primary/90"
-              >
-                Try Again
-              </Button>
-              <Button 
-                variant="outline"
+              <button
                 onClick={() => {
                   setPaymentWindowClosed(false)
                   setOrderConfirmed(false)
                   setError('')
                   router.push('/')
                 }}
+                className="btn-outline flex-1"
               >
-                Return Home
-              </Button>
+                Return home
+              </button>
             </div>
-          </Card>
+          </div>
         </main>
         <Footer />
       </div>
@@ -915,24 +922,43 @@ export default function BookingHybrid() {
 
   if (orderConfirmed) {
     return (
-      <div className="min-h-screen bg-light flex flex-col">
+      <div className="min-h-screen bg-soft-hero flex flex-col">
         <Header />
-        <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12">
-          <Card className="text-center p-12">
-            <div className="mb-6">
-              <CheckCircle size={60} className="mx-auto text-primary" />
+        <main className="flex-1 flex items-center justify-center w-full px-4 py-12">
+          <div className="surface-card w-full max-w-md p-8 sm:p-10 text-center animate-slide-up">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-white shadow-glow">
+              <CheckCircle size={30} />
             </div>
-            <h1 className="text-3xl font-bold text-dark mb-3">Payment Processing...</h1>
-            <p className="text-gray mb-2">Order ID: {orderId}</p>
-            <p className="text-gray mb-8">A payment page has opened in a new tab. Complete your payment there to confirm your booking.</p>
-            <div className="bg-mint p-4 rounded-lg mb-8">
-              <p className="text-sm text-dark font-semibold mb-2 flex items-center gap-2"><FileText size={18} /> Payment Tab Instructions:</p>
-              <p className="text-xs text-gray mb-3 flex items-center gap-2"><Check size={16} className="text-primary" /> Complete payment in the new tab that opened</p>
-              <p className="text-xs text-gray mb-3 flex items-center gap-2"><Check size={16} className="text-primary" /> You will see a success message in that tab after payment</p>
-              <p className="text-xs text-gray flex items-center gap-2"><Check size={16} className="text-primary" /> You can safely close the payment tab after confirming success</p>
+            <h1 className="text-2xl font-bold text-dark mb-1">Payment processing…</h1>
+            {orderId && (
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary-deep mb-3">
+                Order #{orderId.slice(0, 8).toUpperCase()}
+              </p>
+            )}
+            <p className="text-gray text-sm mb-6">
+              A secure payment page has opened in a new tab. Complete payment there to confirm your booking.
+            </p>
+            <div className="rounded-2xl bg-mint/60 p-4 mb-7 text-left">
+              <p className="text-xs font-bold uppercase tracking-wider text-primary-deep mb-3 flex items-center gap-2">
+                <FileText size={14} /> Next steps
+              </p>
+              <ul className="space-y-2">
+                {[
+                  'Complete payment in the new tab that opened',
+                  'You’ll see a success message there once it’s done',
+                  'You can safely close that tab afterwards',
+                ].map((line) => (
+                  <li key={line} className="flex items-start gap-2 text-xs text-dark">
+                    <Check size={14} className="text-primary flex-shrink-0 mt-0.5" />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <Button onClick={() => router.push('/')} className="mx-auto">Return to Home</Button>
-          </Card>
+            <button onClick={() => router.push('/')} className="btn-primary w-full shadow-glow">
+              Return to home
+            </button>
+          </div>
         </main>
         <Footer />
       </div>
@@ -941,34 +967,76 @@ export default function BookingHybrid() {
 
   const displayedDeliverySlots = getDisplayedDeliverySlots()
 
+  // Presentational only — per-step icon for the redesigned step header.
+  const stepIcons = [Shirt, MapPin, Truck, Droplet, Package, ShieldCheck, Calendar, CheckCircle]
+  const StepIcon = stepIcons[currentStep - 1] || Shirt
+  const liveTotal = calculateTotal()
+
   return (
     <div className="min-h-screen bg-light flex flex-col">
       <Header />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-12">
-        {/* Top Navigation - Back to Home */}
-        <div className="mb-8 flex justify-between items-center">
-          <button
-            onClick={() => router.push('/')}
-            className="absolute top-6 left-6 p-2 hover:bg-mint rounded-full transition"
-            title="Go back to home"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-left text-primary" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
-          </button>
-          <div className="text-right ml-auto">
-            <p className="text-sm text-gray">Step {currentStep} of {steps.length}</p>
+      {/* Booking trust ribbon — visual flavor only, no logic */}
+      <section aria-label="What to expect" className="relative overflow-hidden bg-gradient-to-r from-mint via-white to-mint/40 border-b border-line">
+        <div aria-hidden className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-primary/15 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-10 right-1/3 h-40 w-40 rounded-full bg-accent/15 blur-3xl" />
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="hidden sm:flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-md flex-shrink-0">
+                <Truck size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wider text-primary-deep">You&rsquo;re booking with Washlee</p>
+                <p className="text-sm text-dark font-semibold leading-tight truncate">
+                  Free pickup &amp; delivery · $7.50/kg standard · $75 minimum
+                </p>
+              </div>
+            </div>
+            <ul className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] font-semibold">
+              <li className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-primary-deep ring-1 ring-line">
+                <CheckCircle size={12} /> Vetted local Pros
+              </li>
+              <li className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-primary-deep ring-1 ring-line">
+                <CheckCircle size={12} /> Damage protection
+              </li>
+              <li className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-primary-deep ring-1 ring-line">
+                <Clock size={12} /> ~ 60s to book
+              </li>
+            </ul>
           </div>
         </div>
+      </section>
 
-        {/* Progress Indicator - Poplin Style Dots */}
-        <div className="mb-16">
-          <div className="flex justify-end mb-8">
-            <button onClick={() => setShowStepInfo(true)} className="w-10 h-10 rounded-full border-2 border-gray flex items-center justify-center hover:bg-light transition">?</button>
-          </div>
+      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8 sm:py-12 pb-32">
+        {/* Top row — back home + step counter + help */}
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <button
+            onClick={() => router.push('/')}
+            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-2 text-sm font-semibold text-dark hover:border-primary hover:text-primary transition min-h-[44px]"
+            title="Go back to home"
+          >
+            <ArrowLeft size={16} />
+            <span className="hidden sm:inline">Home</span>
+          </button>
+          <span className="rounded-full bg-mint px-3 py-1.5 text-xs font-bold text-primary-deep">
+            Step {currentStep} of {steps.length}
+          </span>
+          <button
+            onClick={() => setShowStepInfo(true)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white text-gray hover:border-primary hover:text-primary transition"
+            aria-label="About this step"
+          >
+            <Info size={18} />
+          </button>
+        </div>
 
-          {/* Dot Progress Indicator */}
-          <div className="flex justify-center gap-2 mb-12">
-            {steps.map((step) => (
+        {/* Segmented progress bar */}
+        <div className="mb-7 flex items-center gap-1.5" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={steps.length}>
+          {steps.map((step) => {
+            const done = step.number < currentStep
+            const active = step.number === currentStep
+            return (
               <button
                 key={step.number}
                 onClick={() => {
@@ -977,451 +1045,671 @@ export default function BookingHybrid() {
                     setError('')
                   }
                 }}
-                className={`w-3 h-3 rounded-full transition ${
-                  step.number <= currentStep ? 'bg-primary' : 'bg-gray opacity-30'
-                } ${step.number > currentStep ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                disabled={step.number >= currentStep}
+                aria-label={`Step ${step.number}: ${step.title}`}
+                className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                  done
+                    ? 'bg-primary cursor-pointer hover:bg-primary-deep'
+                    : active
+                      ? 'bg-primary'
+                      : 'bg-line cursor-not-allowed'
+                }`}
               />
-            ))}
-          </div>
+            )
+          })}
+        </div>
 
-          <div className="text-center mb-8">
-            <h2 className="text-xl sm:text-2xl font-bold text-dark mb-2">{steps[currentStep - 1].title}</h2>
-            <p className="text-gray">{steps[currentStep - 1].description}</p>
+        {/* Step header */}
+        <div key={currentStep} className="mb-6 flex items-start gap-4 animate-slide-up">
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-glow">
+            <StepIcon size={22} />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-primary-deep">Step {currentStep}</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-dark leading-tight">{steps[currentStep - 1].title}</h2>
+            <p className="text-sm text-gray mt-0.5">{steps[currentStep - 1].description}</p>
           </div>
         </div>
 
         {/* Error */}
         {error && (
-          <div className="max-w-2xl mx-auto mb-8">
-            <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg flex gap-3">
-              <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p>{error}</p>
-              </div>
-            </div>
+          <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 text-red-700 px-4 py-3.5 flex gap-3 animate-slide-up">
+            <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+            <p className="text-sm font-medium leading-relaxed">{error}</p>
           </div>
         )}
 
         {/* STEP 1: Select Service */}
         {currentStep === 1 && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="p-8 mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-dark">STANDARD LAUNDRY SERVICE</h3>
-                {presets.length > 0 && (
-                  <button
-                    onClick={() => setShowPresetsModal(true)}
-                    className="text-sm px-3 py-1 bg-primary/10 text-primary rounded-full font-semibold hover:bg-primary/20 transition"
-                  >
-                    <Zap size={18} className="inline mr-1 text-orange-500" /> Quick Reorder ({presets.length})
-                  </button>
-                )}
-              </div>
-              <p className="text-sm text-gray mb-6">Washlee provides professional wash, dry, and fold service. Pick up tomorrow or get express same-day service.</p>
-              
-              <div className="space-y-4">
-                <div className="border-2 border-primary bg-mint rounded-lg p-6">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="text-2xl font-bold text-dark">👕 Professional Laundry</p>
-                      <p className="text-sm text-gray mt-2">Wash • Dry • Fold • Deliver</p>
-                    </div>
+          <div className="space-y-5 animate-slide-up">
+            {presets.length > 0 && (
+              <button
+                onClick={() => setShowPresetsModal(true)}
+                className="group flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-mint/50 p-4 text-left transition hover:border-primary hover:bg-mint min-h-[44px]"
+              >
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                  <Zap size={18} />
+                </span>
+                <span className="flex-1">
+                  <span className="block text-sm font-bold text-dark">Quick reorder</span>
+                  <span className="block text-xs text-gray">Reuse a saved order — {presets.length} available</span>
+                </span>
+                <ChevronRight size={18} className="text-primary-deep transition group-hover:translate-x-0.5" />
+              </button>
+            )}
+
+            {/* Hero service card */}
+            <div className="surface-card overflow-hidden">
+              <div className="relative bg-gradient-to-br from-mint to-white p-6 sm:p-7">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-glow">
+                    <Shirt size={22} />
                   </div>
-                  <p className="text-lg font-bold text-primary mt-4">$7.50/kg (Standard)</p>
-                  <p className="text-sm text-gray mt-1">$12.50/kg (Express same-day)</p>
-                  
-                  <div className="mt-4 pt-4 border-t border-primary/30 space-y-2">
-                    <p className="text-sm text-dark flex items-center gap-2"><Check size={16} className="text-primary" /> Professional washing & folding</p>
-                    <p className="text-sm text-dark flex items-center gap-2"><Check size={16} className="text-primary" /> Free pickup & delivery (next day or express)</p>
-                    <p className="text-sm text-dark flex items-center gap-2"><Check size={16} className="text-primary" /> Choice of detergent & care options</p>
-                    <p className="text-sm text-dark flex items-center gap-2"><Check size={16} className="text-primary" /> Poplin's Protection Plan available</p>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-dark">Professional wash &amp; fold</h3>
+                    <p className="text-sm text-gray mt-0.5">Sorted, washed, dried, and folded — picked up and delivered to your door.</p>
+                  </div>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-line bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-soft">Standard</p>
+                    <p className="text-xl font-bold text-dark">$7.50<span className="text-sm font-medium text-gray">/kg</span></p>
+                    <p className="text-[11px] text-gray">Next business day</p>
+                  </div>
+                  <div className="rounded-xl border border-line bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-soft">Express</p>
+                    <p className="text-xl font-bold text-dark">$12.50<span className="text-sm font-medium text-gray">/kg</span></p>
+                    <p className="text-[11px] text-gray">Same-day by 7pm</p>
                   </div>
                 </div>
               </div>
-            </Card>
+              <div className="border-t border-line p-6 sm:p-7">
+                <p className="text-xs font-bold uppercase tracking-wider text-primary-deep mb-3">What&rsquo;s included</p>
+                <ul className="grid sm:grid-cols-2 gap-2.5">
+                  {[
+                    'Professional washing & folding',
+                    'Free pickup & delivery',
+                    'Choice of detergent & care options',
+                    'Washlee Protection Plan available',
+                  ].map((line) => (
+                    <li key={line} className="flex items-start gap-2 text-sm text-dark">
+                      <Check size={16} className="text-primary flex-shrink-0 mt-0.5" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Process strip — visual storytelling */}
+            <div className="surface-card p-5 sm:p-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-soft mb-4">How your order flows</p>
+              <ol className="grid grid-cols-4 gap-2">
+                {[
+                  { icon: MapPin, label: 'Pickup' },
+                  { icon: Droplet, label: 'Wash' },
+                  { icon: Shirt, label: 'Fold' },
+                  { icon: Truck, label: 'Deliver' },
+                ].map((stage, i) => (
+                  <li key={stage.label} className="relative flex flex-col items-center gap-2 text-center">
+                    {i < 3 && (
+                      <span aria-hidden className="absolute right-[-1rem] top-5 hidden h-px w-8 bg-line sm:block" />
+                    )}
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-mint text-primary-deep">
+                      <stage.icon size={17} />
+                    </span>
+                    <span className="text-xs font-semibold text-dark">{stage.label}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {/* Visual flavor — pickup photo slot */}
+            <PhotoSlot
+              src="/marketing/pickup-handoff.jpg"
+              alt="A Washlee Pro collecting a laundry bag at a Melbourne doorway"
+              aspect="aspect-[16/9]"
+              placeholderHint="Replace with a real booking pickup photo — Pro collecting a bag at a Melbourne door."
+              caption="Free pickup &amp; delivery across Greater Melbourne"
+            />
           </div>
         )}
 
         {/* STEP 2: Pickup Location */}
         {currentStep === 2 && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="p-8 mb-8">
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-dark mb-2">Pickup Address</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={addressInput}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      setAddressInput(val)
-                      setAddressError('')
-                      fetchAddressPredictions(val, 'pickup')
-                    }}
-                    placeholder="Enter your address (e.g., 123 Main St, Sydney NSW)"
-                    className="w-full px-4 py-3 border-2 border-gray rounded-lg focus:border-primary outline-none"
-                  />
-                  
-                  {addressPredictionTarget === 'pickup' && showAddressPredictions && addressPredictions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-white border-2 border-primary rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto mt-1">
-                      {addressPredictions.map((prediction, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => selectAddress(prediction)}
-                          className="w-full text-left px-4 py-3 hover:bg-mint border-b border-light last:border-b-0 transition"
-                        >
-                          <p className="font-semibold text-dark text-sm">{prediction.main_text}</p>
-                          <p className="text-xs text-gray">{prediction.secondary_text}</p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                {isValidatingAddress && (
-                  <div className="mt-3 flex items-center gap-3 p-3 bg-mint rounded-lg">
-                    <Spinner />
-                    <p className="text-sm text-dark font-semibold">Validating address...</p>
-                  </div>
-                )}
-                
-                {addressPredictionTarget === 'pickup' && addressError && (
-                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-700">{addressError}</p>
-                  </div>
-                )}
-                
-                {bookingData.pickupAddressDetails && (
-                  <div className="mt-3 p-3 bg-mint rounded-lg">
-                    <p className="text-sm text-dark font-semibold flex items-center gap-2"><Check size={16} className="text-primary" /> Address confirmed: {bookingData.pickupAddress}</p>
+          <div className="space-y-5 animate-slide-up">
+            {/* Pickup */}
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <MapPin size={16} />
+                </span>
+                <h3 className="font-bold text-dark">Pickup address</h3>
+              </div>
+
+              <label className="label-field" htmlFor="pickup-address">Where should we collect from?</label>
+              <div className="relative">
+                <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-soft pointer-events-none" />
+                <input
+                  id="pickup-address"
+                  type="text"
+                  value={addressInput}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setAddressInput(val)
+                    setAddressError('')
+                    fetchAddressPredictions(val, 'pickup')
+                  }}
+                  placeholder="Start typing your address…"
+                  className="input-field pl-10"
+                />
+
+                {addressPredictionTarget === 'pickup' && showAddressPredictions && addressPredictions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-line rounded-2xl shadow-lg z-50 max-h-64 overflow-y-auto overflow-hidden">
+                    {addressPredictions.map((prediction, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => selectAddress(prediction)}
+                        className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-mint border-b border-line last:border-b-0 transition"
+                      >
+                        <MapPin size={16} className="text-primary-deep flex-shrink-0 mt-0.5" />
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-dark text-sm truncate">{prediction.main_text}</span>
+                          <span className="block text-xs text-gray truncate">{prediction.secondary_text}</span>
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
 
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-dark mb-2">Select Pickup Spot</label>
+              {isValidatingAddress && (
+                <div className="mt-3 flex items-center gap-3 p-3 bg-mint/60 rounded-xl">
+                  <Spinner />
+                  <p className="text-sm text-dark font-semibold">Validating address…</p>
+                </div>
+              )}
+
+              {addressPredictionTarget === 'pickup' && addressError && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl flex gap-2">
+                  <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-700">{addressError}</p>
+                </div>
+              )}
+
+              {bookingData.pickupAddressDetails && (
+                <div className="mt-3 p-3 bg-mint/70 border border-primary/20 rounded-xl">
+                  <p className="text-sm text-dark font-semibold flex items-center gap-2">
+                    <CheckCircle size={16} className="text-primary-deep flex-shrink-0" />
+                    Confirmed: {bookingData.pickupAddress}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-5">
+                <label className="label-field">Pickup spot</label>
                 <button
                   onClick={() => setShowPickupSpotModal(true)}
-                  className="w-full border-2 border-gray rounded-lg p-4 text-left hover:border-primary transition"
+                  className="w-full flex items-center justify-between gap-3 border border-line rounded-xl p-3.5 text-left hover:border-primary transition min-h-[48px]"
                 >
-                  <p className="text-dark font-semibold">{pickupSpots.find(s => s.id === bookingData.pickupSpot)?.label}</p>
+                  <span className="flex items-center gap-2.5">
+                    <HomeIcon size={16} className="text-primary-deep" />
+                    <span className="text-dark font-semibold">{pickupSpots.find(s => s.id === bookingData.pickupSpot)?.label}</span>
+                  </span>
+                  <ChevronRight size={16} className="text-gray-soft" />
                 </button>
               </div>
 
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={bookingData.addPickupInstructions}
-                  onChange={(e) => setBookingData({ ...bookingData, addPickupInstructions: e.target.checked })}
-                  className="w-5 h-5"
-                />
-                <span className="text-dark font-semibold">Add pickup instructions</span>
-                <button onClick={() => setShowPickupInstructionsInfo(true)} className="text-primary text-sm"><Info size={16} className="inline" /></button>
-              </label>
-
-              {bookingData.addPickupInstructions && (
-                <textarea
-                  value={bookingData.pickupInstructions}
-                  onChange={(e) => setBookingData({ ...bookingData, pickupInstructions: e.target.value })}
-                  placeholder="Building access details, gate codes, etc..."
-                  className="w-full mt-4 p-3 border-2 border-gray rounded-lg focus:border-primary outline-none"
-                  rows={3}
-                />
-              )}
-
-              {/* Delivery Address Section */}
-              <div className="mt-12 pt-8 border-t-2 border-gray">
-                <h4 className="font-bold text-dark mb-4">Delivery Address</h4>
-                
-                <label className="flex items-center gap-3 cursor-pointer mb-6">
+              <div className="mt-5 rounded-xl border border-line p-3.5">
+                <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={sameAsPickup}
-                    onChange={(e) => {
-                      setSameAsPickup(e.target.checked)
-                      if (e.target.checked) {
-                        // Copy pickup address to delivery
-                        setBookingData({
-                          ...bookingData,
-                          deliveryAddress: bookingData.pickupAddress,
-                          deliveryAddressDetails: bookingData.pickupAddressDetails,
-                        })
-                      }
-                    }}
-                    className="w-5 h-5"
+                    checked={bookingData.addPickupInstructions}
+                    onChange={(e) => setBookingData({ ...bookingData, addPickupInstructions: e.target.checked })}
+                    className="w-5 h-5 accent-primary rounded"
                   />
-                  <span className="text-dark font-semibold">Same as pickup address</span>
+                  <span className="text-dark font-semibold text-sm flex-1">Add pickup instructions</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPickupInstructionsInfo(true)}
+                    className="text-gray-soft hover:text-primary transition"
+                    aria-label="About pickup instructions"
+                  >
+                    <Info size={16} />
+                  </button>
                 </label>
 
-                {!sameAsPickup && (
-                  <div className="mb-6">
-                    <label className="block text-sm font-semibold text-dark mb-2">Delivery Address</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Enter delivery address..."
-                        value={bookingData.deliveryAddress}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          setBookingData({
-                            ...bookingData,
-                            deliveryAddress: val,
-                            deliveryAddressDetails: null,
-                          })
-                          setAddressError('')
-                          fetchAddressPredictions(val, 'delivery')
-                        }}
-                        className="w-full px-4 py-3 border-2 border-gray rounded-lg focus:border-primary outline-none"
-                      />
-
-                      {addressPredictionTarget === 'delivery' && showAddressPredictions && addressPredictions.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 bg-white border-2 border-primary rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto mt-1">
-                          {addressPredictions.map((prediction, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => {
-                                selectAddress({ ...prediction, isDelivery: true })
-                              }}
-                              className="w-full text-left px-4 py-3 hover:bg-mint border-b border-light last:border-b-0 transition"
-                            >
-                              <p className="font-semibold text-dark text-sm">{prediction.main_text}</p>
-                              <p className="text-xs text-gray">{prediction.secondary_text}</p>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {addressPredictionTarget === 'delivery' && addressError && (
-                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm text-red-700">{addressError}</p>
-                      </div>
-                    )}
-                    
-                    {bookingData.deliveryAddressDetails && (
-                      <div className="mt-3 p-3 bg-mint rounded-lg">
-                        <p className="text-sm text-dark font-semibold flex items-center gap-2"><Check size={16} className="text-primary" /> Address confirmed: {bookingData.deliveryAddress}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {sameAsPickup && bookingData.pickupAddressDetails && (
-                  <div className="p-3 bg-mint rounded-lg">
-                    <p className="text-sm text-dark font-semibold flex items-center gap-2"><Check size={16} className="text-primary" /> Delivery to: {bookingData.pickupAddress}</p>
-                  </div>
+                {bookingData.addPickupInstructions && (
+                  <textarea
+                    value={bookingData.pickupInstructions}
+                    onChange={(e) => setBookingData({ ...bookingData, pickupInstructions: e.target.value })}
+                    placeholder="Building access details, gate codes, etc…"
+                    className="input-field mt-3"
+                    rows={3}
+                  />
                 )}
               </div>
-            </Card>
+            </div>
+
+            {/* Delivery */}
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <Truck size={16} />
+                </span>
+                <h3 className="font-bold text-dark">Delivery address</h3>
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer rounded-xl border border-line p-3.5 mb-4 has-[:checked]:border-primary has-[:checked]:bg-mint/40 transition">
+                <input
+                  type="checkbox"
+                  checked={sameAsPickup}
+                  onChange={(e) => {
+                    setSameAsPickup(e.target.checked)
+                    if (e.target.checked) {
+                      setBookingData({
+                        ...bookingData,
+                        deliveryAddress: bookingData.pickupAddress,
+                        deliveryAddressDetails: bookingData.pickupAddressDetails,
+                      })
+                    }
+                  }}
+                  className="w-5 h-5 accent-primary rounded"
+                />
+                <span className="text-dark font-semibold text-sm">Deliver to my pickup address</span>
+              </label>
+
+              {!sameAsPickup && (
+                <div>
+                  <label className="label-field" htmlFor="delivery-address">Where should we deliver to?</label>
+                  <div className="relative">
+                    <Truck size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-soft pointer-events-none" />
+                    <input
+                      id="delivery-address"
+                      type="text"
+                      placeholder="Start typing the delivery address…"
+                      value={bookingData.deliveryAddress}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setBookingData({
+                          ...bookingData,
+                          deliveryAddress: val,
+                          deliveryAddressDetails: null,
+                        })
+                        setAddressError('')
+                        fetchAddressPredictions(val, 'delivery')
+                      }}
+                      className="input-field pl-10"
+                    />
+
+                    {addressPredictionTarget === 'delivery' && showAddressPredictions && addressPredictions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-line rounded-2xl shadow-lg z-50 max-h-64 overflow-y-auto overflow-hidden">
+                        {addressPredictions.map((prediction, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              selectAddress({ ...prediction, isDelivery: true })
+                            }}
+                            className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-mint border-b border-line last:border-b-0 transition"
+                          >
+                            <MapPin size={16} className="text-primary-deep flex-shrink-0 mt-0.5" />
+                            <span className="min-w-0">
+                              <span className="block font-semibold text-dark text-sm truncate">{prediction.main_text}</span>
+                              <span className="block text-xs text-gray truncate">{prediction.secondary_text}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {addressPredictionTarget === 'delivery' && addressError && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl flex gap-2">
+                      <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-700">{addressError}</p>
+                    </div>
+                  )}
+
+                  {bookingData.deliveryAddressDetails && (
+                    <div className="mt-3 p-3 bg-mint/70 border border-primary/20 rounded-xl">
+                      <p className="text-sm text-dark font-semibold flex items-center gap-2">
+                        <CheckCircle size={16} className="text-primary-deep flex-shrink-0" />
+                        Confirmed: {bookingData.deliveryAddress}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {sameAsPickup && bookingData.pickupAddressDetails && (
+                <div className="p-3 bg-mint/70 border border-primary/20 rounded-xl">
+                  <p className="text-sm text-dark font-semibold flex items-center gap-2">
+                    <CheckCircle size={16} className="text-primary-deep flex-shrink-0" />
+                    Delivering to: {bookingData.pickupAddress}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* STEP 3: Delivery Speed */}
         {currentStep === 3 && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="p-8 mb-8">
-              <h3 className="font-bold text-lg text-dark mb-6">DELIVERY SPEED</h3>
-
-              {/* System Status - Real Data */}
-              {deliveryMetrics && !metricsLoading && (
-                <div className="mb-8 p-6 bg-mint rounded-xl border-2 border-primary/20">
-                  <div className="grid grid-cols-2 gap-6 text-center">
-                    <div>
-                      <p className="text-gray text-sm mb-2">Active Team</p>
-                      <p className="font-bold text-dark text-3xl">{deliveryMetrics.activeMembers}</p>
-                      <p className="text-xs text-gray mt-1">team members</p>
-                    </div>
-                    <div>
-                      <p className="text-gray text-sm mb-2">System Capacity</p>
-                      <p className="font-bold text-dark text-3xl">{deliveryMetrics.capacityUsage.toFixed(0)}%</p>
-                      <p className="text-xs text-gray mt-1">utilization</p>
-                    </div>
+          <div className="space-y-5 animate-slide-up">
+            {/* System Status - Real Data */}
+            {deliveryMetrics && !metricsLoading && (
+              <div className="surface-card p-4 sm:p-5">
+                <div className="grid grid-cols-2 divide-x divide-line">
+                  <div className="text-center px-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-soft mb-1">Active team</p>
+                    <p className="text-2xl font-bold text-dark">{deliveryMetrics.activeMembers}</p>
+                    <p className="text-[11px] text-gray">team members</p>
+                  </div>
+                  <div className="text-center px-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-soft mb-1">Capacity</p>
+                    <p className="text-2xl font-bold text-dark">{deliveryMetrics.capacityUsage.toFixed(0)}%</p>
+                    <p className="text-[11px] text-gray">utilisation</p>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {metricsLoading ? (
-                <div className="text-center py-12">
-                  <p className="text-gray text-sm">Checking team availability...</p>
+            {metricsLoading ? (
+              <div className="surface-card p-10 flex flex-col items-center gap-3">
+                <Spinner />
+                <p className="text-sm text-gray font-semibold">Checking team availability…</p>
+              </div>
+            ) : deliveryMetrics && deliveryMetrics.capacityUsage > 85 ? (
+              // TEAM IS FULL
+              <div className="surface-card p-6 sm:p-8 text-center border-red-200 bg-red-50">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+                  <AlertTriangle size={22} />
                 </div>
-              ) : deliveryMetrics && deliveryMetrics.capacityUsage > 85 ? (
-                // TEAM IS FULL
-                <div className="space-y-4">
-                  <div className="p-6 bg-red-50 border-2 border-red-200 rounded-xl text-center">
-                    <p className="text-red-700 font-bold text-lg mb-2 flex items-center justify-center gap-2"><AlertTriangle size={24} className="text-red-600" /> Our team is at full capacity</p>
-                    <p className="text-red-600 text-sm mb-4">We're currently receiving high demand. Please try booking again in a few minutes.</p>
-                    <p className="text-xs text-red-500">Capacity: {deliveryMetrics.capacityUsage.toFixed(0)}% • Active orders: {deliveryMetrics.activeOrders}</p>
+                <p className="text-red-700 font-bold text-lg mb-1">Our team is at full capacity</p>
+                <p className="text-red-600 text-sm mb-3">We&rsquo;re receiving high demand right now. Please try booking again in a few minutes.</p>
+                <p className="text-xs text-red-500">Capacity: {deliveryMetrics.capacityUsage.toFixed(0)}% · Active orders: {deliveryMetrics.activeOrders}</p>
+              </div>
+            ) : (
+              // NORMAL - SHOW DELIVERY OPTIONS
+              <div className="space-y-3">
+                {/* Standard Delivery */}
+                <button
+                  type="button"
+                  onClick={() => setBookingData({ ...bookingData, deliverySpeed: 'standard' })}
+                  aria-pressed={bookingData.deliverySpeed === 'standard'}
+                  className={`w-full text-left border-2 rounded-2xl p-5 transition-all duration-200 ${
+                    bookingData.deliverySpeed === 'standard'
+                      ? 'border-primary bg-mint shadow-glow'
+                      : 'border-line bg-white hover:border-primary/50'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition ${
+                      bookingData.deliverySpeed === 'standard' ? 'bg-primary text-white' : 'bg-mint text-primary-deep'
+                    }`}>
+                      <Truck size={20} />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-bold text-dark">Standard delivery</p>
+                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-primary-deep ring-1 ring-line whitespace-nowrap">$7.50/kg</span>
+                      </div>
+                      <p className="text-sm text-gray mt-0.5">Next business day, delivered by 5pm</p>
+                      <p className="text-xs text-gray-soft mt-1.5">
+                        {new Date(Date.now() + 86400000).toLocaleDateString('en-AU', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                    <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition ${
+                      bookingData.deliverySpeed === 'standard' ? 'border-primary bg-primary text-white' : 'border-line'
+                    }`}>
+                      {bookingData.deliverySpeed === 'standard' && <Check size={12} />}
+                    </span>
                   </div>
-                </div>
-              ) : (
-                // NORMAL - SHOW DELIVERY OPTIONS
-                <div className="space-y-4">
-                  {/* Standard Delivery */}
-                  <div
-                    onClick={() => setBookingData({ ...bookingData, deliverySpeed: 'standard' })}
-                    className={`border-2 rounded-xl p-6 cursor-pointer transition ${
-                      bookingData.deliverySpeed === 'standard'
-                        ? 'border-primary bg-mint'
-                        : 'border-gray hover:border-primary bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-4 mb-3">
-                      <div className="flex-1">
-                        <p className="font-bold text-dark text-lg flex items-center gap-2"><Truck size={20} className="text-primary" /> Standard Delivery</p>
-                        <p className="text-gray text-sm mt-1">Next-day delivery (by 5pm)</p>
-                        <p className="text-xs text-gray mt-2">
-                          {new Date(Date.now() + 86400000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                </button>
+
+                {/* Express Delivery */}
+                <button
+                  type="button"
+                  onClick={() => setBookingData({ ...bookingData, deliverySpeed: 'express' })}
+                  aria-pressed={bookingData.deliverySpeed === 'express'}
+                  className={`w-full text-left border-2 rounded-2xl p-5 transition-all duration-200 ${
+                    bookingData.deliverySpeed === 'express'
+                      ? 'border-amber-400 bg-amber-50 shadow-md'
+                      : 'border-line bg-white hover:border-amber-300'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition ${
+                      bookingData.deliverySpeed === 'express' ? 'bg-amber-400 text-white' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      <Zap size={20} />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-bold text-dark flex items-center gap-2">
+                          Express delivery
+                          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Fast</span>
                         </p>
+                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200 whitespace-nowrap">$12.50/kg</span>
                       </div>
-                      <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">$7.50/kg</span>
+                      <p className="text-sm text-gray mt-0.5">Same-day, delivered by 7pm</p>
+                      <p className="text-xs text-gray-soft mt-1.5">
+                        {new Date().toLocaleDateString('en-AU', { weekday: 'short', month: 'short', day: 'numeric' })} · max 25kg
+                      </p>
                     </div>
-                    {bookingData.deliverySpeed === 'standard' && (
-                      <div className="mt-4 pt-4 border-t border-primary space-y-2">
-                        <p className="text-xs text-primary font-semibold flex items-center gap-2"><Check size={14} className="text-primary" /> Next-day delivery by 5pm</p>
-                      </div>
-                    )}
+                    <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition ${
+                      bookingData.deliverySpeed === 'express' ? 'border-amber-400 bg-amber-400 text-white' : 'border-line'
+                    }`}>
+                      {bookingData.deliverySpeed === 'express' && <Check size={12} />}
+                    </span>
                   </div>
-
-                  {/* Express Delivery */}
-                  <div
-                    onClick={() => setBookingData({ ...bookingData, deliverySpeed: 'express' })}
-                    className={`border-2 rounded-xl p-6 cursor-pointer transition ${
-                      bookingData.deliverySpeed === 'express'
-                        ? 'border-orange-500 bg-orange-50'
-                        : 'border-gray hover:border-orange-500 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-4 mb-3">
-                      <div className="flex-1">
-                        <p className="font-bold text-dark text-lg flex items-center gap-2"><Zap size={20} className="text-orange-500" /> Express Delivery</p>
-                        <p className="text-gray text-sm mt-1">Same-day delivery (by 7pm)</p>
-                        <p className="text-xs text-gray mt-2">
-                          {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                        </p>
-                      </div>
-                      <span className="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">$12.50/kg</span>
-                    </div>
-                    {bookingData.deliverySpeed === 'express' && (
-                      <div className="mt-4 pt-4 border-t border-orange-500 space-y-2">
-                        <p className="text-xs text-orange-600 font-semibold flex items-center gap-2"><Check size={14} className="text-orange-600" /> Same-day delivery by 7pm (max 25kg)</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </Card>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* STEP 4: Laundry Care */}
         {currentStep === 4 && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="p-8 mb-8">
-              <h3 className="font-bold text-dark mb-6">LAUNDRY CARE & PREFERENCES</h3>
-              
-              {/* Detergent Selection */}
-              <div className="mb-8">
-                <div className="flex items-center gap-2 mb-3">
-                  <label className="block text-sm font-semibold text-dark">Select Detergent</label>
-                  <button onClick={() => setShowDetergentInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
-                </div>
+          <div className="space-y-5 animate-slide-up">
+            {/* Detergent */}
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <Droplet size={16} />
+                </span>
+                <h3 className="font-bold text-dark flex-1">Detergent</h3>
                 <button
-                  onClick={() => setShowDetergentModal(true)}
-                  className="w-full border-2 border-gray rounded-lg p-4 text-left hover:border-primary transition"
+                  type="button"
+                  onClick={() => setShowDetergentInfo(true)}
+                  className="text-gray-soft hover:text-primary transition"
+                  aria-label="About detergents"
                 >
-                  <p className="text-dark font-semibold">{detergents.find(d => d.id === bookingData.detergent)?.label}</p>
+                  <Info size={16} />
                 </button>
+              </div>
+              <button
+                onClick={() => setShowDetergentModal(true)}
+                className="w-full flex items-center justify-between gap-3 border border-line rounded-xl p-3.5 text-left hover:border-primary transition min-h-[48px]"
+              >
+                <span className="text-dark font-semibold">{detergents.find(d => d.id === bookingData.detergent)?.label}</span>
+                <ChevronRight size={16} className="text-gray-soft" />
+              </button>
 
-                {bookingData.detergent === 'i-will-provide' && (
-                  <div className="mt-4">
-                    <label className="text-xs font-semibold text-gray mb-2 block">Detergent Brand & Details</label>
-                    <textarea
-                      value={bookingData.detergentCustom}
-                      onChange={(e) => setBookingData({ ...bookingData, detergentCustom: e.target.value })}
-                      placeholder="e.g., Woolite Delicates, or any other specific instructions..."
-                      className="w-full p-3 border-2 border-gray rounded-lg focus:border-primary outline-none text-sm"
-                      rows={2}
-                    />
+              {bookingData.detergent === 'i-will-provide' && (
+                <div className="mt-4">
+                  <label className="label-field" htmlFor="detergent-custom">Detergent brand &amp; details</label>
+                  <textarea
+                    id="detergent-custom"
+                    value={bookingData.detergentCustom}
+                    onChange={(e) => setBookingData({ ...bookingData, detergentCustom: e.target.value })}
+                    placeholder="e.g. a specific brand, or any instructions…"
+                    className="input-field text-sm"
+                    rows={2}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Special care */}
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <Wind size={16} />
+                </span>
+                <h3 className="font-bold text-dark flex-1">Special care</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowSpecialCareInfo(true)}
+                  className="text-gray-soft hover:text-primary transition"
+                  aria-label="About special care"
+                >
+                  <Info size={16} />
+                </button>
+              </div>
+              <div className="space-y-2.5">
+                <label
+                  className="flex items-start gap-3 cursor-pointer p-4 border-2 rounded-xl transition has-[:checked]:border-primary has-[:checked]:bg-mint/40 border-line hover:border-primary/50"
+                  onClick={() => setBookingData({ ...bookingData, delicateCycle: !bookingData.delicateCycle })}
+                >
+                  <input type="checkbox" checked={bookingData.delicateCycle} onChange={() => {}} className="w-5 h-5 mt-0.5 accent-primary rounded" />
+                  <div>
+                    <p className="font-semibold text-dark text-sm">Delicate cycle</p>
+                    <p className="text-xs text-gray mt-0.5">Place delicates in a separate bag clearly labelled &lsquo;delicates&rsquo;.</p>
                   </div>
-                )}
-              </div>
+                </label>
 
-              {/* Care Instructions */}
-              <div className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <h4 className="text-sm font-semibold text-dark">Special Care Instructions</h4>
-                  <button onClick={() => setShowSpecialCareInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
-                </div>
-                <div className="space-y-3">
-                  <label className="flex items-start gap-3 cursor-pointer p-4 border-2 border-gray rounded-lg hover:border-primary transition"
-                    onClick={() => setBookingData({ ...bookingData, delicateCycle: !bookingData.delicateCycle })}
-                  >
-                    <input type="checkbox" checked={bookingData.delicateCycle} onChange={() => {}} className="w-5 h-5 mt-1" />
-                    <div>
-                      <p className="font-semibold text-dark">Delicate Cycle</p>
-                      <p className="text-xs text-gray">Place your delicates in a separate bag clearly labeled 'delicates'.</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start gap-3 cursor-pointer p-4 border-2 border-gray rounded-lg hover:border-primary transition"
-                    onClick={() => setBookingData({ ...bookingData, returnsOnHangers: !bookingData.returnsOnHangers })}
-                  >
-                    <input type="checkbox" checked={bookingData.returnsOnHangers} onChange={() => {}} className="w-5 h-5 mt-1" />
-                    <div>
-                      <p className="font-semibold text-dark">Return Items on Hangers</p>
-                      <p className="text-xs text-gray">Your items will be returned on hangers (must provide hangers).</p>
-                    </div>
-                  </label>
-                </div>
+                <label
+                  className="flex items-start gap-3 cursor-pointer p-4 border-2 rounded-xl transition has-[:checked]:border-primary has-[:checked]:bg-mint/40 border-line hover:border-primary/50"
+                  onClick={() => setBookingData({ ...bookingData, returnsOnHangers: !bookingData.returnsOnHangers })}
+                >
+                  <input type="checkbox" checked={bookingData.returnsOnHangers} onChange={() => {}} className="w-5 h-5 mt-0.5 accent-primary rounded" />
+                  <div>
+                    <p className="font-semibold text-dark text-sm">Return items on hangers</p>
+                    <p className="text-xs text-gray mt-0.5">Items returned on hangers (you provide the hangers).</p>
+                  </div>
+                </label>
               </div>
+            </div>
 
-              {/* Add-ons (Optional) */}
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <p className="text-sm font-semibold text-dark">ADD-ONS (OPTIONAL)</p>
-                  <button onClick={() => setShowAddOnsInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
-                </div>
-                <div className="space-y-3">
-                  <label className="flex items-start gap-3 cursor-pointer p-4 border-2 border-gray rounded-lg hover:border-primary transition"
-                    onClick={() => setBookingData({ ...bookingData, hangDry: !bookingData.hangDry })}
-                  >
-                    <input type="checkbox" checked={bookingData.hangDry} onChange={() => {}} className="w-5 h-5 mt-1" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-dark">Hang Dry</p>
-                      <p className="text-xs text-gray">Your items will be air-dried instead of machine dried.</p>
-                    </div>
-                    <span className="text-sm font-bold text-primary whitespace-nowrap">+$16.50</span>
-                  </label>
-                </div>
+            {/* Add-ons */}
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <Sparkles size={16} />
+                </span>
+                <h3 className="font-bold text-dark flex-1">Add-ons <span className="text-xs font-medium text-gray-soft">(optional)</span></h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddOnsInfo(true)}
+                  className="text-gray-soft hover:text-primary transition"
+                  aria-label="About add-ons"
+                >
+                  <Info size={16} />
+                </button>
               </div>
-            </Card>
+              <label
+                className="flex items-center gap-3 cursor-pointer p-4 border-2 rounded-xl transition has-[:checked]:border-primary has-[:checked]:bg-mint/40 border-line hover:border-primary/50"
+                onClick={() => setBookingData({ ...bookingData, hangDry: !bookingData.hangDry })}
+              >
+                <input type="checkbox" checked={bookingData.hangDry} onChange={() => {}} className="w-5 h-5 accent-primary rounded flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-dark text-sm">Hang dry</p>
+                  <p className="text-xs text-gray mt-0.5">Items air-dried instead of machine dried.</p>
+                </div>
+                <span className="rounded-full bg-mint px-2.5 py-1 text-xs font-bold text-primary-deep whitespace-nowrap">+$16.50</span>
+              </label>
+            </div>
           </div>
         )}
 
         {/* STEP 5: Bag Count */}
         {currentStep === 5 && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="p-8 mb-8">
-              <div className="flex items-center gap-2 mb-6">
-                <h3 className="font-bold text-dark">LAUNDRY WEIGHT</h3>
-                <button onClick={() => setShowWeightInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
+          <div className="space-y-5 animate-slide-up">
+            {/* Live weight readout */}
+            <div className="surface-card overflow-hidden">
+              <div className="bg-gradient-to-br from-mint to-white p-6 sm:p-7 text-center">
+                <p className="text-xs font-bold uppercase tracking-wider text-primary-deep">Estimated load</p>
+                <p className="mt-1 text-5xl font-bold text-dark leading-none">
+                  {((bookingData as any).customWeight || bookingData.bagCount * 10).toFixed(1)}
+                  <span className="text-xl font-semibold text-gray align-top ml-1">kg</span>
+                </p>
+                <p className="mt-2 text-sm text-gray">
+                  Charged at ${bookingData.deliverySpeed === 'express' ? '12.50' : '7.50'}/kg · $75 minimum order
+                </p>
               </div>
-              <p className="text-sm text-gray mb-6">Select weight or number of bags. Minimum 10kg (1 bag). Charged at $7.50/kg (standard) or $12.50/kg (express).</p>
+            </div>
 
-              <div className="space-y-6">
-                <div>
-                  <p className="font-semibold text-dark mb-2">How many bags?</p>
-                  <p className="text-xs text-gray mb-3">Minimum 10kg (1 bag) | Each bag = 10kg</p>
-                  <div className="flex items-center gap-4">
+            {/* Quick pick — bag sizes */}
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <Package size={16} />
+                </span>
+                <h3 className="font-bold text-dark flex-1">Quick pick a bag size</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowWeightInfo(true)}
+                  className="text-gray-soft hover:text-primary transition"
+                  aria-label="About measuring laundry"
+                >
+                  <Info size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Medium bag', kg: 10, helper: 'About a week of clothes' },
+                  { label: 'Large bag', kg: 15, helper: 'A full household load' },
+                ].map((bag) => {
+                  const active = ((bookingData as any).customWeight || bookingData.bagCount * 10) === bag.kg
+                  return (
+                    <button
+                      key={bag.label}
+                      type="button"
+                      onClick={() => {
+                        setBookingData({ ...bookingData, customWeight: bag.kg })
+                        setError('')
+                      }}
+                      aria-pressed={active}
+                      className={`rounded-2xl border-2 p-4 text-left transition-all duration-200 ${
+                        active ? 'border-primary bg-mint shadow-glow' : 'border-line bg-white hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <Package size={20} className={active ? 'text-primary-deep' : 'text-gray-soft'} />
+                        {active && <Check size={16} className="text-primary-deep" />}
+                      </div>
+                      <p className="mt-2 font-bold text-dark">{bag.label}</p>
+                      <p className="text-xs text-gray">~{bag.kg}kg · {bag.helper}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Fine-tune */}
+            <div className="surface-card p-6 sm:p-7">
+              <h3 className="font-bold text-dark mb-1">Fine-tune your weight</h3>
+              <p className="text-xs text-gray mb-5">Adjust by the bag, drag the slider, or enter an exact figure. Minimum 10kg, maximum 45kg.</p>
+
+              {/* Bag count stepper */}
+              <div className="rounded-xl border border-line p-4 mb-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-dark text-sm">Bags</p>
+                    <p className="text-xs text-gray">Each bag ≈ 10kg</p>
+                  </div>
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => setBookingData({ ...bookingData, bagCount: Math.max(1, bookingData.bagCount - 1) })}
-                      className="w-10 h-10 rounded-full bg-dark text-white font-bold hover:bg-dark/90"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-dark text-white text-xl font-bold hover:bg-dark-soft transition"
+                      aria-label="Fewer bags"
                     >
                       −
                     </button>
-                    <span className="text-2xl font-bold text-dark w-8 text-center">{bookingData.bagCount}</span>
+                    <span className="text-2xl font-bold text-dark w-8 text-center tabular-nums">{bookingData.bagCount}</span>
                     <button
                       onClick={() => {
                         const newCount = bookingData.bagCount + 1
@@ -1433,310 +1721,351 @@ export default function BookingHybrid() {
                           setError('')
                         }
                       }}
-                      className="w-10 h-10 rounded-full bg-dark text-white font-bold hover:bg-dark/90"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-dark text-white text-xl font-bold hover:bg-dark-soft transition"
+                      aria-label="More bags"
                     >
                       +
                     </button>
                   </div>
-                  <p className="text-sm font-semibold mt-2 text-primary">
-                    ≈ {(bookingData.bagCount * 10).toFixed(1)} kg
-                  </p>
-
-                  {/* Slider */}
-                  <div className="mt-4 mb-4">
-                    <input
-                      type="range"
-                      min="10"
-                      max="45"
-                      step="0.5"
-                      value={(bookingData as any).customWeight || bookingData.bagCount * 10}
-                      onChange={(e) => {
-                        const newWeight = parseFloat(e.target.value)
-                        setBookingData({ ...bookingData, customWeight: newWeight })
-                        if (newWeight > 45) {
-                          setError('Loads over 45kg need to be pre-booked. Contact support to arrange.')
-                        } else {
-                          setError('')
-                        }
-                      }}
-                      className="w-full h-2 bg-light rounded-lg appearance-none cursor-pointer accent-primary"
-                    />
-                  </div>
-
-                  {/* Custom Weight Input */}
-                  <div className="mt-4">
-                    <label className="text-xs text-gray font-semibold mb-2 block">Or enter custom weight (kg):</label>
-                    <input
-                      type="number"
-                      min="10"
-                      max="45"
-                      step="0.5"
-                      value={(bookingData as any).customWeight || ''}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        if (val) {
-                          const newWeight = Math.max(10, Math.min(45, parseFloat(val)))
-                          setBookingData({ ...bookingData, customWeight: newWeight })
-                          if (newWeight > 45) {
-                            setError('Loads over 45kg need to be pre-booked. Contact support to arrange.')
-                          } else {
-                            setError('')
-                          }
-                        }
-                      }}
-                      onBlur={() => {
-                        if (!(bookingData as any).customWeight) {
-                          setBookingData({ ...bookingData, customWeight: bookingData.bagCount * 10 })
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray rounded-lg text-sm focus:border-primary focus:outline-none"
-                      placeholder="10"
-                    />
-                    <p className="text-xs text-gray mt-1">Minimum: 10kg | Maximum: 45kg</p>
-                  </div>
                 </div>
-
               </div>
 
-              {calculateTotal() < 75 && (
-                <div className="mt-6 bg-blue-100 border border-blue-300 text-blue-700 p-4 rounded-lg text-sm flex items-center gap-2">
-                  <DollarSign size={18} className="text-blue-700 flex-shrink-0" />
-                  <span>$75 MINIMUM ORDER - Add more laundry to meet minimum!</span>
+              {/* Slider */}
+              <div className="rounded-xl border border-line p-4 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-semibold text-dark text-sm">Weight slider</p>
+                  <span className="rounded-full bg-mint px-2.5 py-0.5 text-xs font-bold text-primary-deep">
+                    {((bookingData as any).customWeight || bookingData.bagCount * 10).toFixed(1)} kg
+                  </span>
                 </div>
-              )}
+                <input
+                  type="range"
+                  min="10"
+                  max="45"
+                  step="0.5"
+                  value={(bookingData as any).customWeight || bookingData.bagCount * 10}
+                  onChange={(e) => {
+                    const newWeight = parseFloat(e.target.value)
+                    setBookingData({ ...bookingData, customWeight: newWeight })
+                    if (newWeight > 45) {
+                      setError('Loads over 45kg need to be pre-booked. Contact support to arrange.')
+                    } else {
+                      setError('')
+                    }
+                  }}
+                  className="w-full h-2 bg-line rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+                <div className="flex justify-between mt-1.5 text-[11px] text-gray-soft font-medium">
+                  <span>10kg</span>
+                  <span>45kg</span>
+                </div>
+              </div>
 
-              {((bookingData as any).customWeight || bookingData.bagCount * 10) > 45 && (
-                <div className="mt-6 bg-amber-100 border border-amber-300 text-amber-700 p-4 rounded-lg text-sm">
-                  <strong>Large load:</strong> Loads over 45kg need to be pre-booked with support before pickup.
-                </div>
-              )}
-            </Card>
+              {/* Custom Weight Input */}
+              <div>
+                <label className="label-field" htmlFor="custom-weight">Or enter an exact weight (kg)</label>
+                <input
+                  id="custom-weight"
+                  type="number"
+                  min="10"
+                  max="45"
+                  step="0.5"
+                  value={(bookingData as any).customWeight || ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val) {
+                      const newWeight = Math.max(10, Math.min(45, parseFloat(val)))
+                      setBookingData({ ...bookingData, customWeight: newWeight })
+                      if (newWeight > 45) {
+                        setError('Loads over 45kg need to be pre-booked. Contact support to arrange.')
+                      } else {
+                        setError('')
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!(bookingData as any).customWeight) {
+                      setBookingData({ ...bookingData, customWeight: bookingData.bagCount * 10 })
+                    }
+                  }}
+                  className="input-field"
+                  placeholder="10"
+                />
+              </div>
+            </div>
+
+            {calculateTotal() < 75 && (
+              <div className="rounded-2xl bg-mint/60 border border-primary/20 text-primary-deep p-4 text-sm flex items-center gap-2.5">
+                <DollarSign size={18} className="flex-shrink-0" />
+                <span className="font-semibold">$75 minimum order — add a little more laundry to meet the minimum.</span>
+              </div>
+            )}
+
+            {((bookingData as any).customWeight || bookingData.bagCount * 10) > 45 && (
+              <div className="rounded-2xl bg-amber-50 border border-amber-300 text-amber-800 p-4 text-sm flex items-start gap-2.5">
+                <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
+                <span><strong>Large load:</strong> loads over 45kg need to be pre-booked with support before pickup.</span>
+              </div>
+            )}
           </div>
         )}
 
         {/* STEP 6: Protection Plan */}
         {currentStep === 6 && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="p-6 mb-8">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-bold text-dark">COVERAGE</h3>
-                <button onClick={() => setShowProtectionPlanInfo(true)} className="text-primary hover:text-primary/80"><Info size={16} className="inline" /></button>
+          <div className="space-y-5 animate-slide-up">
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <ShieldCheck size={16} />
+                </span>
+                <h3 className="font-bold text-dark flex-1">Protection plan</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowProtectionPlanInfo(true)}
+                  className="text-gray-soft hover:text-primary transition"
+                  aria-label="About protection plans"
+                >
+                  <Info size={16} />
+                </button>
               </div>
-              <p className="text-xs text-gray mb-4">Washlee's Protection Plan covers you in the rare instance of damage or loss.</p>
-
-              <div className="space-y-2">
-                {protectionPlans.map((plan) => (
-                  <button
-                    key={plan.id}
-                    onClick={() => setBookingData({ ...bookingData, protectionPlan: plan.id })}
-                    className={`w-full p-4 rounded-lg border-2 transition text-left ${
-                      bookingData.protectionPlan === plan.id
-                        ? 'border-primary bg-mint'
-                        : 'border-gray hover:border-primary'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <p className="font-semibold text-dark text-sm">{plan.name}</p>
-                        <p className="text-xs text-gray">{plan.coverage}</p>
-                        <p className="text-xs text-gray">{plan.max}</p>
-                      </div>
-                      <p className="text-sm font-bold text-primary whitespace-nowrap">{plan.price}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              <p className="text-xs text-blue-600 mt-3">
-                <a href="/protection-plan" className="underline">Learn more</a> about Washlee's Protection Plan.
+              <p className="text-sm text-gray mb-5">
+                Every order includes Basic cover. Upgrade for a higher cap on delicates or business attire.
               </p>
-            </Card>
+
+              <div className="space-y-2.5">
+                {protectionPlans.map((plan) => {
+                  const active = bookingData.protectionPlan === plan.id
+                  return (
+                    <button
+                      key={plan.id}
+                      onClick={() => setBookingData({ ...bookingData, protectionPlan: plan.id })}
+                      aria-pressed={active}
+                      className={`w-full p-4 rounded-2xl border-2 text-left transition-all duration-200 ${
+                        active ? 'border-primary bg-mint shadow-glow' : 'border-line bg-white hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition ${
+                          active ? 'border-primary bg-primary text-white' : 'border-line'
+                        }`}>
+                          {active && <Check size={12} />}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-bold text-dark text-sm">{plan.name}</p>
+                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${
+                              plan.price === 'FREE' ? 'bg-mint text-primary-deep' : 'bg-white text-primary-deep ring-1 ring-line'
+                            }`}>
+                              {plan.price === 'FREE' ? 'Included' : plan.price}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray mt-0.5">{plan.coverage} · {plan.max}</p>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <a
+                href="/protection-plan"
+                className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary-deep hover:text-primary transition"
+              >
+                Learn more about the Protection Plan
+                <ChevronRight size={14} />
+              </a>
+            </div>
           </div>
         )}
 
         {/* STEP 7: Schedule Pickup Date & Delivery Time */}
         {currentStep === 7 && (
-          <div className="max-w-3xl mx-auto">
-            <Card className="p-8 mb-8">
-              {slotsError && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-700 font-semibold flex items-center gap-2">
-                    <AlertCircle size={18} /> {slotsError}
-                  </p>
-                </div>
-              )}
-              
-              {/* Pickup Date Selection */}
-              <div className="mb-8">
-                <label className="block text-sm font-semibold text-dark mb-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock size={18} className="text-primary" />
-                    Pickup Date (required)
-                  </div>
-                </label>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  {/* Date Picker */}
-                  <div>
-                    <input
-                      type="date"
-                      min={new Date().toISOString().split('T')[0]}
-                      max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                      value={selectedPickupDate}
-                      onChange={(e) => {
-                        const nextPickupDate = e.target.value
-                        setSelectedPickupDate(nextPickupDate)
-                        setBookingData({ ...bookingData, pickupDate: nextPickupDate, deliveryDate: '', deliveryTimeSlot: '' })
-                        if (nextPickupDate) {
-                          fetchAvailableSlots(nextPickupDate)
-                        } else {
-                          setSelectedDeliveryDate('')
-                          setAvailableDeliverySlots([])
-                        }
-                      }}
-                      className="w-full border-2 border-gray rounded-lg p-3 focus:border-primary outline-none"
-                    />
-                  </div>
-                </div>
+          <div className="space-y-5 animate-slide-up">
+            {slotsError && (
+              <div className="rounded-2xl bg-red-50 border border-red-200 p-4 flex gap-2.5">
+                <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700 font-medium">{slotsError}</p>
               </div>
-              
-              {/* Delivery Date & Time Selection */}
-              <div className="mb-8">
-                <label className="block text-sm font-semibold text-dark mb-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Truck size={18} className="text-primary" />
-                    Delivery Date & Time (required)
-                  </div>
-                </label>
-                
-                {/* Time Slots Grid */}
-                {slotsLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Spinner />
-                  </div>
-                ) : displayedDeliverySlots.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {displayedDeliverySlots.map((slot: any) => (
+            )}
+
+            {/* Pickup Date */}
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <Calendar size={16} />
+                </span>
+                <h3 className="font-bold text-dark">Pickup date</h3>
+                <span className="text-xs font-semibold text-red-500">Required</span>
+              </div>
+              <p className="text-sm text-gray mb-4">Choose when a Washlee Pro should collect your laundry.</p>
+              <input
+                type="date"
+                min={new Date().toISOString().split('T')[0]}
+                max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                value={selectedPickupDate}
+                onChange={(e) => {
+                  const nextPickupDate = e.target.value
+                  setSelectedPickupDate(nextPickupDate)
+                  setBookingData({ ...bookingData, pickupDate: nextPickupDate, deliveryDate: '', deliveryTimeSlot: '' })
+                  if (nextPickupDate) {
+                    fetchAvailableSlots(nextPickupDate)
+                  } else {
+                    setSelectedDeliveryDate('')
+                    setAvailableDeliverySlots([])
+                  }
+                }}
+                className="input-field sm:max-w-xs"
+              />
+            </div>
+
+            {/* Delivery Date & Time */}
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <Truck size={16} />
+                </span>
+                <h3 className="font-bold text-dark">Delivery time</h3>
+                <span className="text-xs font-semibold text-red-500">Required</span>
+              </div>
+              <p className="text-sm text-gray mb-4">
+                {selectedPickupDate ? 'Pick a delivery window below.' : 'Select a pickup date first to see available windows.'}
+              </p>
+
+              {slotsLoading ? (
+                <div className="flex flex-col items-center gap-3 py-10">
+                  <Spinner />
+                  <p className="text-sm text-gray font-semibold">Finding available windows…</p>
+                </div>
+              ) : displayedDeliverySlots.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {displayedDeliverySlots.map((slot: any) => {
+                    const active = bookingData.deliveryTimeSlot === slot.timeSlot
+                    return (
                       <button
                         key={slot.timeSlot}
                         onClick={() => setBookingData({ ...bookingData, deliveryTimeSlot: slot.timeSlot })}
-                        className={`p-4 rounded-lg border-2 transition text-center ${
-                          bookingData.deliveryTimeSlot === slot.timeSlot
-                            ? 'border-primary bg-mint text-dark font-semibold'
-                            : 'border-gray hover:border-primary text-gray'
+                        aria-pressed={active}
+                        className={`flex items-center justify-center gap-1.5 p-3.5 rounded-xl border-2 text-sm font-semibold transition-all duration-200 min-h-[48px] ${
+                          active
+                            ? 'border-primary bg-mint text-dark shadow-glow'
+                            : 'border-line bg-white text-gray hover:border-primary/50'
                         }`}
                       >
-                        <div className="font-semibold">{slot.timeSlot}</div>
+                        {active && <Check size={14} className="text-primary-deep" />}
+                        {slot.timeSlot}
                       </button>
-                    ))}
-                  </div>
-                ) : selectedPickupDate && selectedDeliveryDate && !slotsLoading ? (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-yellow-700">No available time slots for this date.</p>
-                  </div>
-                ) : null}
-              </div>
-            </Card>
+                    )
+                  })}
+                </div>
+              ) : selectedPickupDate && selectedDeliveryDate && !slotsLoading ? (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex gap-2.5">
+                  <AlertCircle size={16} className="text-amber-700 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800">No delivery windows are available for this date. Try a different pickup date.</p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-line p-8 text-center">
+                  <Clock size={24} className="mx-auto text-gray-soft mb-2" />
+                  <p className="text-sm text-gray">Delivery windows appear once you&rsquo;ve picked a pickup date.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* STEP 8: Review & Confirm */}
         {currentStep === 8 && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="p-8 mb-8">
-              <h3 className="font-bold text-dark mb-6">Order Summary</h3>
-
-              {/* Order Details */}
-              <div className="space-y-4 border-b border-gray pb-6 mb-6">
-                <div className="flex justify-between">
-                  <span className="text-gray">Service:</span>
-                  <span className="font-semibold text-dark">{services.find(s => s.id === bookingData.selectedService)?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray">Weight:</span>
-                  <span className="font-semibold text-dark">{getDetailedPricing().weight}kg</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray">Delivery:</span>
-                  <span className="font-semibold text-dark">{bookingData.deliverySpeed === 'standard' ? 'Standard' : 'Express'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray">Protection Plan:</span>
-                  <span className="font-semibold text-dark">{getDetailedPricing().protectionPlanName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray">Pickup Date:</span>
-                  <span className="font-semibold text-dark">{bookingData.pickupDate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray">Delivery Time:</span>
-                  <span className="font-semibold text-dark">{bookingData.deliveryDate} {bookingData.deliveryTimeSlot}</span>
-                </div>
-              </div>
-
-              {/* Pricing Breakdown */}
-              <div className="space-y-3 mb-6 pb-6 border-b border-gray">
-                <h4 className="font-semibold text-dark text-sm uppercase tracking-wide">Pricing Breakdown</h4>
-                
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray">{getDetailedPricing().weight}kg @ ${getDetailedPricing().baseRate.toFixed(2)}/kg</span>
-                  <span className="font-medium text-dark">${getDetailedPricing().laundryBase.toFixed(2)}</span>
-                </div>
-
-                {bookingData.hangDry && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray">Hang Dry Service</span>
-                    <span className="font-medium text-dark">${getDetailedPricing().hangDry.toFixed(2)}</span>
-                  </div>
-                )}
-
-                {getDetailedPricing().protectionPlan > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray">{getDetailedPricing().protectionPlanName} Protection</span>
-                    <span className="font-medium text-dark">${getDetailedPricing().protectionPlan.toFixed(2)}</span>
-                  </div>
-                )}
-
-                {getDetailedPricing().subtotal < 75 && (
-                  <div className="flex justify-between text-xs text-[#6b7b78] bg-[#E8FFFB] p-2 rounded">
-                    <span>Minimum booking amount applied</span>
-                    <span>($75.00)</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Total */}
-              <div className="mb-6 pt-4 border-t border-gray">
-                <div className="flex justify-between mb-2">
-                  <span className="font-bold text-dark">Total:</span>
-                  <span className="text-2xl font-bold text-primary">${calculateTotal().toFixed(2)}</span>
-                </div>
-                <p className="text-xs text-gray">(includes 10% GST)</p>
-              </div>
-
-              <label className="flex items-start gap-3 mb-6 p-4 border border-gray rounded-lg hover:bg-light transition cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={agreedToTerms}
-                  onChange={(e) => setAgreedToTerms(e.target.checked)}
-                  className="w-5 h-5 rounded mt-1 cursor-pointer"
-                />
-                <span className="text-sm text-gray">
-                  I agree to the <a href="/terms-of-service" className="text-primary hover:underline">Terms of Service</a> and understand the pricing
+          <div className="space-y-5 animate-slide-up">
+            {/* Order details */}
+            <div className="surface-card p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint text-primary-deep">
+                  <ListTodo size={16} />
                 </span>
-              </label>
-            </Card>
+                <h3 className="font-bold text-dark">Order details</h3>
+              </div>
+              <dl className="divide-y divide-line">
+                {[
+                  { icon: Shirt, label: 'Service', value: services.find(s => s.id === bookingData.selectedService)?.name },
+                  { icon: Package, label: 'Weight', value: `${getDetailedPricing().weight}kg` },
+                  { icon: Truck, label: 'Delivery', value: bookingData.deliverySpeed === 'standard' ? 'Standard' : 'Express' },
+                  { icon: ShieldCheck, label: 'Protection plan', value: getDetailedPricing().protectionPlanName },
+                  { icon: Calendar, label: 'Pickup date', value: bookingData.pickupDate || '—' },
+                  { icon: Clock, label: 'Delivery time', value: `${bookingData.deliveryDate} ${bookingData.deliveryTimeSlot}`.trim() || '—' },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-4 py-2.5">
+                    <dt className="flex items-center gap-2 text-sm text-gray">
+                      <row.icon size={15} className="text-gray-soft" />
+                      {row.label}
+                    </dt>
+                    <dd className="text-sm font-semibold text-dark text-right">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            {/* Pricing breakdown */}
+            <div className="surface-card overflow-hidden">
+              <div className="p-6 sm:p-7">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary-deep mb-3">Pricing breakdown</h4>
+                <div className="space-y-2.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray">{getDetailedPricing().weight}kg @ ${getDetailedPricing().baseRate.toFixed(2)}/kg</span>
+                    <span className="font-semibold text-dark">${getDetailedPricing().laundryBase.toFixed(2)}</span>
+                  </div>
+                  {bookingData.hangDry && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray">Hang dry service</span>
+                      <span className="font-semibold text-dark">${getDetailedPricing().hangDry.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {getDetailedPricing().protectionPlan > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray">{getDetailedPricing().protectionPlanName} protection</span>
+                      <span className="font-semibold text-dark">${getDetailedPricing().protectionPlan.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {getDetailedPricing().subtotal < 75 && (
+                    <div className="flex justify-between items-center text-xs bg-mint/60 text-primary-deep px-3 py-2 rounded-lg">
+                      <span className="font-medium">Minimum order amount applied</span>
+                      <span className="font-bold">$75.00</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-mint to-white border-t border-line p-6 sm:p-7">
+                <div className="flex items-baseline justify-between">
+                  <span className="font-bold text-dark">Total</span>
+                  <span className="text-3xl font-bold text-primary">${calculateTotal().toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-gray mt-1">Includes 10% GST · paid securely via Stripe.</p>
+              </div>
+            </div>
+
+            {/* Terms */}
+            <label className="surface-card flex items-start gap-3 p-4 cursor-pointer transition has-[:checked]:border-primary has-[:checked]:bg-mint/30">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="w-5 h-5 rounded mt-0.5 cursor-pointer accent-primary flex-shrink-0"
+              />
+              <span className="text-sm text-dark">
+                I agree to the{' '}
+                <a href="/terms-of-service" className="text-primary-deep font-semibold hover:underline">Terms of Service</a>
+                {' '}and understand the pricing.
+              </span>
+            </label>
           </div>
         )}
 
         {/* Modals */}
         {/* Pickup Spot Modal */}
         {showPickupSpotModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-sm p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">Select Pickup Spot</h3>
-                <button onClick={() => setShowPickupSpotModal(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowPickupSpotModal(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -1763,13 +2092,13 @@ export default function BookingHybrid() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowPickupSpotModal(false)}
-                  className="flex-1 py-2 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition"
+                  className="btn-outline flex-1"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => setShowPickupSpotModal(false)}
-                  className="flex-1 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                  className="btn-primary flex-1"
                 >
                   Done
                 </button>
@@ -1780,11 +2109,11 @@ export default function BookingHybrid() {
 
         {/* Detergent Modal */}
         {showDetergentModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-sm p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">Select Detergent</h3>
-                <button onClick={() => setShowDetergentModal(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowDetergentModal(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -1811,13 +2140,13 @@ export default function BookingHybrid() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowDetergentModal(false)}
-                  className="flex-1 py-2 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition"
+                  className="btn-outline flex-1"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => setShowDetergentModal(false)}
-                  className="flex-1 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                  className="btn-primary flex-1"
                 >
                   Done
                 </button>
@@ -1828,11 +2157,11 @@ export default function BookingHybrid() {
 
         {/* Pickup Instructions Info Modal */}
         {showPickupInstructionsInfo && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-sm p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">Pickup Instructions</h3>
-                <button onClick={() => setShowPickupInstructionsInfo(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowPickupInstructionsInfo(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -1850,7 +2179,7 @@ export default function BookingHybrid() {
 
               <button
                 onClick={() => setShowPickupInstructionsInfo(false)}
-                className="w-full py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                className="btn-primary w-full"
               >
                 Got it
               </button>
@@ -1860,11 +2189,11 @@ export default function BookingHybrid() {
 
         {/* Detergent Info Modal */}
         {showDetergentInfo && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-sm p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">Detergent Types</h3>
-                <button onClick={() => setShowDetergentInfo(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowDetergentInfo(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -1876,7 +2205,7 @@ export default function BookingHybrid() {
               </div>
               <button
                 onClick={() => setShowDetergentInfo(false)}
-                className="w-full py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                className="btn-primary w-full"
               >
                 Got it
               </button>
@@ -1886,11 +2215,11 @@ export default function BookingHybrid() {
 
         {/* Special Care Info Modal */}
         {showSpecialCareInfo && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-sm p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">Special Care Instructions</h3>
-                <button onClick={() => setShowSpecialCareInfo(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowSpecialCareInfo(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -1901,7 +2230,7 @@ export default function BookingHybrid() {
               </div>
               <button
                 onClick={() => setShowSpecialCareInfo(false)}
-                className="w-full py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                className="btn-primary w-full"
               >
                 Got it
               </button>
@@ -1911,11 +2240,11 @@ export default function BookingHybrid() {
 
         {/* Add-ons Info Modal */}
         {showAddOnsInfo && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-sm p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">Premium Add-ons</h3>
-                <button onClick={() => setShowAddOnsInfo(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowAddOnsInfo(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -1927,7 +2256,7 @@ export default function BookingHybrid() {
               </div>
               <button
                 onClick={() => setShowAddOnsInfo(false)}
-                className="w-full py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                className="btn-primary w-full"
               >
                 Got it
               </button>
@@ -1937,11 +2266,11 @@ export default function BookingHybrid() {
 
         {/* Weight Info Modal */}
         {showWeightInfo && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-sm p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">Measuring Your Laundry</h3>
-                <button onClick={() => setShowWeightInfo(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowWeightInfo(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -1956,7 +2285,7 @@ export default function BookingHybrid() {
               </div>
               <button
                 onClick={() => setShowWeightInfo(false)}
-                className="w-full py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                className="btn-primary w-full"
               >
                 Got it
               </button>
@@ -1966,11 +2295,11 @@ export default function BookingHybrid() {
 
         {/* Delivery Speed Info Modal */}
         {showDeliverySpeedInfo && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-sm p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">Delivery Options</h3>
-                <button onClick={() => setShowDeliverySpeedInfo(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowDeliverySpeedInfo(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -1981,7 +2310,7 @@ export default function BookingHybrid() {
               </div>
               <button
                 onClick={() => setShowDeliverySpeedInfo(false)}
-                className="w-full py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                className="btn-primary w-full"
               >
                 Got it
               </button>
@@ -1991,11 +2320,11 @@ export default function BookingHybrid() {
 
         {/* Protection Plan Info Modal */}
         {showProtectionPlanInfo && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-sm p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">Protection Plans</h3>
-                <button onClick={() => setShowProtectionPlanInfo(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowProtectionPlanInfo(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -2010,7 +2339,7 @@ export default function BookingHybrid() {
               </div>
               <button
                 onClick={() => setShowProtectionPlanInfo(false)}
-                className="w-full py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                className="btn-primary w-full"
               >
                 Got it
               </button>
@@ -2020,11 +2349,11 @@ export default function BookingHybrid() {
 
         {/* Step Info Modal */}
         {showStepInfo && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 max-h-96 overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-md p-6 sm:p-7 max-h-[85vh] overflow-y-auto animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark">{steps[currentStep - 1].title}</h3>
-                <button onClick={() => setShowStepInfo(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowStepInfo(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -2126,7 +2455,7 @@ export default function BookingHybrid() {
 
               <button
                 onClick={() => setShowStepInfo(false)}
-                className="w-full py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition"
+                className="btn-primary w-full"
               >
                 Got it
               </button>
@@ -2136,11 +2465,11 @@ export default function BookingHybrid() {
 
         {/* Presets Modal */}
         {showPresetsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-md p-6 sm:p-7 max-h-[85vh] overflow-y-auto animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark flex items-center gap-2"><Zap size={20} className="text-orange-500" /> Quick Reorder</h3>
-                <button onClick={() => setShowPresetsModal(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowPresetsModal(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -2184,91 +2513,64 @@ export default function BookingHybrid() {
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="max-w-2xl mx-auto mt-12">
-          {currentStep === 1 ? (
-            // Step 1: Only Continue button, full width and bigger
-            <Button
-              onClick={handleNext}
-              size="lg"
-              className="w-full py-4 flex items-center justify-center gap-2 text-lg"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Spinner />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  Continue <ChevronRight size={20} />
-                </>
+        {/* Sticky bottom bar — running total + navigation */}
+        <div className="fixed bottom-0 inset-x-0 z-40 border-t border-line bg-white/95 backdrop-blur-md shadow-[0_-8px_24px_-12px_rgba(20,32,30,0.18)]">
+          <div className="max-w-3xl mx-auto px-4 py-3 sm:py-3.5 flex items-center gap-3 sm:gap-4">
+            {/* Live total */}
+            <div className="flex-shrink-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-soft leading-none">
+                {currentStep === 8 ? 'Total' : 'Estimated total'}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-dark leading-tight tabular-nums">
+                ${liveTotal.toFixed(2)}
+              </p>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex flex-1 items-center justify-end gap-2.5">
+              {currentStep !== 1 && (
+                <button
+                  onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+                  disabled={isLoading}
+                  className="btn-outline px-4 sm:px-6 disabled:opacity-50"
+                >
+                  <ChevronLeft size={18} />
+                  <span className="hidden sm:inline">Back</span>
+                </button>
               )}
-            </Button>
-          ) : currentStep === 8 ? (
-            // Step 8: Back and Confirm & Pay button
-            <div className="flex gap-4">
               <button
-                onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition"
-              >
-                Back
-              </button>
-              <Button
                 onClick={handleNext}
-                size="lg"
-                className="flex-1 flex items-center justify-center gap-2"
                 disabled={isLoading}
+                className={`btn-primary shadow-glow disabled:opacity-60 ${currentStep === 1 ? 'flex-1 sm:flex-none sm:px-10' : 'flex-1 sm:flex-none sm:px-8'}`}
               >
                 {isLoading ? (
                   <>
                     <Spinner />
-                    Processing...
+                    Processing…
+                  </>
+                ) : currentStep === 8 ? (
+                  <>
+                    Confirm &amp; pay
+                    <CheckCircle size={18} />
                   </>
                 ) : (
                   <>
-                    Confirm & Pay <CheckCircle size={20} />
+                    Continue
+                    <ChevronRight size={18} />
                   </>
                 )}
-              </Button>
-            </div>
-          ) : (
-            // Other steps: Back and Continue buttons
-            <div className="flex gap-4">
-              <button
-                onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                className="flex-1 py-3 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition"
-              >
-                Back
               </button>
-              <Button
-                onClick={handleNext}
-                size="lg"
-                className="flex-1 flex items-center justify-center gap-2"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Spinner />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    Continue <ChevronRight size={20} />
-                  </>
-                )}
-              </Button>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Express Delivery Warning Modal */}
         {showExpressWarning && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="surface-card w-full max-w-md p-6 sm:p-7 animate-slide-up">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-dark flex items-center gap-2"><Zap size={24} className="text-orange-500" /> Express Delivery</h3>
-                <button onClick={() => setShowExpressWarning(false)} className="text-gray hover:text-dark">
+                <button onClick={() => setShowExpressWarning(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray hover:bg-light hover:text-dark transition">
                   <X size={24} />
                 </button>
               </div>
@@ -2294,7 +2596,7 @@ export default function BookingHybrid() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowExpressWarning(false)}
-                  className="flex-1 py-2 border-2 border-gray rounded-lg font-semibold text-dark hover:bg-light transition"
+                  className="btn-outline flex-1"
                 >
                   Back
                 </button>

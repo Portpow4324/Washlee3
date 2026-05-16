@@ -73,7 +73,6 @@ export default function AdminPayoutsPage() {
       const data = await response.json()
       setPayouts(data.payouts || [])
     } catch (err) {
-      console.error('Error fetching payouts:', err)
       setError(err instanceof Error ? err.message : 'Could not load payouts.')
     } finally {
       setLoading(false)
@@ -102,7 +101,6 @@ export default function AdminPayoutsPage() {
         setError(data.error || 'Could not approve payout.')
       }
     } catch (err) {
-      console.error('Error approving payout:', err)
       setError(err instanceof Error ? err.message : 'Could not approve payout.')
     } finally {
       setProcessingId(null)
@@ -137,7 +135,6 @@ export default function AdminPayoutsPage() {
         setError(data.error || 'Could not mark payout as complete.')
       }
     } catch (err) {
-      console.error('Error completing payout:', err)
       setError(err instanceof Error ? err.message : 'Could not complete payout.')
     } finally {
       setProcessingId(null)
@@ -170,7 +167,6 @@ export default function AdminPayoutsPage() {
         setError(data.error || 'Could not reject payout.')
       }
     } catch (err) {
-      console.error('Error rejecting payout:', err)
       setError(err instanceof Error ? err.message : 'Could not reject payout.')
     } finally {
       setProcessingId(null)

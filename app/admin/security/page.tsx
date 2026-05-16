@@ -127,7 +127,7 @@ export default function AdminSecurityDashboard() {
       setStats(getErrorStats())
       setLoading(false)
     } catch (error) {
-      console.error('Error loading errors:', error)
+      setScanMessage(error instanceof Error ? error.message : 'Could not load error logs.')
       setLoading(false)
     }
   }, [filter, searchQuery])

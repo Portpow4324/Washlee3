@@ -4,6 +4,8 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Link from 'next/link'
 import { Shield, Users, Zap, CheckCircle, ArrowRight, AlertCircle } from 'lucide-react'
+import PhotoSlot from '@/components/marketing/PhotoSlot'
+import Reveal from '@/components/marketing/Reveal'
 
 const trust = [
   {
@@ -65,35 +67,89 @@ export default function ProtectionPlanPage() {
     <>
       <Header />
 
-      <section className="bg-soft-hero">
-        <div className="container-page py-14 sm:py-24">
-          <div className="max-w-2xl">
-            <span className="pill mb-4">
-              <Shield size={14} /> Damage protection on every order
-            </span>
-            <h1 className="h1 text-dark text-balance mb-4">You&rsquo;re covered.</h1>
-            <p className="text-lg text-gray leading-relaxed">
-              Every Washlee order includes basic damage protection. Need a higher cap for delicates or business attire? Pick Premium or Premium+ at checkout — that&rsquo;s it.
-            </p>
+      <section className="relative overflow-hidden bg-soft-hero">
+        <div aria-hidden className="pointer-events-none absolute -top-20 -left-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl animate-blob" />
+        <div aria-hidden className="pointer-events-none absolute top-1/3 right-0 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-blob" style={{ animationDelay: '2s' }} />
+
+        <div className="relative container-page py-14 sm:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-7 animate-slide-up">
+              <span className="pill mb-4">
+                <Shield size={14} /> Damage protection on every order
+              </span>
+              <h1 className="h1 text-dark text-balance mb-4">You&rsquo;re covered.</h1>
+              <p className="text-lg text-gray leading-relaxed mb-6 max-w-xl">
+                Every Washlee order includes basic damage protection. Need a higher cap for delicates or business attire? Pick Premium or Premium+ at checkout — that&rsquo;s it.
+              </p>
+              <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-dark mb-8">
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Basic included</li>
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Per-item &amp; per-order caps</li>
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Vetted Pros</li>
+              </ul>
+              <Link href="/booking" className="btn-primary shadow-glow">
+                Book a pickup
+                <ArrowRight size={16} />
+              </Link>
+            </div>
+
+            <div className="lg:col-span-5">
+              <Reveal as="fade" delay={0.05}>
+                <PhotoSlot
+                  src="/marketing/protection-handoff.jpg"
+                  alt="Pro carefully handing back a wrapped Washlee order"
+                  aspect="aspect-[4/5]"
+                  placeholderHint="Pro carefully handing back a wrapped order at the door."
+                  priority
+                  caption="Wrapped, returned, and protected · every order"
+                />
+              </Reveal>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="container-page py-14">
         <div className="text-center mb-10">
-          <h2 className="section-title">Why you can trust us with your wardrobe</h2>
-          <p className="section-subtitle">Vetted Pros, transparent process, real cover.</p>
+          <Reveal>
+            <h2 className="section-title">Why you can trust us with your wardrobe</h2>
+            <p className="section-subtitle">Vetted Pros, transparent process, real cover.</p>
+          </Reveal>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {trust.map((t) => (
-            <div key={t.title} className="surface-card p-6">
-              <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center mb-4">
-                <t.icon size={18} className="text-primary-deep" />
+          {trust.map((t, i) => (
+            <Reveal key={t.title} delay={i * 0.05}>
+              <div className="surface-card card-hover p-6 h-full">
+                <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center mb-4">
+                  <t.icon size={18} className="text-primary-deep" />
+                </div>
+                <h3 className="font-bold text-dark mb-1.5">{t.title}</h3>
+                <p className="text-sm text-gray leading-relaxed">{t.body}</p>
               </div>
-              <h3 className="font-bold text-dark mb-1.5">{t.title}</h3>
-              <p className="text-sm text-gray leading-relaxed">{t.body}</p>
-            </div>
+            </Reveal>
           ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-10 max-w-5xl mx-auto">
+          <Reveal>
+            <PhotoSlot
+              src="/marketing/protection-care.jpg"
+              alt="Folded delicates with a care label visible"
+              aspect="aspect-[4/3]"
+              placeholderHint="Folded delicates with a care label visible, soft natural light."
+              caption="Care notes reviewed before washing"
+              tone="mint"
+            />
+          </Reveal>
+          <Reveal delay={0.05}>
+            <PhotoSlot
+              src="/marketing/folded-laundry.jpg"
+              alt="Freshly folded clean laundry"
+              aspect="aspect-[4/3]"
+              placeholderHint="Freshly folded clean laundry, light timber surface."
+              caption="Quality-checked before it&apos;s packaged"
+              tone="warm"
+            />
+          </Reveal>
         </div>
       </section>
 

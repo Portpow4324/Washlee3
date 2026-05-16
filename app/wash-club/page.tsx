@@ -1,30 +1,31 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import Button from '@/components/Button'
-import Card from '@/components/Card'
 import Link from 'next/link'
 import {
   Gift,
-  TrendingUp,
-  Zap,
   Award,
   Crown,
   CheckCircle,
   ChevronRight,
   Star,
   Sparkles,
-  Target,
   Lock,
   Unlock,
   DollarSign,
-  Percent,
-  AlertCircle,
+  ArrowRight,
+  Truck,
+  Calendar,
+  Wallet,
 } from 'lucide-react'
+import PhoneMockup from '@/components/marketing/PhoneMockup'
+import { RewardsAppScreen } from '@/components/marketing/AppScreens'
+import PhotoSlot from '@/components/marketing/PhotoSlot'
+import Reveal from '@/components/marketing/Reveal'
 
 interface TierData {
   name: string
@@ -39,7 +40,6 @@ interface TierData {
 
 export default function WashClubPage() {
   const [selectedTier, setSelectedTier] = useState('silver')
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const { user, loading } = useAuth()
   const router = useRouter()
 
@@ -63,13 +63,13 @@ export default function WashClubPage() {
       pointsPerDollar: 1,
       rewardRate: '5%',
       minSpend: 0,
-      icon: <Award size={32} className="text-amber-700" />,
+      icon: <Award size={28} className="text-amber-700" />,
       benefits: [
         '1 point per $1 spent',
         '5% reward rate on points',
         'Access to exclusive deals',
         'Birthday bonus points',
-        'Free tier - no membership fee',
+        'Free tier — no membership fee',
       ],
     },
     silver: {
@@ -79,50 +79,50 @@ export default function WashClubPage() {
       pointsPerDollar: 1,
       rewardRate: '7.5%',
       minSpend: 500,
-      icon: <Star size={32} className="text-gray-500" />,
+      icon: <Star size={28} className="text-gray-500" />,
       benefits: [
         '1 point per $1 spent',
         '7.5% reward rate on points',
-        '10% discount on express delivery',
+        '10% discount on Express delivery',
         'Priority customer support',
         'Monthly bonus points',
-        'Free tier - automatic at $500 spend',
+        'Free tier — automatic at $500 spend',
       ],
     },
     gold: {
       name: 'Gold',
-      color: 'text-yellow-500',
+      color: 'text-yellow-600',
       bgColor: 'bg-yellow-50 border-yellow-300',
       pointsPerDollar: 1,
       rewardRate: '10%',
       minSpend: 1500,
-      icon: <Crown size={32} className="text-yellow-500" />,
+      icon: <Crown size={28} className="text-yellow-600" />,
       benefits: [
         '1 point per $1 spent',
         '10% reward rate on points',
-        '15% discount on express delivery',
+        '15% discount on Express delivery',
         'Free priority support',
         'Exclusive Gold member sales',
         'Double points on special days',
-        'Free tier - automatic at $1,500 spend',
+        'Free tier — automatic at $1,500 spend',
       ],
     },
     platinum: {
       name: 'Platinum',
-      color: 'text-primary',
-      bgColor: 'bg-primary/5 border-primary',
+      color: 'text-primary-deep',
+      bgColor: 'bg-mint border-primary',
       pointsPerDollar: 1.25,
       rewardRate: '12.5%',
       minSpend: 4000,
-      icon: <Sparkles size={32} className="text-primary" />,
+      icon: <Sparkles size={28} className="text-primary-deep" />,
       benefits: [
         '1.25 points per $1 spent',
         '12.5% reward rate on points',
-        '20% discount on express delivery',
-        '24/7 dedicated support line',
+        '20% discount on Express delivery',
+        'Dedicated support line',
         'Exclusive Platinum member events',
         'Triple points on special days',
-        'Free premium services',
+        'Premium services included',
         'Birthday gift worth 500 points',
       ],
     },
@@ -131,334 +131,367 @@ export default function WashClubPage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-gradient-to-b from-light via-white to-light">
-        {/* Premium Hero Section */}
-        <section className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary via-accent to-primary opacity-10" />
-          <div className="max-w-6xl mx-auto px-4 py-24 relative z-10">
-            <div className="text-center mb-8">
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <Sparkles size={48} className="text-primary animate-pulse" />
-                <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  Wash Club Rewards
-                </h1>
-              </div>
-              <p className="text-xl text-gray max-w-2xl mx-auto mb-3">
+
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-soft-hero">
+        <div aria-hidden className="pointer-events-none absolute -top-20 -left-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl animate-blob" />
+        <div aria-hidden className="pointer-events-none absolute top-1/3 right-0 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-blob" style={{ animationDelay: '2s' }} />
+
+        <div className="relative container-page py-14 sm:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-7 animate-slide-up">
+              <span className="pill mb-4">
+                <Gift size={14} /> Wash Club rewards
+              </span>
+              <h1 className="h1 text-dark text-balance mb-4">
+                Free loyalty.
+                <br />
+                <span className="text-primary">Real perks.</span>
+              </h1>
+              <p className="text-lg text-gray leading-relaxed mb-8 max-w-xl">
                 Earn 1 point for every dollar spent. Free to join, free forever — no membership fee, ever.
               </p>
-              <span className="pill"><Sparkles size={14} /> Pay-per-order. Wash Club just rewards you.</span>
+
+              <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-dark mb-8">
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> No subscription</li>
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Earn on every order</li>
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Tier up automatically</li>
+              </ul>
+
+              {!loading && (
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {user ? (
+                    <button onClick={handleJoinClick} className="btn-primary shadow-glow">
+                      <Sparkles size={16} /> Start earning now
+                      <ArrowRight size={16} />
+                    </button>
+                  ) : (
+                    <>
+                      <button onClick={handleJoinClick} className="btn-primary shadow-glow">
+                        <Unlock size={16} /> Join Wash Club
+                        <ArrowRight size={16} />
+                      </button>
+                      <button onClick={handleSignIn} className="btn-outline">
+                        <Lock size={16} /> Sign in
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Auth CTA - Prominent */}
-            {!loading && (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-                {user ? (
-                  <>
-                    <Button 
-                      onClick={handleJoinClick}
-                      className="bg-primary text-white hover:bg-primary/90 text-lg px-8 py-3"
-                    >
-                      <Sparkles size={20} />
-                      Start Earning Now
-                    </Button>
-                    <p className="text-sm text-gray self-center">Welcome back, {user.email?.split('@')[0]}!</p>
-                  </>
-                ) : (
-                  <>
-                    <Button 
-                      onClick={handleJoinClick}
-                      className="bg-primary text-white hover:bg-primary/90 text-lg px-8 py-3"
-                    >
-                      <Unlock size={20} />
-                      Sign Up for Rewards
-                    </Button>
-                    <Button 
-                      onClick={handleSignIn}
-                      variant="outline"
-                      className="border-2 border-primary text-primary hover:bg-primary/5 text-lg px-8 py-3"
-                    >
-                      <Lock size={20} />
-                      Sign In
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Points System Explanation */}
-        <section className="py-16 bg-white">
-          <div className="max-w-6xl mx-auto px-4">
-            <h2 className="text-3xl font-bold text-dark mb-12 text-center">How Points Work</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="text-center">
-                <div className="bg-gradient-to-br from-primary to-accent p-8 rounded-lg text-white mb-4 inline-block w-24 h-24 flex items-center justify-center">
-                  <DollarSign size={48} />
+            <div className="lg:col-span-5 relative">
+              <Reveal as="fade" delay={0.05}>
+                <PhotoSlot
+                  src="/marketing/wash-club-rewards.jpg"
+                  alt="Folded laundry next to a phone showing Wash Club rewards"
+                  aspect="aspect-[4/5]"
+                  placeholderHint="Folded laundry next to a phone showing rewards in a bright Melbourne home."
+                  priority
+                  caption="Earn on every order · redeem any time"
+                />
+              </Reveal>
+              {/* Floating phone mockup */}
+              <div className="pointer-events-none absolute -right-4 sm:-right-6 lg:-right-8 -bottom-6 sm:-bottom-8 w-[150px] sm:w-[180px] animate-float-slow">
+                <div className="rotate-[-5deg]">
+                  <PhoneMockup tone="dark" label="Wash Club rewards screen">
+                    <RewardsAppScreen />
+                  </PhoneMockup>
                 </div>
-                <h3 className="text-2xl font-bold text-dark mb-2">Spend $1</h3>
-                <p className="text-gray">Every dollar you spend on any wash service earns you points.</p>
-              </div>
-
-              <div className="text-center">
-                <div className="bg-gradient-to-br from-accent to-primary p-8 rounded-lg text-white mb-4 inline-block w-24 h-24 flex items-center justify-center">
-                  <Star size={48} />
-                </div>
-                <h3 className="text-2xl font-bold text-dark mb-2">Earn 1+ Points</h3>
-                <p className="text-gray">Get 1 point minimum (up to 1.25 at Platinum level). Tier up to earn more!</p>
-              </div>
-
-              <div className="text-center">
-                <div className="bg-gradient-to-br from-yellow-400 to-primary p-8 rounded-lg text-white mb-4 inline-block w-24 h-24 flex items-center justify-center">
-                  <Gift size={48} />
-                </div>
-                <h3 className="text-2xl font-bold text-dark mb-2">Redeem Rewards</h3>
-                <p className="text-gray">Convert points to discounts at checkout or save them for bigger rewards.</p>
               </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Tier Comparison - Premium Cards */}
-        <section className="py-20">
-          <div className="max-w-6xl mx-auto px-4">
-            <h2 className="text-4xl font-bold text-dark mb-4 text-center">Choose Your Tier</h2>
-            <p className="text-center text-gray text-lg mb-16 max-w-2xl mx-auto">
-              Automatically advance through tiers as you spend more. The more you wash, the more you earn.
-            </p>
+      {/* Points System Explanation */}
+      <section className="bg-white">
+        <div className="section">
+          <div className="text-center mb-10">
+            <Reveal>
+              <h2 className="section-title">How points work</h2>
+              <p className="section-subtitle">Three steps. No spreadsheets.</p>
+            </Reveal>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { icon: DollarSign, title: 'Spend $1', body: 'Every dollar you spend on a Washlee order earns points automatically.' },
+              { icon: Star, title: 'Earn points', body: 'Get 1 point per dollar minimum (1.25 at Platinum). Tier up to earn faster.' },
+              { icon: Gift, title: 'Redeem rewards', body: 'Use points at checkout — discounts, free Express, or save for bigger perks.' },
+            ].map((s, i) => (
+              <Reveal key={s.title} delay={i * 0.06}>
+                <div className="surface-card card-hover p-6 sm:p-7 h-full">
+                  <div className="w-12 h-12 rounded-2xl bg-mint flex items-center justify-center mb-4">
+                    <s.icon size={22} className="text-primary-deep" />
+                  </div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-gray-soft mb-1">Step {i + 1}</p>
+                  <h3 className="text-xl font-bold text-dark mb-2">{s.title}</h3>
+                  <p className="text-sm text-gray leading-relaxed">{s.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* Tier Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-              {Object.entries(tiers).map(([key, tier]) => {
-                const isSelected = selectedTier === key
+      {/* Tier Comparison */}
+      <section className="bg-soft-mint">
+        <div className="section">
+          <div className="text-center mb-10">
+            <Reveal>
+              <h2 className="section-title">Choose your tier</h2>
+              <p className="section-subtitle">Tiers unlock automatically as you wash more. No fees at any tier.</p>
+            </Reveal>
+          </div>
 
-                return (
-                  <div
-                    key={key}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+            {Object.entries(tiers).map(([key, tier], i) => {
+              const isSelected = selectedTier === key
+              return (
+                <Reveal key={key} delay={i * 0.05}>
+                  <button
+                    type="button"
                     onClick={() => setSelectedTier(key)}
-                    className={`cursor-pointer transition-all duration-300 rounded-2xl border-2 overflow-hidden ${
-                      isSelected
-                        ? `${tier.bgColor} border-2 transform scale-105 shadow-lg`
-                        : `border-gray/10 hover:border-gray/20 bg-white`
+                    className={`surface-card overflow-hidden text-left transition-all duration-300 w-full h-full ${
+                      isSelected ? 'border-primary shadow-glow scale-[1.02]' : 'card-hover'
                     }`}
                   >
-                    {/* Tier Header */}
-                    <div className={`${tier.bgColor} p-6`}>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className={`text-2xl font-bold ${tier.color}`}>{tier.name}</h3>
-                        <div className={`${tier.color}`}>{tier.icon}</div>
+                    <div className={`p-5 ${tier.bgColor} border-b border-line`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className={`text-xl font-bold ${tier.color}`}>{tier.name}</h3>
+                        <div>{tier.icon}</div>
                       </div>
                       {key === 'platinum' && (
-                        <div className="bg-gradient-to-r from-primary to-accent text-white px-3 py-1 rounded-full text-xs font-bold inline-block">
-                          Most Rewarding ⭐
-                        </div>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold text-white">
+                          Most rewarding
+                        </span>
                       )}
                     </div>
-
-                    {/* Tier Body */}
-                    <div className="p-6">
-                      {/* Points Rate */}
-                      <div className="mb-6">
-                        <div className="flex items-baseline gap-2 mb-2">
-                          <span className={`text-3xl font-bold ${tier.color}`}>
-                            {tier.pointsPerDollar}
-                          </span>
-                          <span className="text-gray text-sm">pts per $1</span>
+                    <div className="p-5">
+                      <div className="mb-4">
+                        <div className="flex items-baseline gap-1.5 mb-1">
+                          <span className={`text-2xl font-bold ${tier.color}`}>{tier.pointsPerDollar}</span>
+                          <span className="text-gray text-xs">pts per $1</span>
                         </div>
-                        <div className={`text-sm ${tier.color} font-semibold`}>
-                          {tier.rewardRate} reward value
-                        </div>
+                        <p className={`text-xs font-semibold ${tier.color}`}>{tier.rewardRate} reward value</p>
                       </div>
-
-                      {/* Spend Requirement */}
                       {tier.minSpend > 0 ? (
-                        <div className="bg-light rounded-lg p-3 mb-6">
-                          <p className="text-xs text-gray mb-1">Unlock at annual spend:</p>
-                          <p className={`text-lg font-bold ${tier.color}`}>${tier.minSpend.toLocaleString()}</p>
+                        <div className="rounded-xl bg-light p-3 mb-4">
+                          <p className="text-[10px] uppercase tracking-wider text-gray-soft mb-0.5">Unlock at annual spend</p>
+                          <p className={`text-base font-bold ${tier.color}`}>${tier.minSpend.toLocaleString()}</p>
                         </div>
                       ) : (
-                        <div className="bg-light rounded-lg p-3 mb-6">
-                          <p className={`text-lg font-bold ${tier.color}`}>🎁 Entry Level - Start Here</p>
+                        <div className="rounded-xl bg-light p-3 mb-4">
+                          <p className={`text-sm font-bold ${tier.color}`}>Entry tier — start here</p>
                         </div>
                       )}
-
-                      {/* Benefits Preview */}
-                      <div className="space-y-2 mb-6">
-                        {tier.benefits.slice(0, 3).map((benefit, idx) => (
-                          <div key={idx} className="flex items-start gap-2 text-sm">
-                            <CheckCircle size={16} className={`${tier.color} flex-shrink-0 mt-0.5`} />
-                            <span className="text-dark">{benefit}</span>
-                          </div>
+                      <ul className="space-y-1.5 mb-5">
+                        {tier.benefits.slice(0, 3).map((benefit) => (
+                          <li key={benefit} className="flex items-start gap-2 text-xs text-dark">
+                            <CheckCircle size={13} className={`${tier.color} flex-shrink-0 mt-0.5`} />
+                            <span>{benefit}</span>
+                          </li>
                         ))}
                         {tier.benefits.length > 3 && (
-                          <p className="text-xs text-gray/60 ml-6 italic">+{tier.benefits.length - 3} more benefits</p>
+                          <li className="text-[11px] text-gray-soft italic ml-5">+{tier.benefits.length - 3} more</li>
                         )}
-                      </div>
-
-                      {/* CTA Button */}
-                      <Button 
-                        onClick={handleJoinClick}
-                        variant={isSelected ? 'primary' : 'outline'}
-                        className="w-full"
-                      >
-                        {user ? `Apply ${tier.name}` : 'Sign Up'}
-                        <ChevronRight size={16} />
-                      </Button>
+                      </ul>
+                      <span className={`inline-flex items-center gap-1 text-xs font-bold ${tier.color}`}>
+                        See all benefits <ChevronRight size={12} />
+                      </span>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  </button>
+                </Reveal>
+              )
+            })}
+          </div>
 
-            {/* Selected Tier Full Details */}
-            <div className="bg-gradient-to-r from-light to-white rounded-2xl border-2 border-gray/10 p-8 md:p-12">
-              <div className="flex items-center gap-4 mb-8">
-                <div className={`p-4 rounded-lg ${tiers[selectedTier].bgColor}`}>
+          {/* Selected tier full details */}
+          <Reveal as="fade">
+            <div className="surface-card p-6 sm:p-10 bg-white">
+              <div className="flex items-center gap-4 mb-6">
+                <div className={`p-3 rounded-2xl ${tiers[selectedTier].bgColor}`}>
                   {tiers[selectedTier].icon}
                 </div>
                 <div>
-                  <h3 className={`text-3xl font-bold ${tiers[selectedTier].color} mb-1`}>
-                    {tiers[selectedTier].name} Tier
+                  <h3 className={`text-2xl sm:text-3xl font-bold ${tiers[selectedTier].color} mb-0.5`}>
+                    {tiers[selectedTier].name} tier
                   </h3>
-                  <p className="text-gray">All the benefits you get</p>
+                  <p className="text-sm text-gray">All benefits at this level</p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {tiers[selectedTier].benefits.map((benefit, idx) => (
-                  <div key={idx} className="flex items-start gap-3 bg-white p-4 rounded-lg border border-gray/10">
-                    <CheckCircle size={20} className={`${tiers[selectedTier].color} flex-shrink-0 mt-0.5`} />
-                    <span className="text-dark font-medium">{benefit}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {tiers[selectedTier].benefits.map((benefit) => (
+                  <div key={benefit} className="flex items-start gap-3 bg-light rounded-xl p-3">
+                    <CheckCircle size={18} className={`${tiers[selectedTier].color} flex-shrink-0 mt-0.5`} />
+                    <span className="text-sm text-dark font-medium">{benefit}</span>
                   </div>
                 ))}
               </div>
             </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Lifestyle band — photo + perks */}
+      <section className="bg-white">
+        <div className="section">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-6">
+              <Reveal>
+                <PhotoSlot
+                  src="/marketing/wash-club-tier.jpg"
+                  alt="Folded laundry next to a coffee in a calm Melbourne home"
+                  aspect="aspect-[4/3]"
+                  placeholderHint="Fresh laundry beside a coffee with the Washlee app open."
+                  caption="Real perks · pay-per-order · zero membership fee"
+                />
+              </Reveal>
+            </div>
+            <div className="lg:col-span-6">
+              <Reveal as="fade" delay={0.05}>
+                <h2 className="h2 text-dark mb-3">Loyalty without the catch</h2>
+                <p className="text-gray text-base sm:text-lg leading-relaxed mb-6 max-w-xl">
+                  Most loyalty programs gate the good stuff behind a monthly fee. Wash Club doesn&rsquo;t. The more you wash, the more you earn — that&rsquo;s the whole deal.
+                </p>
+                <ul className="space-y-3 max-w-md">
+                  {[
+                    { icon: Wallet, title: 'No membership fee — ever', body: 'Bronze starts free. Silver, Gold, Platinum unlock by spend, not by payment.' },
+                    { icon: Calendar, title: 'Birthday + monthly bonuses', body: 'Earn extra points around your birthday and on featured wash days.' },
+                    { icon: Truck, title: 'Express discounts', body: 'Up to 20% off Express delivery once you reach Platinum.' },
+                  ].map((line, i) => (
+                    <Reveal key={line.title} delay={0.1 + i * 0.05}>
+                      <li className="flex items-start gap-3 surface-card card-hover p-4">
+                        <div className="w-9 h-9 rounded-lg bg-mint flex items-center justify-center flex-shrink-0">
+                          <line.icon size={16} className="text-primary-deep" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-dark text-sm">{line.title}</p>
+                          <p className="text-xs text-gray leading-relaxed mt-0.5">{line.body}</p>
+                        </div>
+                      </li>
+                    </Reveal>
+                  ))}
+                </ul>
+              </Reveal>
+            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Redemption Examples */}
-        <section className="py-20 bg-white">
-          <div className="max-w-6xl mx-auto px-4">
-            <h2 className="text-4xl font-bold text-dark mb-16 text-center">Turn Points Into Rewards</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                {
-                  points: 100,
-                  value: '$5.00',
-                  reward: 'Free Express Delivery',
-                  icon: '🚚',
-                },
-                {
-                  points: 250,
-                  value: '$12.50',
-                  reward: 'Premium Stain Treatment',
-                  icon: '✨',
-                },
-                {
-                  points: 500,
-                  value: '$25.00',
-                  reward: 'Complete Order Discount',
-                  icon: '🎁',
-                },
-              ].map((item, idx) => (
-                <Card key={idx} className="text-center p-8 bg-gradient-to-b from-light to-white">
-                  <div className="text-5xl mb-4">{item.icon}</div>
-                  <div className="mb-4">
-                    <div className="text-4xl font-bold text-primary mb-2">{item.points} pts</div>
-                    <div className="text-2xl font-bold text-accent">{item.value}</div>
+      {/* Redemption */}
+      <section className="bg-soft-mint">
+        <div className="section">
+          <div className="text-center mb-10">
+            <Reveal>
+              <h2 className="section-title">Turn points into rewards</h2>
+              <p className="section-subtitle">A few ways to spend what you&rsquo;ve earned.</p>
+            </Reveal>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { points: 100, value: '$5.00', reward: 'Free Express upgrade', icon: Truck },
+              { points: 250, value: '$12.50', reward: 'Premium care add-on', icon: Sparkles },
+              { points: 500, value: '$25.00', reward: 'Discount on any order', icon: Gift },
+            ].map((item, i) => (
+              <Reveal key={item.reward} delay={i * 0.06}>
+                <div className="surface-card card-hover p-6 sm:p-7 text-center h-full">
+                  <div className="w-12 h-12 rounded-2xl bg-mint flex items-center justify-center mx-auto mb-4">
+                    <item.icon size={22} className="text-primary-deep" />
                   </div>
-                  <p className="text-dark font-semibold mb-4">{item.reward}</p>
-                  <Button variant="outline" className="w-full">
-                    Learn More
-                  </Button>
-                </Card>
-              ))}
-            </div>
+                  <p className="text-3xl font-bold text-primary-deep">{item.points} <span className="text-sm font-medium text-gray">pts</span></p>
+                  <p className="mt-1 text-lg font-bold text-dark">{item.value}</p>
+                  <p className="mt-3 text-sm text-gray">{item.reward}</p>
+                </div>
+              </Reveal>
+            ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* FAQ */}
-        <section className="py-20">
-          <div className="max-w-4xl mx-auto px-4">
-            <h2 className="text-4xl font-bold text-dark mb-16 text-center">Questions?</h2>
-
-            <div className="space-y-4">
+      {/* FAQ */}
+      <section className="bg-white">
+        <div className="section">
+          <div className="container-narrow">
+            <div className="text-center mb-10">
+              <Reveal>
+                <h2 className="section-title">Questions</h2>
+                <p className="section-subtitle">The basics, answered.</p>
+              </Reveal>
+            </div>
+            <div className="space-y-3">
               {[
-                {
-                  q: '💰 How do points really work?',
-                  a: 'Simple: Spend $1, earn 1 point. Higher tiers earn more points per dollar. At Platinum, earn 1.25 points per dollar.',
-                },
-                {
-                  q: '📈 How do I advance tiers?',
-                  a: 'Tier advancement is automatic based on annual spending. Bronze is free to join. Silver requires $500, Gold $1,500, and Platinum $4,000 annual spend.',
-                },
-                {
-                  q: '🎁 When can I redeem my points?',
-                  a: 'Redeem anytime at checkout! Points are worth 5¢ each at minimum. Use them for discounts, free services, or exclusive rewards.',
-                },
-                {
-                  q: '⏰ Do points expire?',
-                  a: "Points remain active for 24 months. With regular orders, you'll always have rewards available.",
-                },
-                {
-                  q: '🔄 Can I combine points with promotions?',
-                  a: 'Absolutely! Use your points alongside promotional codes for maximum savings on your laundry orders.',
-                },
-                {
-                  q: '👥 Can I share points with family?',
-                  a: 'Each Wash Club membership is personal to your account. Sign up all your family members to maximize household rewards!',
-                },
-              ].map((item, idx) => (
-                <Card key={idx} className="p-6 hover:shadow-md transition-shadow">
-                  <h4 className="font-bold text-dark text-lg mb-3">{item.q}</h4>
-                  <p className="text-gray">{item.a}</p>
-                </Card>
+                { q: 'How do points work?', a: 'Spend $1, earn 1 point. Higher tiers earn more per dollar — at Platinum, you earn 1.25 points per dollar.' },
+                { q: 'How do I advance tiers?', a: 'Tier advancement is automatic, based on annual spend. Bronze is free. Silver unlocks at $500, Gold at $1,500, Platinum at $4,000.' },
+                { q: 'When can I redeem points?', a: 'Any time at checkout. Use them for discounts, free Express upgrades, or larger perks.' },
+                { q: 'Do points expire?', a: 'Points stay active for 24 months. Most regular customers redeem long before then.' },
+                { q: 'Can I combine points with promos?', a: 'Yes — you can stack point redemptions with promo codes for maximum savings.' },
+                { q: 'Is Wash Club a subscription?', a: 'No. Wash Club is free loyalty only. There&rsquo;s no monthly or annual membership fee at any tier.' },
+              ].map((item) => (
+                <Reveal key={item.q}>
+                  <details className="group surface-card card-hover overflow-hidden">
+                    <summary className="flex items-center justify-between cursor-pointer list-none p-5 sm:p-6">
+                      <span className="font-semibold text-dark pr-4">{item.q}</span>
+                      <span className="text-primary-deep transition group-open:rotate-180 text-lg" aria-hidden>⌄</span>
+                    </summary>
+                    <p className="px-5 pb-5 sm:px-6 sm:pb-6 -mt-1 text-sm text-gray leading-relaxed">{item.a}</p>
+                  </details>
+                </Reveal>
               ))}
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Final CTA Section */}
-        <section className="relative overflow-hidden py-20">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary via-accent to-primary opacity-5" />
-          <div className="max-w-4xl mx-auto px-4 relative z-10 text-center">
-            <h2 className="text-4xl md:text-5xl font-bold text-dark mb-4">
-              Start Earning Points Today
-            </h2>
-            <p className="text-xl text-gray mb-12 max-w-2xl mx-auto">
-              Join Wash Club in seconds. No fees, no catches — just rewards that grow with every wash.
-            </p>
-
-            {!loading && !user ? (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button 
-                  onClick={handleJoinClick}
-                  className="bg-primary text-white hover:bg-primary/90 text-lg px-8 py-4"
-                >
-                  <Unlock size={20} />
-                  Sign Up Now
-                </Button>
-                <Button 
-                  onClick={handleSignIn}
-                  variant="outline"
-                  className="border-2 border-dark text-dark hover:bg-dark/5 text-lg px-8 py-4"
-                >
-                  Already have an account? Sign In
-                </Button>
+      {/* Final CTA */}
+      <section className="container-page pb-16">
+        <Reveal>
+          <div className="surface-card overflow-hidden bg-gradient-to-br from-primary to-accent text-white">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-0 items-center">
+              <div className="p-8 sm:p-12 text-center md:text-left">
+                <h2 className="text-3xl sm:text-4xl font-bold mb-3">Start earning today</h2>
+                <p className="text-white/90 mb-6 max-w-md">
+                  Free to join, free forever. Use the Washlee app to track your tier, points, and perks anytime.
+                </p>
+                {!loading && !user ? (
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
+                    <button
+                      onClick={handleJoinClick}
+                      className="inline-flex items-center justify-center gap-2 bg-white text-primary-deep font-bold px-6 py-3 rounded-full hover:shadow-lg transition min-h-[48px]"
+                    >
+                      <Unlock size={16} /> Sign up free
+                    </button>
+                    <button
+                      onClick={handleSignIn}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold text-white border border-white/30 hover:bg-white/10 transition min-h-[48px]"
+                    >
+                      Sign in
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleJoinClick}
+                    className="inline-flex items-center justify-center gap-2 bg-white text-primary-deep font-bold px-6 py-3 rounded-full hover:shadow-lg transition min-h-[48px]"
+                  >
+                    <Sparkles size={16} /> Start earning
+                  </button>
+                )}
+                <p className="mt-4 text-xs text-white/75">
+                  Or just <Link href="/booking" className="underline">book a pickup</Link> — points start accruing automatically.
+                </p>
               </div>
-            ) : (
-              <Button 
-                onClick={handleJoinClick}
-                className="bg-primary text-white hover:bg-primary/90 text-lg px-8 py-4"
-              >
-                <Sparkles size={20} />
-                Start Your Wash Club Journey
-              </Button>
-            )}
+              <div className="hidden md:flex items-center justify-center p-8 lg:p-12">
+                <div className="animate-float">
+                  <PhoneMockup className="w-[230px]" tone="dark" label="Wash Club rewards screen">
+                    <RewardsAppScreen />
+                  </PhoneMockup>
+                </div>
+              </div>
+            </div>
           </div>
-        </section>
-      </main>
+        </Reveal>
+      </section>
+
       <Footer />
     </>
   )

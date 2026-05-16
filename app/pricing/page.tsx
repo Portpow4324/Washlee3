@@ -4,10 +4,12 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Link from 'next/link'
 import { useState } from 'react'
-import { ChevronDown, ShoppingBag, Zap, CheckCircle, Clock, Shield, ArrowRight } from 'lucide-react'
+import { ChevronDown, ShoppingBag, Zap, CheckCircle, Clock, Shield, ArrowRight, MapPin } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/navigation'
 import PlaceholderReviews from '@/components/marketing/PlaceholderReviews'
+import PhotoSlot from '@/components/marketing/PhotoSlot'
+import Reveal from '@/components/marketing/Reveal'
 
 const STANDARD_RATE = 7.5
 const EXPRESS_RATE = 12.5
@@ -51,16 +53,38 @@ export default function PricingPage() {
       <Header />
 
       {/* Hero */}
-      <section className="bg-soft-hero">
-        <div className="container-page py-14 sm:py-24">
-          <div className="max-w-2xl">
-            <span className="pill mb-4">
-              <CheckCircle size={14} /> Pay-per-order. No subscription.
-            </span>
-            <h1 className="h1 text-dark text-balance mb-4">Simple, per-kilo pricing.</h1>
-            <p className="text-lg text-gray leading-relaxed">
-              One rate for standard, one for Express. Free pickup and delivery, every time. The price you see is the price you pay.
-            </p>
+      <section className="relative overflow-hidden bg-soft-hero">
+        <div aria-hidden className="pointer-events-none absolute -top-20 -left-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl animate-blob" />
+        <div aria-hidden className="pointer-events-none absolute top-1/3 right-0 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-blob" style={{ animationDelay: '2s' }} />
+
+        <div className="relative container-page py-14 sm:py-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-7 animate-slide-up">
+              <span className="pill mb-4">
+                <CheckCircle size={14} /> Pay-per-order. No subscription.
+              </span>
+              <h1 className="h1 text-dark text-balance mb-4">Simple, per-kilo pricing.</h1>
+              <p className="text-lg text-gray leading-relaxed mb-6 max-w-xl">
+                One rate for standard, one for Express. Free pickup and delivery, every time. The price you see is the price you pay.
+              </p>
+              <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-dark">
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> $7.50/kg standard</li>
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> $12.50/kg Express</li>
+                <li className="inline-flex items-center gap-2"><MapPin size={16} className="text-primary" /> Greater Melbourne</li>
+              </ul>
+            </div>
+            <div className="lg:col-span-5">
+              <Reveal as="fade" delay={0.05}>
+                <PhotoSlot
+                  src="/marketing/folded-laundry.jpg"
+                  alt="Freshly folded laundry stacked in a clean Melbourne home"
+                  aspect="aspect-[4/3]"
+                  placeholderHint="Freshly folded clean laundry on a light timber table."
+                  priority
+                  caption="Standard wash &amp; fold · returned next business day"
+                />
+              </Reveal>
+            </div>
           </div>
         </div>
       </section>
@@ -95,23 +119,50 @@ export default function PricingPage() {
       {/* Bag sizes */}
       <section className="section-tight bg-white">
         <div className="text-center mb-10">
-          <h2 className="section-title">Choose a bag</h2>
-          <p className="section-subtitle">We offer two bag sizes — pick the one closest to your load.</p>
+          <Reveal>
+            <h2 className="section-title">Choose a bag</h2>
+            <p className="section-subtitle">We offer two bag sizes — pick the one closest to your load.</p>
+          </Reveal>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
-          {BAG_OPTIONS.map((b) => (
-            <div key={b.id} className="surface-card p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center">
-                  <ShoppingBag size={18} className="text-primary-deep" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl mx-auto">
+          {BAG_OPTIONS.map((b, i) => (
+            <Reveal key={b.id} delay={i * 0.06}>
+              <div className="surface-card card-hover overflow-hidden h-full">
+                <div className="grid grid-cols-3 gap-0">
+                  <div className="col-span-1 relative">
+                    {/* Visual bag scale */}
+                    <div className={`flex h-full items-end justify-center pb-3 pt-4 px-3 ${b.id === 'medium' ? 'bg-soft-mint' : 'bg-photo-fallback-warm'}`}>
+                      <div className="relative">
+                        {/* Stylised bag illustration */}
+                        <div
+                          className={`relative rounded-b-2xl rounded-t-md bg-gradient-to-b from-primary to-primary-deep shadow-md ${
+                            b.id === 'medium' ? 'h-20 w-16' : 'h-28 w-20'
+                          }`}
+                        >
+                          <div className="absolute -top-2 left-1/2 -translate-x-1/2 h-3 w-8 rounded-t-full border border-primary-deep bg-mint" />
+                          <span className="absolute inset-x-0 bottom-2 text-center text-[10px] font-bold uppercase tracking-wider text-white/90">
+                            {b.kg}kg
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-span-2 p-5 sm:p-6">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-9 h-9 rounded-xl bg-mint flex items-center justify-center">
+                        <ShoppingBag size={16} className="text-primary-deep" />
+                      </div>
+                      <h3 className="font-bold text-dark">{b.label}</h3>
+                    </div>
+                    <p className="text-sm text-gray mb-3">{b.helper}</p>
+                    <div className="text-sm text-dark space-y-1">
+                      <p>Standard <span className="float-right font-bold text-primary-deep">${(b.kg * STANDARD_RATE).toFixed(2)}</span></p>
+                      <p>Express <span className="float-right font-bold text-primary-deep">${(b.kg * EXPRESS_RATE).toFixed(2)}</span></p>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="font-bold text-dark">{b.label}</h3>
               </div>
-              <p className="text-sm text-gray mb-3">{b.helper}</p>
-              <div className="text-sm text-dark">
-                Standard: <span className="font-semibold">${(b.kg * STANDARD_RATE).toFixed(2)}</span> &nbsp;·&nbsp; Express: <span className="font-semibold">${(b.kg * EXPRESS_RATE).toFixed(2)}</span>
-              </div>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>

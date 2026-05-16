@@ -120,7 +120,7 @@ export default function RootLayout({
         />
         {googleMapsApiKey && (
           <Script
-            src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`}
+            src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&loading=async`}
             strategy="beforeInteractive"
           />
         )}

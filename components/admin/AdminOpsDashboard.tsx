@@ -115,7 +115,7 @@ const navItems: NavItem[] = [
   },
   { label: 'Orders', href: '/admin/orders', icon: ClipboardList },
   { label: 'Users', href: '/admin/users', icon: Users },
-  { label: 'Pros', href: '/admin/employee-codes', icon: WashingMachine },
+  { label: 'Employee codes', href: '/admin/employee-codes', icon: Key },
   { label: 'Applications', href: '/admin/pro-applications', icon: Briefcase },
   { label: 'Payouts', href: '/admin/payouts', icon: BadgeDollarSign },
   { label: 'Tickets', href: '/admin/support-tickets', icon: Headphones },
@@ -126,7 +126,6 @@ const navItems: NavItem[] = [
   { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { label: 'Monitoring', href: '/admin/monitoring', icon: Activity },
   { label: 'Security', href: '/admin/security', icon: ShieldCheck },
-  { label: 'Employee codes', href: '/admin/employee-codes', icon: Key },
 ]
 
 const initialState: DashboardState = {

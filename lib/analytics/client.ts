@@ -27,8 +27,7 @@ const ATTRIBUTION_PATHS = [
   '/mobile-app',
   '/pricing',
   '/contact',
-  '/corporate',
-  '/wholesale',
+  '/business',
 ]
 
 type Attribution = Partial<Record<(typeof ATTRIBUTION_PARAMS)[number], string>>

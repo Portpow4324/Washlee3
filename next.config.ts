@@ -3,6 +3,13 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   allowedDevOrigins: ['172.20.10.3'],
+  async redirects() {
+    return [
+      // "Wholesale" / "Corporate" replaced by the unified Business Laundry route.
+      { source: '/wholesale', destination: '/business', permanent: true },
+      { source: '/corporate', destination: '/business', permanent: true },
+    ]
+  },
   images: {
     remotePatterns: [
       {

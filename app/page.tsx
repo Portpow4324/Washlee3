@@ -78,11 +78,10 @@ export default function Home() {
             {/* Visual stack: photo card + floating phone mockup + estimate ribbon */}
             <div className="lg:col-span-5 relative">
               <div className="relative mx-auto w-full max-w-[460px]">
-                {/* Photo card — falls back to gradient if /marketing/hero-laundry-pickup.jpg is missing */}
+                {/* Photo card — falls back to gradient if the hero photo is missing */}
                 <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[2rem] border border-line shadow-[0_24px_60px_-20px_rgba(20,32,30,0.25)] bg-photo-fallback animate-slide-up">
-                  {/* TODO: replace with real photo at /public/marketing/hero-laundry-pickup.jpg */}
                   <Image
-                    src="/marketing/hero-laundry-pickup.jpg"
+                    src="/marketing/home-hero-realistic-laundry.png"
                     alt=""
                     fill
                     sizes="(min-width: 1024px) 460px, 100vw"

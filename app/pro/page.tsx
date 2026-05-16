@@ -14,7 +14,10 @@ import {
   Truck,
   CheckCircle,
   HelpCircle,
+  MapPin,
 } from 'lucide-react'
+import PhotoSlot from '@/components/marketing/PhotoSlot'
+import Reveal from '@/components/marketing/Reveal'
 
 const benefits = [
   {
@@ -89,8 +92,11 @@ export default function ProPage() {
       <Header />
 
       {/* Hero */}
-      <section className="bg-soft-hero">
-        <div className="container-page py-14 sm:py-24">
+      <section className="relative overflow-hidden bg-soft-hero">
+        <div aria-hidden className="pointer-events-none absolute -top-20 -left-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl animate-blob" />
+        <div aria-hidden className="pointer-events-none absolute top-1/3 right-0 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-blob" style={{ animationDelay: '2s' }} />
+
+        <div className="relative container-page py-14 sm:py-24">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             <div className="lg:col-span-7 animate-slide-up">
               <span className="pill mb-4">
@@ -105,6 +111,13 @@ export default function ProPage() {
                 Set your own schedule, accept the orders you want, and get paid weekly. You&rsquo;re an
                 independent contractor — work as much or as little as suits you.
               </p>
+
+              <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-dark mb-8">
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> $0 to join</li>
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Weekly AU bank payouts</li>
+                <li className="inline-flex items-center gap-2"><MapPin size={16} className="text-primary" /> Greater Melbourne</li>
+              </ul>
+
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
@@ -120,31 +133,36 @@ export default function ProPage() {
               </div>
             </div>
 
-            <div className="lg:col-span-5">
-              <div className="surface-card p-6 sm:p-8 bg-gradient-to-br from-mint to-white">
-                <p className="text-xs uppercase tracking-wider font-bold text-primary-deep mb-4">
-                  At a glance
-                </p>
-                <ul className="space-y-3 text-sm">
+            <div className="lg:col-span-5 relative">
+              <Reveal as="fade" delay={0.05}>
+                <PhotoSlot
+                  src="/marketing/pro-hero.jpg"
+                  alt="A Washlee Pro at a Melbourne apartment entrance with a laundry bag"
+                  aspect="aspect-[4/5]"
+                  placeholderHint="Washlee Pro at a Melbourne apartment entrance with a laundry bag, daylight."
+                  priority
+                  caption="Independent contractor · paid commission per completed order"
+                />
+              </Reveal>
+              {/* Stats card overlay */}
+              <div className="absolute -bottom-6 -left-3 sm:-left-6 lg:-left-10 w-[230px] sm:w-[260px] surface-card p-4 sm:p-5 bg-white shadow-lg ring-1 ring-line">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-primary-deep mb-2">At a glance</p>
+                <ul className="space-y-1.5 text-xs">
                   <li className="flex items-center justify-between">
                     <span className="text-gray">Pay model</span>
-                    <span className="font-bold text-dark">Commission per order</span>
+                    <span className="font-bold text-dark">Commission</span>
                   </li>
                   <li className="flex items-center justify-between">
                     <span className="text-gray">Payout</span>
-                    <span className="font-bold text-dark">Weekly, to your bank</span>
+                    <span className="font-bold text-dark">Weekly</span>
                   </li>
                   <li className="flex items-center justify-between">
                     <span className="text-gray">Schedule</span>
-                    <span className="font-bold text-dark">100% flexible</span>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <span className="text-gray">Service area</span>
-                    <span className="font-bold text-dark">Greater Melbourne</span>
+                    <span className="font-bold text-dark">Flexible</span>
                   </li>
                   <li className="flex items-center justify-between">
                     <span className="text-gray">Cost to join</span>
-                    <span className="font-bold text-dark">$0</span>
+                    <span className="font-bold text-primary-deep">$0</span>
                   </li>
                 </ul>
               </div>
@@ -193,6 +211,40 @@ export default function ProPage() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      {/* A day in the field */}
+      <section className="container-page py-14">
+        <div className="text-center mb-10">
+          <Reveal>
+            <h2 className="section-title">A typical day</h2>
+            <p className="section-subtitle">Real work, in real Melbourne suburbs.</p>
+          </Reveal>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+          {[
+            { src: '/marketing/pickup-handoff.jpg', label: 'Pickup', body: 'Arrive in your window, take the bag, mark it picked up in the Pro app.', hint: 'Pro picking up a bag at a Melbourne doorway.' },
+            { src: '/marketing/pro-driving.jpg', label: 'In transit', body: 'Drop loads at the partner facility — distance and load size shape your payout.', hint: 'Pro loading a Washlee bag into a vehicle, residential street.' },
+            { src: '/marketing/step-deliver.jpg', label: 'Delivery', body: 'Return clean folded laundry to the customer in their delivery window.', hint: 'Pro returning a folded laundry bag to a customer at the door.' },
+          ].map((item, i) => (
+            <Reveal key={item.label} delay={i * 0.06}>
+              <div className="surface-card card-hover overflow-hidden h-full">
+                <PhotoSlot
+                  src={item.src}
+                  alt={`${item.label} — Washlee Pro day in the field`}
+                  aspect="aspect-[4/3]"
+                  className="rounded-none border-0 border-b border-line"
+                  placeholderHint={item.hint}
+                  rounded="lg"
+                />
+                <div className="p-5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-primary-deep">{item.label}</p>
+                  <p className="mt-1 text-sm text-dark leading-relaxed">{item.body}</p>
+                </div>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 

@@ -82,7 +82,7 @@ export default function Header() {
   const pagesWithoutBackButton = [
     '/how-it-works',
     '/pricing',
-    '/wholesale',
+    '/business',
     '/faq',
     '/wash-club',
     '/pro',
@@ -150,13 +150,14 @@ export default function Header() {
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-4">
             <Link href="/admin" className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden flex-shrink-0 bg-white">
                 <Image
                   src="/logo-washlee.png"
                   alt="Washlee Logo"
                   width={48}
-                  height={48}
-                  className="w-full h-full object-cover"
+                  height={32}
+                  className="rounded-full object-contain"
+                  style={{ width: '48px', height: 'auto' }}
                 />
               </div>
               <span className="font-bold text-xl text-dark">Washlee Admin</span>
@@ -205,13 +206,14 @@ export default function Header() {
               </button>
             )}
             <Link href="/" className="flex items-center gap-2.5" aria-label="Washlee home">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 shadow-soft">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full overflow-hidden flex-shrink-0 shadow-soft sm:h-12 sm:w-12">
                 <Image
                   src="/logo-washlee.png"
                   alt=""
                   width={48}
-                  height={48}
-                  className="w-full h-full object-cover"
+                  height={32}
+                  className="rounded-full object-contain"
+                  style={{ width: '44px', height: 'auto' }}
                 />
               </div>
               <span className="font-bold text-lg text-dark">Washlee</span>
@@ -229,8 +231,8 @@ export default function Header() {
             <Link href="/pricing" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Pricing
             </Link>
-            <Link href="/wholesale" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
-              Wholesale
+            <Link href="/business" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
+              Business
             </Link>
             <Link href="/faq" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               FAQ
@@ -444,8 +446,8 @@ export default function Header() {
             <Link href="/pricing" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
               Pricing
             </Link>
-            <Link href="/wholesale" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
-              Wholesale
+            <Link href="/business" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
+              Business
             </Link>
             <Link href="/faq" className="block px-4 py-3 text-base text-primary hover:bg-mint rounded-full transition font-semibold">
               FAQ
@@ -595,7 +597,7 @@ export default function Header() {
             </p>
             
             <div className="bg-mint rounded-lg p-4 mb-6">
-              <p className="text-sm font-semibold text-dark mb-2">As a Pro member, you'll:</p>
+              <p className="text-sm font-semibold text-dark mb-2">As a Pro member, you&rsquo;ll:</p>
               <ul className="text-sm text-dark space-y-1">
                 <li>✓ Accept laundry pickup & delivery jobs</li>
                 <li>✓ Earn competitive rates per order</li>
@@ -654,7 +656,7 @@ export default function Header() {
                 onClick={() => setShowPendingModal(false)}
                 className="flex-1 px-4 py-3 bg-gray/20 text-dark rounded-lg hover:bg-gray/30 transition font-semibold"
               >
-                I'll Wait
+                I&rsquo;ll Wait
               </button>
               <button
                 onClick={() => {
@@ -663,7 +665,7 @@ export default function Header() {
                 }}
                 className="flex-1 px-4 py-3 bg-primary text-white rounded-lg hover:shadow-lg transition font-semibold"
               >
-                I'm Interested
+                I&rsquo;m Interested
               </button>
             </div>
           </div>

@@ -13,6 +13,8 @@ export type LocalLandingPageConfig = {
   audience: string
   highlights: string[]
   faqs: LocalLandingFaq[]
+  /** Optional override for the hero primary CTA. Defaults to the booking flow. */
+  primaryCta?: { href: string; label: string }
 }
 
 const standardFaqs: LocalLandingFaq[] = [
@@ -111,23 +113,24 @@ export const cityLandingPages: LocalLandingPageConfig[] = [
     title: 'Business laundry service in Melbourne',
     metaTitle: 'Business Laundry Service Melbourne | Washlee',
     description:
-      'Washlee helps Melbourne businesses arrange laundry pickup for towels, uniforms, team laundry and recurring operational loads.',
+      'Washlee Business Laundry: recurring pickup and delivery for Melbourne cafes, salons, gyms, offices and short-stay operators — tea towels, aprons, uniforms and towels.',
     eyebrow: 'Business laundry',
     intro:
-      'For teams and operators, Washlee can review business laundry needs and help set up the right pickup process.',
-    audience: 'Useful for studios, clinics, offices, gyms, beauty operators, and small teams with repeat laundry needs.',
+      'For Melbourne teams and venues, Washlee Business Laundry sets up recurring pickup for tea towels, aprons, uniforms, and towels — washed on a schedule and returned ready to use.',
+    audience: 'Useful for cafes, restaurants, bakeries, salons, gyms, offices, short-stay operators, and local teams with repeat laundry needs.',
     highlights: [
-      'Business inquiry path for larger loads',
-      'Clear standard and express rates as a baseline',
-      'Custom notes for handling and timing',
-      'Melbourne-first service area',
+      'Recurring pickup — weekly through to daily high volume',
+      'Quote-based business pricing, scoped to your volume',
+      'Service-area check before you commit',
+      'Customer-owned laundry, Melbourne-first service area',
     ],
+    primaryCta: { href: '/business', label: 'Explore Business Laundry' },
     faqs: [
       ...standardFaqs,
       {
-        question: 'Do businesses need to use the normal booking flow?',
+        question: 'How do businesses get started?',
         answer:
-          'Smaller business orders can start with standard booking. Larger or recurring business needs should use the business enquiry path so the team can confirm capacity first.',
+          'Use the Business Laundry page to check your area, then request a quote. Business pricing is quote-based and scoped to your item types, volume, and pickup frequency.',
       },
     ],
   },

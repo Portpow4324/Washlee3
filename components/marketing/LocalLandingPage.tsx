@@ -62,14 +62,25 @@ export default function LocalLandingPage({ page }: { page: LocalLandingPageConfi
             <h1 className="h1 text-dark text-balance mb-4">{page.title}</h1>
             <p className="text-lg text-gray leading-relaxed mb-8">{page.intro}</p>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                href={`/booking?landing_page=${page.slug}`}
-                data-analytics-label={`${page.slug}_book`}
-                className="btn-primary"
-              >
-                Book a pickup
-                <ArrowRight size={16} />
-              </Link>
+              {page.primaryCta ? (
+                <Link
+                  href={page.primaryCta.href}
+                  data-analytics-label={`${page.slug}_primary`}
+                  className="btn-primary"
+                >
+                  {page.primaryCta.label}
+                  <ArrowRight size={16} />
+                </Link>
+              ) : (
+                <Link
+                  href={`/booking?landing_page=${page.slug}`}
+                  data-analytics-label={`${page.slug}_book`}
+                  className="btn-primary"
+                >
+                  Book a pickup
+                  <ArrowRight size={16} />
+                </Link>
+              )}
               <Link href="/pricing" className="btn-outline">
                 See pricing
               </Link>

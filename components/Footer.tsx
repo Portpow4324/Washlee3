@@ -18,8 +18,9 @@ export default function Footer() {
                 src="/logo-washlee.png"
                 alt="Washlee"
                 width={48}
-                height={48}
+                height={32}
                 className="rounded-full object-cover"
+                style={{ width: '48px', height: 'auto' }}
                 priority
               />
               <span className="font-bold text-xl">Washlee</span>
@@ -64,7 +65,7 @@ export default function Footer() {
               <li><Link href="/damage-protection" className="hover:text-primary transition">Damage protection</Link></li>
               <li><Link href="/protection-plan" className="hover:text-primary transition">Protection plan</Link></li>
               <li><Link href="/sustainability" className="hover:text-primary transition">Sustainability</Link></li>
-              <li><Link href="/corporate" className="hover:text-primary transition">Corporate &amp; wholesale</Link></li>
+              <li><Link href="/business" className="hover:text-primary transition">Business laundry</Link></li>
             </ul>
           </div>
 

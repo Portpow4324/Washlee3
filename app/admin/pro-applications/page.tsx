@@ -87,6 +87,7 @@ export default function ProApplicationsPage() {
   const [employeeIdGenerated, setEmployeeIdGenerated] = useState(false)
   const [generatedEmployeeId, setGeneratedEmployeeId] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
     if (!hasAdminAccess) return
@@ -97,6 +98,7 @@ export default function ProApplicationsPage() {
   const loadApplications = async () => {
     try {
       setIsLoading(true)
+      setErrorMessage('')
       const url = statusFilter !== 'all' 
         ? `/api/admin/pro-approvals?status=${statusFilter}` 
         : '/api/admin/pro-approvals'
@@ -105,10 +107,9 @@ export default function ProApplicationsPage() {
       if (!response.ok) throw new Error('Failed to load applications')
 
       const data = await response.json()
-      console.log('[ProApplications] Loaded applications:', data)
       setApplications(data.data || [])
     } catch (error) {
-      console.error('[ProApplications] Error loading applications:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Could not load applications.')
     } finally {
       setIsLoading(false)
     }
@@ -198,8 +199,9 @@ export default function ProApplicationsPage() {
         setSelectedApp(null)
       }, 3000)
     } catch (error) {
-      console.error('[ProApplications] Error approving application:', error)
-      alert(`Failed to approve application: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      const message = `Failed to approve application: ${error instanceof Error ? error.message : 'Unknown error'}`
+      setErrorMessage(message)
+      alert(message)
     } finally {
       setActionLoading(false)
     }
@@ -245,8 +247,9 @@ export default function ProApplicationsPage() {
         setSelectedApp(null)
       }, 3000)
     } catch (error) {
-      console.error('[ProApplications] Error rejecting application:', error)
-      alert(`Failed to reject application: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      const message = `Failed to reject application: ${error instanceof Error ? error.message : 'Unknown error'}`
+      setErrorMessage(message)
+      alert(message)
     } finally {
       setActionLoading(false)
     }
@@ -315,6 +318,12 @@ export default function ProApplicationsPage() {
         {successMessage && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
             {successMessage}
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+            {errorMessage}
           </div>
         )}
 

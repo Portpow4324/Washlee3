@@ -38,6 +38,10 @@ interface CampaignFormState {
   scheduleTime: string
 }
 
+type CampaignListResponse = {
+  campaigns?: Campaign[]
+}
+
 export default function EmailCampaignsPage() {
   const { hasAdminAccess, checkingAdminAccess } = useRequireAdminAccess()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -62,6 +66,7 @@ export default function EmailCampaignsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleteSaving, setDeleteSaving] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [pageError, setPageError] = useState<string | null>(null)
 
   useEffect(() => {
     if (hasAdminAccess) {
@@ -72,20 +77,20 @@ export default function EmailCampaignsPage() {
   const fetchCampaigns = async () => {
     try {
       setLoading(true)
+      setPageError(null)
       const response = await fetch('/api/marketing/campaigns/list')
       if (!response.ok) throw new Error('Failed to load campaigns')
       
-      const data = await response.json()
-      // Convert ISO strings back to Date objects for display
-      const campaigns = data.campaigns.map((c: any) => ({
+      const data = (await response.json()) as CampaignListResponse
+      const campaigns = (data.campaigns || []).map((c) => ({
         ...c,
-        createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
-        scheduledFor: c.scheduledFor ? new Date(c.scheduledFor) : undefined,
+        createdAt: c.createdAt || new Date().toISOString(),
+        scheduledFor: c.scheduledFor || undefined,
       }))
       setCampaigns(campaigns)
       setLoading(false)
     } catch (error) {
-      console.error('Error fetching campaigns:', error)
+      setPageError(error instanceof Error ? error.message : 'Could not load campaigns.')
       setLoading(false)
     }
   }
@@ -107,7 +112,7 @@ export default function EmailCampaignsPage() {
 
       if (!response.ok) throw new Error('Failed to create campaign')
 
-      const result = await response.json()
+      await response.json().catch(() => null)
       alert(`Campaign ${campaignForm.campaignType === 'promotional' ? 'created' : 'sent'} successfully!`)
 
       // Reset form
@@ -124,8 +129,9 @@ export default function EmailCampaignsPage() {
       setShowNewCampaign(false)
       fetchCampaigns()
     } catch (error) {
-      console.error('Error:', error)
-      alert('Error creating campaign')
+      const message = error instanceof Error ? error.message : 'Error creating campaign'
+      setPageError(message)
+      alert(message)
     }
   }
 
@@ -268,6 +274,12 @@ export default function EmailCampaignsPage() {
           </Button>
         </div>
 
+        {pageError && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {pageError}
+          </div>
+        )}
+
         {/* Campaign Form */}
         {showNewCampaign && (
           <Card className="p-6 mb-8">
@@ -295,7 +307,7 @@ export default function EmailCampaignsPage() {
                     onChange={(e) =>
                       setCampaignForm({
                         ...campaignForm,
-                        campaignType: e.target.value as any,
+                        campaignType: e.target.value as Campaign['campaignType'],
                       })
                     }
                     className="w-full px-4 py-2 rounded-lg border-2 border-gray/20 focus:border-primary"

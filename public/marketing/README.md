@@ -45,6 +45,37 @@ Pro app:
 - `melbourne-service-area.jpg` — 16:9 — Melbourne street/suburb service-area photo.
 - `home-laundry-room.jpg` — 4:3 — customer-friendly home laundry room context.
 
+### Process photos (How it works, Care guide, Services)
+- `step-book.jpg` — 4:3 landscape — phone in hand booking a pickup, calm Melbourne kitchen.
+- `step-collect.jpg` — 4:3 landscape — Pro picking up reusable bag at a doorway.
+- `step-wash.jpg` — 4:3 landscape — clean facility wash/fold (no logos visible), warm light.
+- `step-deliver.jpg` — 4:3 landscape — Pro handing folded bag back at the door.
+- `care-fabric-detail.jpg` — 1:1 square — close-up of folded shirt or cashmere texture.
+- `care-detergent.jpg` — 4:3 landscape — eco detergent bottle on stack of folded laundry.
+
+### Service & rewards photos
+- `service-standard.jpg` — 1:1 square — neat folded everyday wash on a tray.
+- `service-express.jpg` — 1:1 square — phone showing Express tracking next to a packed bag.
+- `service-delicates.jpg` — 1:1 square — silk blouse or wool sweater being folded gently.
+- `wash-club-tier.jpg` — 4:3 landscape — fresh laundry next to a steaming coffee, app open.
+
+### Pro page photos
+- `pro-hero.jpg` — 3:2 landscape — Washlee Pro at apartment entrance with bag, daylight.
+- `pro-driving.jpg` — 4:3 landscape — Pro loading bag into car, neutral residential street.
+- `pro-app-jobs.png` — 9:19.5 portrait — Pro app available-jobs screen.
+
+### Protection / damage-protection photos
+- `protection-care.jpg` — 4:3 landscape — folded delicates with care label visible, soft light.
+- `protection-handoff.jpg` — 1:1 square — Pro carefully handing back wrapped order.
+
+### Business Laundry photos (/business)
+- `business-cafe.jpg` — 4:5 portrait — Melbourne café/venue counter with fresh tea towels and aprons, warm daylight.
+- `business-folded-towels.jpg` — 4:3 landscape — stacks of folded café tea towels, aprons, and bar towels, clean and bright.
+- `business-pickup-bins.jpg` — 4:3 landscape — laundry bins/bags of venue laundry at a café back door, ready for pickup.
+- `business-aprons.jpg` — 4:3 landscape — folded aprons and tea towels, clean and bright.
+- `business-handoff.jpg` — 4:3 landscape — Pro returning clean folded laundry to a Melbourne venue.
+- `business-melbourne.jpg` — 4:3 landscape — local Melbourne business street with cafés/shopfronts, daylight.
+
 ## Until the real photos arrive
 
 If a path is missing, the page renders a styled gradient block in its place — the

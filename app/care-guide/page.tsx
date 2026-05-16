@@ -12,7 +12,11 @@ import {
   Shirt,
   ArrowRight,
   Thermometer,
+  CheckCircle,
+  Leaf,
 } from 'lucide-react'
+import PhotoSlot from '@/components/marketing/PhotoSlot'
+import Reveal from '@/components/marketing/Reveal'
 
 const standards = [
   { icon: Thermometer, title: 'Right temperature', body: 'Cold for darks and delicates, warm for everyday loads, hot only when fabrics call for it.' },
@@ -75,35 +79,90 @@ export default function CareGuidePage() {
     <>
       <Header />
 
-      <section className="bg-soft-hero">
-        <div className="container-page py-14 sm:py-24">
-          <div className="max-w-2xl">
-            <span className="pill mb-4">
-              <Shirt size={14} /> Care guide
-            </span>
-            <h1 className="h1 text-dark text-balance mb-4">How we care for your clothes.</h1>
-            <p className="text-lg text-gray leading-relaxed">
-              Every fabric is different. Here&rsquo;s how Washlee Pros sort, wash, dry, and fold so your wardrobe lasts longer.
-            </p>
+      <section className="relative overflow-hidden bg-soft-hero">
+        <div aria-hidden className="pointer-events-none absolute -top-20 -left-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl animate-blob" />
+        <div aria-hidden className="pointer-events-none absolute top-1/3 right-0 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-blob" style={{ animationDelay: '2s' }} />
+
+        <div className="relative container-page py-14 sm:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-7 animate-slide-up">
+              <span className="pill mb-4">
+                <Shirt size={14} /> Care guide
+              </span>
+              <h1 className="h1 text-dark text-balance mb-4">How we care for your clothes.</h1>
+              <p className="text-lg text-gray leading-relaxed mb-6 max-w-xl">
+                Every fabric is different. Here&rsquo;s how Washlee Pros sort, wash, dry, and fold so your wardrobe lasts longer.
+              </p>
+              <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-dark mb-8">
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Eco detergent default</li>
+                <li className="inline-flex items-center gap-2"><CheckCircle size={16} className="text-primary" /> Hang dry on request</li>
+                <li className="inline-flex items-center gap-2"><Leaf size={16} className="text-primary" /> Low-temperature cycles</li>
+              </ul>
+              <Link href="/booking" className="btn-primary shadow-glow">
+                Book a pickup with care notes
+                <ArrowRight size={16} />
+              </Link>
+            </div>
+
+            <div className="lg:col-span-5">
+              <Reveal as="fade" delay={0.05}>
+                <PhotoSlot
+                  src="/marketing/care-fabric-detail.jpg"
+                  alt="Close-up of folded fabric with visible texture"
+                  aspect="aspect-[4/5]"
+                  placeholderHint="Close-up of folded shirt or cashmere texture, soft natural light."
+                  priority
+                  caption="Sorted, washed, folded — the way you asked"
+                />
+              </Reveal>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="container-page py-14">
         <div className="text-center mb-10">
-          <h2 className="section-title">Our care standards</h2>
-          <p className="section-subtitle">The defaults we apply to every order.</p>
+          <Reveal>
+            <h2 className="section-title">Our care standards</h2>
+            <p className="section-subtitle">The defaults we apply to every order.</p>
+          </Reveal>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {standards.map((s) => (
-            <div key={s.title} className="surface-card p-6">
-              <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center mb-4">
-                <s.icon size={18} className="text-primary-deep" />
+          {standards.map((s, i) => (
+            <Reveal key={s.title} delay={i * 0.05}>
+              <div className="surface-card card-hover p-6 h-full">
+                <div className="w-10 h-10 rounded-xl bg-mint flex items-center justify-center mb-4">
+                  <s.icon size={18} className="text-primary-deep" />
+                </div>
+                <h3 className="font-bold text-dark mb-1.5">{s.title}</h3>
+                <p className="text-sm text-gray leading-relaxed">{s.body}</p>
               </div>
-              <h3 className="font-bold text-dark mb-1.5">{s.title}</h3>
-              <p className="text-sm text-gray leading-relaxed">{s.body}</p>
-            </div>
+            </Reveal>
           ))}
+        </div>
+
+        {/* Detail strip — eco detergent + folded laundry */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-10 max-w-5xl mx-auto">
+          <Reveal>
+            <PhotoSlot
+              src="/marketing/care-detergent.jpg"
+              alt="Eco detergent on a stack of folded laundry"
+              aspect="aspect-[3/2]"
+              placeholderHint="Eco detergent bottle on a stack of folded laundry, bright kitchen light."
+              caption="Eco detergent · low fragrance · pH-neutral"
+              tone="mint"
+            />
+          </Reveal>
+          <Reveal delay={0.05}>
+            <PhotoSlot
+              src="/marketing/folded-laundry.jpg"
+              alt="Freshly folded laundry"
+              aspect="aspect-[3/2]"
+              placeholderHint="Freshly folded clean laundry on a light timber surface."
+              caption="Quality-checked before it&apos;s packaged"
+              tone="warm"
+            />
+          </Reveal>
         </div>
       </section>
 
