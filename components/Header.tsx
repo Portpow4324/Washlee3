@@ -243,6 +243,9 @@ export default function Header() {
             <Link href="/pro" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
               Pro
             </Link>
+            <Link href="/mobile-app" className="px-3 py-2 text-sm text-primary hover:bg-mint rounded-full transition font-semibold whitespace-nowrap">
+              Mobile app
+            </Link>
           </div>
 
           <div className="hidden md:flex items-center gap-3">
